@@ -1,319 +1,265 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CQ - Amateur Radio YSWS</title>
+  <meta name="description" content="Get funded to earn your amateur radio licence, build antennas, and talk to the ISS. A Hack Club YSWS project.">
+  <link rel="stylesheet" href="https://css.hackclub.com/theme.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="robots" content="index,follow">
-    <meta name="generator" content="GrapesJS Studio">
-    <link rel="stylesheet" href="https://css.hackclub.com/theme.css">
-    <style>
-      body {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        margin: 0;
-        color: var(--text);
-        background:
-          radial-gradient(circle at top left, rgba(51, 214, 166, 0.24), transparent 30%),
-          radial-gradient(circle at top right, rgba(51, 142, 218, 0.22), transparent 26%),
-          radial-gradient(circle at 20% 80%, rgba(255, 140, 55, 0.16), transparent 24%),
-          linear-gradient(180deg, #f9fafc 0%, #e7eff8 42%, #f9fafc 100%);
-        position: relative;
-        overflow-x: hidden;
-      }
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background-image:
-          linear-gradient(rgba(60, 72, 88, 0.08) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(60, 72, 88, 0.08) 1px, transparent 1px);
-        background-size: 64px 64px;
-        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 88%);
-        -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 88%);
-      }
-      body::after {
-        content: '';
-        position: fixed;
-        top: -6rem;
-        right: -4rem;
-        width: 20rem;
-        height: 20rem;
-        border-radius: 99999px;
-        background: radial-gradient(circle, rgba(236, 55, 80, 0.24), transparent 62%);
-        filter: blur(12px);
-        pointer-events: none;
-      }
-      .hero-gallery {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        gap: var(--spacing-3);
-        padding: var(--spacing-4) var(--spacing-3) 0;
-        flex-wrap: wrap;
-        position: relative;
-        z-index: 1;
-      }
-      .hero-gallery img {
-        width: min(18vw, 140px);
-        height: min(18vw, 140px);
-        object-fit: cover;
-        border-radius: var(--radii-extra);
-        border: 2px solid rgba(60, 72, 88, 0.12);
-        background: rgba(255, 255, 255, 0.7);
-        box-shadow: var(--shadow-card);
-      }
-      .hero-gallery img:nth-child(2n) {
-        transform: translateY(8px);
-      }
-      /* Header and signup sections */
-      #i841 {
-        text-align: center;
-        padding: var(--spacing-4) var(--spacing-3) !important;
-      }
-      #ihtqi {
-        text-align: center;
-        padding: 0 var(--spacing-3) !important;
-      }
-      #idpek {
-        text-align: center;
-        padding: 0 var(--spacing-3) !important;
-      }
-      #i6pdh {
-        font-size: var(--font-8);
-        margin-bottom: var(--spacing-3);
-      }
-      #imvhm {
-        font-size: var(--font-3);
-        color: var(--muted);
-        max-width: 680px;
-        margin: 0 auto 0;
-      }
-      
-      /* Signup sections */
-      .signup-form {
-        display: flex;
-        justify-content: center;
-      }
-      .signup-row {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        gap: var(--spacing-3) !important;
-        flex-wrap: nowrap !important;
-      }
-      .email-wrap {
-        width: 260px;
-        flex-shrink: 0;
-      }
-      .email-field {
-        width: 100%;
-        padding: var(--spacing-3) !important;
-        font-size: var(--font-2) !important;
-        border: 2px solid var(--primary) !important;
-      }
-      .rsvp-btn {
-        padding: var(--spacing-3) var(--spacing-4) !important;
-        font-size: var(--font-2) !important;
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      
-      /* OR divider */
-      #idpek::before {
-        content: 'or';
-        display: block;
-        color: var(--muted);
-        font-size: var(--font-2);
-        margin-bottom: var(--spacing-3);
-        text-transform: lowercase;
-      }
-      #idpek .gjs-container {
-        display: flex;
-        justify-content: center;
-      }
-      .gjs-section {
-        position: relative;
-        z-index: 1;
-      }
-      .site-footer {
-        margin-top: auto;
-        padding: 0 var(--spacing-3) var(--spacing-4);
-        background: rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(14px);
-        border-top: 1px solid rgba(60, 72, 88, 0.12);
-      }
-      .footer-gallery {
-        max-width: 1024px;
-        margin: 0 auto;
-        padding: 0 var(--spacing-3);
-      }
-      .footer-inner {
-        max-width: 1024px;
-        margin: 0 auto;
-        padding-top: var(--spacing-4);
-        display: flex;
-        justify-content: space-between;
-        gap: var(--spacing-4);
-        align-items: flex-start;
-        flex-wrap: wrap;
-      }
-      .footer-brand {
-        min-width: 220px;
-      }
-      .footer-title {
-        font-size: var(--font-4);
-        margin: 0 0 var(--spacing-2);
-      }
-      .footer-copy {
-        margin: 0;
-        color: var(--muted);
-        max-width: 32rem;
-      }
-      .footer-links,
-      .footer-faq {
-        display: grid;
-        gap: var(--spacing-2);
-        min-width: 180px;
-      }
-      .footer-faq details {
-        border-radius: var(--radii-default);
-        border: 1px solid rgba(60, 72, 88, 0.14);
-        background: rgba(249, 250, 252, 0.82);
-        overflow: hidden;
-      }
-      .footer-faq summary {
-        cursor: pointer;
-        list-style: none;
-        padding: var(--spacing-2) var(--spacing-3);
-        font-weight: var(--font-weight-bold);
-        color: var(--text);
-      }
-      .footer-faq summary::-webkit-details-marker {
-        display: none;
-      }
-      .footer-faq summary::after {
-        content: '+';
-        float: right;
-        color: var(--muted);
-      }
-      .footer-faq details[open] summary::after {
-        content: '–';
-      }
-      .footer-faq-answer {
-        padding: 0 var(--spacing-3) var(--spacing-3);
-        margin: 0;
-        color: var(--muted);
-      }
-      .footer-label {
-        margin: 0 0 var(--spacing-1);
-        font-size: var(--font-1);
-        font-weight: var(--font-weight-bold);
-        letter-spacing: var(--letter-spacing-headline);
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-      .footer-faq-item {
-        min-height: 2.5rem;
-        padding: var(--spacing-2) var(--spacing-3);
-        border-radius: var(--radii-default);
-        border: 1px dashed rgba(60, 72, 88, 0.25);
-        background: rgba(249, 250, 252, 0.7);
-        color: var(--muted);
-      }
-      
-      /* Responsive adjustments */
-      @media (max-width: 48em) {
-        #i841 { padding: var(--spacing-5) var(--spacing-3); }
-        #i6pdh { font-size: var(--font-6); }
-        #imvhm { font-size: var(--font-2); }
-        .signup-row { flex-direction: column !important; align-items: center !important; }
-        .email-wrap { min-width: 100%; max-width: 300px; }
-        .footer-inner { flex-direction: column; }
-      }
-    </style>
-  </head>
-
-  <body id="inth">
-    <div data-type-role="flex-row" class="gjs-plg-flex-row" id="i4ik">
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="isbu"></div>
-    </div>
-    <section class="gjs-section" id="i841">
-      <div class="gjs-container" id="ivt2">
-        <h1 id="i6pdh">Contact</h1>
-        <div id="imvhm">Ever wanted to talk to the ISS? Contact is an Amateur Radio YSWS. Study for a licence, get funding for one. Design antennas, and make them. Earn prizes such as a UV5R and more. RSVP NOW!!!!!!!</div>
+  <nav id="navbar">
+    <div class="navinner container">
+      <a href="https://hackclub.com/" class="navlogo" target="_blank" rel="noopener">
+        <img class="navlogoimg" src="https://assets.hackclub.com/flag-orpheus-left.svg" alt="Hack Club">
+        <span class="navbrandtext">
+          <span class="navname">CQ</span>
+        </span>
+      </a>
+      <div class="navlinks">
+        <a href="#about">About</a>
+        <a href="#iss">Talk to ISS</a>
+        <a href="#licensing">Licensing</a>
+        <a href="#faq">FAQ</a>
       </div>
-    </section>
-    <section id="ihtqi" class="gjs-section">
-      <div id="ie476" class="gjs-container">
-        <form method="get" id="i1pfl" class="signup-form" action="https://rsvp.hackclub.community/cq">
-          <div data-type-role="flex-row" id="ihzkv" class="gjs-plg-flex-row signup-row">
-            <div id="iiyyz" class="email-wrap">
-              <input type="email" id="ijl96" placeholder="email" aria-label="Email address" class="email-field" />
-            </div>
-            <button type="submit" id="icq4l" class="gjs-t-button rsvp-btn">RSVP</button>
+      <a href="https://rsvp.hackclub.community/cq" class="navrsvp" target="_blank" rel="noopener">RSVP</a>
+      <button id="menubutton" class="menubutton" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div id="mobilemenu" class="mobilemenu">
+    <a href="#about">About</a>
+    <a href="#iss">Talk to ISS</a>
+    <a href="#licensing">Licensing</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://rsvp.hackclub.community/cq" target="_blank" rel="noopener">RSVP</a>
+  </div>
+
+  <header id="hero">
+    <div class="container herocontainer">
+      <p class="eyebrow herotag">an upcoming hack club ysws</p>
+      <h1 class="ultratitle herotitle">CQ, CQ, CQ.</h1>
+      <p class="herosubtitle subtitle">Get funded to earn your amateur radio licence. Build antennas. Talk to the ISS. Ship real radio projects and earn a UV-5R or UV-K5. RSVP to make this happen!</p>
+      <div class="heroactions">
+        <a href="https://rsvp.hackclub.community/cq" class="herobtn" target="_blank" rel="noopener">RSVP Now</a>
+        <a href="#about" class="herobtnoutline">Learn More</a>
+      </div>
+      <div class="herostats">
+        <div class="statitem">
+          <span class="statnumber">$0</span>
+          <span class="statlabel">Cost to you</span>
+        </div>
+        <div class="statitem">
+          <span class="statnumber">UV-5R or other</span>
+          <span class="statlabel">Free radio on completion</span>
+        </div>
+      </div>
+    </div>
+    <div class="herobg" aria-hidden="true">
+      <div class="waveline waveline1"></div>
+      <div class="waveline waveline2"></div>
+      <div class="waveline waveline3"></div>
+    </div>
+  </header>
+
+  <section id="about">
+    <div class="container">
+      <p class="eyebrow">What is CQ?</p>
+      <h2 class="title sectiontitle">Amateur radio, funded by Hack Club.</h2>
+      <p class="sectiondesc lead">CQ (short for "seek you/contacting you") is a You Ship, We Ship project. Study for your amateur radio licence, and we will fund the exam fees, get you a handheld radio (choose between a UV-5R and a UV-K5), and support your radio projects like building your own antenna.</p>
+      <div class="cardgrid">
+        <div class="card featurecard">
+          <img src="radio_img.png" alt="Radio" class="featureicon">
+          <h3>Get a Radio</h3>
+          <p>Pass your licence exam and choose between a Baofeng UV-5R or a UV-K5 handheld radio, on us.</p>
+        </div>
+        <div class="card featurecard">
+          <img src="antenna_img.png" alt="Antenna" class="featureicon">
+          <h3>Build Antennas</h3>
+          <p>Design and build your own antennas. We fund the parts so you can experiment with Yagi, dipole, and more.</p>
+        </div>
+        <div class="card featurecard">
+          <img src="ISS_picto.png" alt="ISS" class="featureicon">
+          <h3>Talk to the ISS</h3>
+          <p>The International Space Station has an amateur radio repeater. With the right setup, you can hear and talk through it.</p>
+        </div>
+        <div class="card featurecard">
+          <img src="sattelite.png" alt="Satellite" class="featureicon">
+          <h3>Fund Your Projects</h3>
+          <p>Got a radio project idea? We provide funding for parts, SDRs, and whatever you need to make it happen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="iss">
+    <div class="container">
+      <p class="eyebrow">The cool part</p>
+      <h2 class="title sectiontitle">How to talk to the ISS</h2>
+      <div class="isscontent">
+        <div class="isstext">
+          <div class="issdisclaimer">
+            <strong>Heads up:</strong> Unless you have a radio licence and callsign, it is illegal to transmit. Listening is perfectly legal and you do not need a licence.
           </div>
-        </form>
-      </div>
-    </section>
-    <section class="gjs-section" id="idpek">
-      <div class="gjs-container" id="ikg17">
-        <a id="ijbl8" class="gjs-t-button rsvp-btn" href="https://rsvp.hackclub.community/cq">RSVP with Hack Club</a>
-      </div>
-    </section>
-    <div data-type-role="flex-row" class="gjs-plg-flex-row" id="ir2pt">
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ingwu">
-        <div data-type-role="flex-row" class="gjs-plg-flex-row" id="i3zew">
-          <div data-type-role="flex-column" class="gjs-plg-flex-column" id="i5hag"></div>
+          <p>The ISS has a cross-band amateur radio repeater onboard. It listens on <strong>145.990 MHz FM</strong> with a <strong>67.0 Hz CTCSS tone</strong>, and retransmits on <strong>437.800 MHz FM</strong>.</p>
+          <p>You can listen to it with just a simple handheld radio and hear other amateur radio operators transmitting through it. You get way better reception with a bigger antenna or a Yagi.</p>
+          <div class="issfreqs">
+            <div class="freqbox">
+              <span class="freqlabel">Uplink</span>
+              <span class="freqvalue">145.990 MHz FM</span>
+              <span class="freqnote">67.0 Hz CTCSS</span>
+            </div>
+            <div class="freqbox">
+              <span class="freqlabel">Downlink</span>
+              <span class="freqvalue">437.800 MHz FM</span>
+              <span class="freqnote">Listen here</span>
+            </div>
+          </div>
+          <p>This recording was made using about $30 in parts for a homemade antenna and a $20 SDR (Software Defined Radio):</p>
+          <audio controls preload="none">
+            <source src="https://cdn.hackclub.com/019e04ac-ec09-7fd0-96d2-1e3f3bd6d75d/audio_437810000Hz_17-40-54_04-05-2026.wav" type="audio/wav">
+            Your browser does not support audio playback.
+          </audio>
+          <p class="caption">Audio received from ISS repeater on 437.810 MHz, May 2026</p>
+        </div>
+        <div class="issvisual">
+          <div class="isscard card">
+            <img src="ISS_picto.png" alt="ISS" class="issimg">
+            <p class="isscardlabel">International Space Station</p>
+            <div class="issorbit">
+              <span class="dot"></span>
+              <span class="orbitline"></span>
+            </div>
+          </div>
+          <div class="costbreakdown card sunken">
+            <h4>Total cost to listen</h4>
+            <div class="costrow">
+              <span>Homemade antenna parts</span>
+              <span>~$30</span>
+            </div>
+            <div class="costrow">
+              <span>SDR (Software Defined Radio)</span>
+              <span>~$20</span>
+            </div>
+            <div class="costrow costtotal">
+              <span>Total</span>
+              <span>~$50</span>
+            </div>
+              <span>Get funded to make total cost free! </span>
+          </div>
         </div>
       </div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ik8i4"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="idjll"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="iykjf"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ismwk"></div>
     </div>
-    <div data-type-role="flex-row" class="gjs-plg-flex-row" id="iokva">
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ilx7x"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="i2no2"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="if732"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ixok1"></div>
-      <div data-type-role="flex-column" class="gjs-plg-flex-column" id="ip7qk"></div>
-    </div>
-    <br>
-    <br>
-    <br>
-    <div class="hero-gallery footer-gallery" aria-label="Featured images">
-      <img src="ISS_picto.png" alt="ISS pictogram">
-      <img src="antenna_img.png" alt="Antenna">
-      <img src="radio_img.png" alt="Radio">
-      <img src="sattelite.png" alt="Satellite">
-      <img src="waveform.jpeg" alt="Waveform">
-    </div>
-    <footer class="site-footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <h2 class="footer-title">Contact</h2>
-          <p class="footer-copy">An Amateur Radio YSWS for learning, building antennas, and getting funded to make radio projects happen.</p>
-        </div>
-        <div class="footer-links">
-          <p class="footer-label">Main Website</p>
-          <a href="https://hackclub.com" target="_blank" rel="noopener noreferrer">hackclub.com</a>
-        </div>
-        <div class="footer-faq">
-          <p class="footer-label">FAQ</p>
-          <details>
-            <summary>Question placeholder 1</summary>
-            <p class="footer-faq-answer">Answer placeholder 1.</p>
-          </details>
-          <details>
-            <summary>Question placeholder 2</summary>
-            <p class="footer-faq-answer">Answer placeholder 2.</p>
-          </details>
-        </div>
-      </div>
-    </footer>
-  </body>
+  </section>
 
+  <section id="licensing">
+    <div class="container">
+      <p class="eyebrow">Getting licenced</p>
+      <h2 class="title sectiontitle">Licensing info by country</h2>
+      <p class="sectiondesc lead">CQ covers your exam and licence fees. Here is what licensing looks like in different countries. Know how it works in yours? DM @ruben to add it.</p>
+      <div class="licencegrid">
+        <div class="card licencecard">
+          <div class="licenceflag">AU</div>
+          <h3>Australia</h3>
+          <p>The exam is free by law. After passing you pay for:</p>
+          <ul>
+            <li>Certificate of Recognition: ~$48 AUD</li>
+            <li>Callsign Application: ~$30 AUD</li>
+          </ul>
+          <p class="caption">Both are required before you can legally transmit.</p>
+        </div>
+        <div class="card licencecard">
+          <div class="licenceflag">IN</div>
+          <h3>India</h3>
+          <p>Two exam tiers available:</p>
+          <ul>
+            <li><strong>Restricted:</strong> 1hr MCQ, basic privileges</li>
+            <li><strong>General:</strong> 2hr exam + morse code test</li>
+          </ul>
+          <p>Exam fee: 100 INR. Licence fee: 1,000 INR (20yr) or 2,000 INR (lifetime).</p>
+          <a href="https://www.eservices.dot.gov.in/amateur-station-operator-certificate-asoc" target="_blank" rel="noopener">Official portal</a>
+        </div>
+        <div class="card licencecard licencecardadd">
+          <div class="licenceflag">?</div>
+          <h3>Your country</h3>
+          <p>Know how amateur radio licensing works where you live? Help us fill in the gaps.</p>
+          <a href="https://hackclub.enterprise.slack.com/team/U0AHNB20WDD" target="_blank" rel="noopener">DM @ruben on Slack</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rsvpsection">
+    <div class="container rsvpcontainer">
+      <h2 class="title rsvptitle">Ready to get on the air?</h2>
+      <p class="rsvpdesc subtitle">Join CQ, get funded, earn your licence, and start transmitting.</p>
+      <a href="https://rsvp.hackclub.community/cq" class="rsvpbutton" target="_blank" rel="noopener">RSVP for CQ</a>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="container">
+      <p class="eyebrow">Questions</p>
+      <h2 class="title sectiontitle">FAQ</h2>
+      <div class="faqlist">
+        <details class="faqitem">
+          <summary>What is amateur radio?</summary>
+          <p>Amateur (ham) radio is a hobby where licenced operators use radio equipment to communicate. It covers everything from chatting with people across the world to bouncing signals off the moon or the ISS.</p>
+        </details>
+        <details class="faqitem">
+          <summary>Do I need any experience?</summary>
+          <p>Nope. CQ is designed for complete beginners. We will help you study for the exam and provide resources to learn at your own pace.</p>
+        </details>
+        <details class="faqitem">
+          <summary>What does Hack Club fund?</summary>
+          <p>Exam fees, licence application costs, a handheld radio (UV-5R or UV-K5) on passing, and parts for projects like building your own antenna.</p>
+        </details>
+        <details class="faqitem">
+          <summary>Can I listen without a licence?</summary>
+          <p>Yes. Listening to amateur radio frequencies is perfectly legal everywhere. You only need a licence to transmit (send signals).</p>
+        </details>
+        <details class="faqitem">
+          <summary>What radio do I get?</summary>
+          <p>After you pass your licence exam, you can choose between a Baofeng UV-5R and a UV-K5. Both are solid handheld radios that work great for beginners.</p>
+        </details>
+        <details class="faqitem">
+          <summary>Is this open to people outside the US?</summary>
+          <p>Yes! CQ is open to everyone. Licensing requirements vary by country. Check the licensing section above.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <footer id="sitefooter">
+    <div class="container footerinner">
+      <div class="footerbrand">
+        <img src="https://assets.hackclub.com/flag-standalone.svg" alt="Hack Club" width="64" height="64">
+        <p class="footername">CQ</p>
+        <p class="caption footerdesc">An amateur radio soon YSWS by Students @ Hack Club for Students. Study, build, transmit :))</p>
+      </div>
+      <div class="footerlinks">
+        <p class="footerlabel">Links</p>
+        <a href="https://hackclub.com" target="_blank" rel="noopener">Hack Club</a>
+        <a href="https://rsvp.hackclub.community/cq" target="_blank" rel="noopener">RSVP</a>
+        <a href="https://hackclub.slack.com" target="_blank" rel="noopener">Slack</a>
+      </div>
+      <div class="footerlinks">
+        <p class="footerlabel">Resources</p>
+        <a href="#iss">ISS Repeater Info</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </div>
+    <div class="container footerbottom">
+      <p class="caption">Made with 💖 @ Hack Club.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
 </html>
