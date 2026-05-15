@@ -289,6 +289,23 @@ body {
   overflow: hidden;
 }
 
+.secretmessage {
+  position: absolute;
+  inset: 0;
+  padding: 12vh 6vw 8vh;
+  color: rgba(255, 255, 255, 0.035);
+  font-family: "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: clamp(10px, 1.15vw, 13px);
+  line-height: 1.8;
+  letter-spacing: 0.14em;
+  word-break: break-word;
+  white-space: pre-wrap;
+  transform: rotate(-4deg);
+  transform-origin: center;
+  user-select: none;
+  filter: blur(0.15px);
+}
+
 .waveline {
   position: absolute;
   border-radius: 50%;
