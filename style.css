@@ -293,7 +293,7 @@ body {
   position: absolute;
   inset: 0;
   padding: 12vh 6vw 8vh;
-  color: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.2);
   font-family: "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
   font-size: clamp(10px, 1.15vw, 13px);
   line-height: 1.8;
