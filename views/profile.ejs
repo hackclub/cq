@@ -1,0 +1,14 @@
+<%- include('partials/head') %>
+<main id="main" class="app-main shell narrow-shell">
+  <div class="page-heading"><div><p class="eyebrow">Identity</p><h1>Your profile</h1><p>Your Hack Club details link you to project reviews and Slack updates.</p></div></div>
+  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Check these details:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
+  <form method="post" action="/app/profile" class="panel form-stack">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Display name<input name="name" value="<%= values.name %>" required maxlength="100"></label>
+    <label>Hack Club email<input value="<%= values.email %>" disabled><span class="field-help">Managed by Hack Club Auth.</span></label>
+    <label>Slack user ID<input name="slack_id" value="<%= values.slackId || '' %>" placeholder="U0123ABCD"><span class="field-help">Open your Slack profile → More → Copy member ID.</span></label>
+    <div class="profile-readout"><span>Verification <strong><%= statusLabel(values.verificationStatus) %></strong></span><span>YSWS eligible <strong><%= values.yswsEligible === true ? 'Yes' : values.yswsEligible === false ? 'No' : 'Not reported' %></strong></span></div>
+    <button class="button button-primary" type="submit">Save profile</button>
+  </form>
+</main>
+<%- include('partials/footer') %>

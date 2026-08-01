@@ -1,0 +1,29 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <%- include('nav') %>
+  <div class="page-heading">
+    <div><p class="eyebrow">Admin · messaging</p><h1>Slack notifications</h1><p>Delivery history for participant and organizer messages. Tokens and message credentials are never stored here.</p></div>
+    <span class="status-pill <%= slackConfigured ? 'status-approved' : 'status-rejected' %>"><%= slackConfigured ? 'Bot connected' : 'Bot not configured' %></span>
+  </div>
+  <% if (!notifications.length) { %>
+    <section class="panel empty-state"><h2>No messages yet</h2><p>Submission, review, order, and fulfilment events will appear here.</p></section>
+  <% } else { %>
+    <section class="panel table-wrap">
+      <table>
+        <thead><tr><th>Event</th><th>Recipient</th><th>Status</th><th>Message</th><th>Updated</th></tr></thead>
+        <tbody>
+          <% notifications.forEach((notice) => { %>
+            <tr>
+              <td><strong><%= statusLabel(notice.kind) %></strong><small><%= notice.entityId || '' %></small></td>
+              <td><%= notice.channel || 'Not available' %></td>
+              <td><span class="status-pill status-<%= notice.status %>"><%= statusLabel(notice.status) %></span><% if (notice.error) { %><small><%= notice.error %></small><% } %></td>
+              <td><%= notice.text %></td>
+              <td><%= formatDateTime(notice.updatedAt) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+  <% } %>
+</main>
+<%- include('../partials/footer') %>

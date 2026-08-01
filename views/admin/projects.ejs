@@ -1,0 +1,22 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Projects</h1><p>Program-wide build and submission state.</p></div></div>
+  <%- include('nav') %>
+  <div class="panel table-wrap">
+    <table>
+      <thead><tr><th>Project</th><th>Maker</th><th>Ari</th><th>Updated</th><th>Status</th></tr></thead>
+      <tbody>
+        <% projects.forEach((item) => { %>
+          <tr>
+            <td><a href="/admin/projects/<%= item.id %>"><strong><%= item.title %></strong></a><small><%= item.description %> · <a href="<%= item.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></small></td>
+            <td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || '' %></small></td>
+            <td><%= item.latestSubmission ? statusLabel(item.latestSubmission.phase) : 'Not submitted' %><small><%= item.latestSubmission?.ariId || '' %></small></td>
+            <td><%= formatDate(item.updatedAt) %></td>
+            <td><form method="post" action="/admin/projects/<%= item.id %>" class="inline-admin-form"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><select name="status"><% ['building','submitted','needs_changes','approved','rejected','archived'].forEach((status) => { %><option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= statusLabel(status) %></option><% }) %></select><button class="button button-small" type="submit">Save</button></form></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</main>
+<%- include('../partials/footer') %>

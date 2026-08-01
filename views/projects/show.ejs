@@ -1,0 +1,126 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="project-hero">
+    <div>
+      <div class="project-meta-line"><span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span><span><%= project.track %></span><span>Updated <%= formatDate(project.updatedAt) %></span></div>
+      <h1><%= project.title %></h1>
+      <p><%= project.description %></p>
+      <div class="tag-row"><% project.tags.forEach((tag) => { %><span><%= tag %></span><% }) %></div>
+    </div>
+    <div class="button-row">
+      <a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a>
+      <a class="button button-primary" href="/app/projects/<%= project.id %>/edit">Edit project</a>
+    </div>
+  </div>
+
+  <div class="project-layout">
+    <div class="project-main-column">
+      <section class="panel" id="milestones">
+        <div class="panel-heading"><div><p class="eyebrow">Signal path</p><h2>Milestones</h2></div><strong><%= milestones.filter((item) => item.complete).length %>/<%= milestones.length %></strong></div>
+        <div class="milestone-list">
+          <% milestones.forEach((milestone) => { %>
+            <form method="post" action="/app/projects/<%= project.id %>/milestones/<%= milestone.id %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="milestone <%= milestone.complete ? 'complete' : '' %>">
+                <span class="milestone-check"><%= milestone.complete ? '✓' : '' %></span>
+                <span><%= milestone.title %></span>
+              </button>
+            </form>
+          <% }) %>
+        </div>
+      </section>
+
+      <section class="panel" id="work-log">
+        <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Work log</h2></div><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %> hours</strong></div>
+        <form method="post" action="/app/projects/<%= project.id %>/journals" class="journal-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Date<input type="date" name="entry_date" value="<%= new Date().toISOString().slice(0, 10) %>" required></label>
+          <label>Minutes<input type="number" name="minutes" min="1" max="1440" value="60" required></label>
+          <label class="journal-text">What changed?<textarea name="text" rows="2" minlength="5" maxlength="2000" required placeholder="Cut and tuned the driven element; SWR is now 1.4 at 145.8 MHz."></textarea></label>
+          <button class="button button-primary" type="submit">Add log</button>
+        </form>
+        <% if (!journals.length) { %>
+          <p class="empty-inline">No work logged yet. Concrete notes help reviewers understand the build.</p>
+        <% } else { %>
+          <div class="journal-list">
+            <% journals.forEach((journal) => { %>
+              <article>
+                <div><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div>
+                <p><%= journal.text %></p>
+                <form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/delete" data-confirm="Remove this work log?">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button class="text-button" type="submit">Remove</button>
+                </form>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="panel submission-panel" id="submission">
+        <div class="panel-heading"><div><p class="eyebrow">Final hop</p><h2>Project review</h2></div><span class="review-mark">REVIEW</span></div>
+        <% if (readiness.errors.length) { %>
+          <div class="readiness-list"><strong>Before you can ship:</strong><ul><% readiness.errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div>
+        <% } else { %>
+          <div class="ready-banner"><span>✓</span><div><strong>Ready to submit</strong><p>Your build evidence is ready for Hack Club's project review queue.</p></div></div>
+        <% } %>
+        <% if (!ariConfigured) { %><div class="config-note">Organizer action needed: connect the project review service.</div><% } %>
+
+        <% if (submissions.length) { const latest = submissions[0]; %>
+          <div class="submission-status">
+            <div><small>LATEST SUBMISSION</small><strong><%= statusLabel(latest.phase) %></strong><span><%= latest.ariId || 'Awaiting review ID' %></span></div>
+            <div><small>DECISION</small><strong><%= latest.decision ? statusLabel(latest.decision) : 'Pending' %></strong><span><%= formatDateTime(latest.updatedAt) %></span></div>
+          </div>
+          <% if (latest.lastError) { %><p class="inline-error"><%= latest.lastError %></p><% } %>
+          <% if (latest.review) { const review = latest.review; %>
+            <% if (review.note_to_maker) { %><blockquote><strong>Reviewer note</strong><p><%= review.note_to_maker %></p></blockquote><% } %>
+            <% if (review.approved_hours !== undefined) { %><p class="approval-total"><strong><%= review.approved_hours %> approved hours</strong> · rewarded at 5 hertz per approved hour</p><% } %>
+          <% } %>
+        <% } %>
+        <div class="button-row">
+          <form method="post" action="/app/projects/<%= project.id %>/submit" data-confirm="Submit this project for review?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="button button-primary" type="submit" <%= readiness.errors.length || !ariConfigured ? 'disabled' : '' %>><%= submissions.length ? 'Submit project update' : 'Submit for review' %></button>
+          </form>
+          <% if (submissions.length) { %>
+            <form method="post" action="/app/projects/<%= project.id %>/status"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-ghost" type="submit">Refresh status</button></form>
+            <% if (['processing', 'review', 'under_review', 'second_pass'].includes(submissions[0].phase) && !submissions[0].decision) { %>
+              <form method="post" action="/app/projects/<%= project.id %>/withdraw" data-confirm="Withdraw this open review submission?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Withdraw</button></form>
+            <% } %>
+          <% } %>
+        </div>
+      </section>
+    </div>
+
+    <aside class="project-sidebar">
+      <section class="panel compact-panel">
+        <p class="eyebrow">Station details</p>
+        <dl>
+          <div><dt>Country</dt><dd><%= country?.name || project.countryCode || 'Not set' %></dd></div>
+          <div><dt>Project type</dt><dd><%= statusLabel(project.projectType) %></dd></div>
+          <div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div>
+          <div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div>
+          <div><dt>Hackatime</dt><dd><%= project.hackatimeProjects.join(', ') || 'Using work logs' %></dd></div>
+        </dl>
+      </section>
+      <% if (country) { %>
+        <section class="panel compact-panel safety-mini">
+          <strong>Your local radio guidance</strong>
+          <p><%= country.transmissionRule %></p>
+          <p><%= country.ownershipRule %></p>
+          <p><strong>Fulfilment:</strong> <%= country.fulfilmentNote %></p>
+          <% if (country.sourceUrl) { %><a href="<%= country.sourceUrl %>" target="_blank" rel="noreferrer">Read the official source ↗</a><% } %>
+          <small>Guidance only; check current local rules before buying, importing, or transmitting.</small>
+        </section>
+      <% } %>
+      <section class="panel compact-panel safety-mini">
+        <strong>Transmit safely</strong><p>Do not transmit until you have the authorisation and callsign required where you live.</p>
+      </section>
+      <form method="post" action="/app/projects/<%= project.id %>/archive" data-confirm="Archive this project? You can keep its data, but it will leave your active list.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="text-button danger-text" type="submit">Archive project</button>
+      </form>
+    </aside>
+  </div>
+</main>
+<%- include('../partials/footer') %>

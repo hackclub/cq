@@ -1,0 +1,10 @@
+<nav class="admin-tabs" aria-label="Admin sections">
+  <a class="<%= currentPath === '/admin' ? 'active' : '' %>" href="/admin">Overview</a>
+  <a class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>" href="/admin/users">Users</a>
+  <a class="<%= currentPath.startsWith('/admin/projects') ? 'active' : '' %>" href="/admin/projects">Projects</a>
+  <a class="<%= currentPath.startsWith('/admin/reviews') ? 'active' : '' %>" href="/admin/reviews">Ari reviews</a>
+  <a class="<%= currentPath.startsWith('/admin/orders') ? 'active' : '' %>" href="/admin/orders">Orders</a>
+  <a class="<%= currentPath.startsWith('/admin/shop') ? 'active' : '' %>" href="/admin/shop">Shop</a>
+  <a class="<%= currentPath.startsWith('/admin/countries') ? 'active' : '' %>" href="/admin/countries">Countries</a>
+  <a class="<%= currentPath.startsWith('/admin/notifications') ? 'active' : '' %>" href="/admin/notifications">Slack</a>
+</nav>

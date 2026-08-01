@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <%- include('nav') %>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Admin · fulfilment and radio rules</p>
+      <h1>Country policies</h1>
+      <p>Control the guidance participants see and how each destination is fulfilled. These notes are operational guidance, not legal advice.</p>
+    </div>
+  </div>
+
+  <section class="panel form-section">
+    <div class="panel-heading"><h2>Add a location</h2></div>
+    <form method="post" action="/admin/countries" class="form-grid">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <label>Code<input name="code" required maxlength="10" placeholder="JP"></label>
+      <label>Name<input name="name" required maxlength="120" placeholder="Japan"></label>
+      <label class="span-two">Ownership guidance<textarea name="ownership_rule" rows="2" maxlength="1200" required></textarea></label>
+      <label class="span-two">Transmission guidance<textarea name="transmission_rule" rows="2" maxlength="1200" required></textarea></label>
+      <label>Fulfilment mode<select name="fulfilment_mode"><option value="local">Local</option><option value="standard">Standard</option><option value="customs">Customs check</option><option value="restricted">Restricted</option><option value="manual_review" selected>Manual review</option></select></label>
+      <label>Sort order<input type="number" name="sort_order" value="100"></label>
+      <label class="span-two">Fulfilment note<textarea name="fulfilment_note" rows="2" maxlength="1200" required></textarea></label>
+      <label class="span-two">Official source URL<input type="url" name="source_url" maxlength="500"></label>
+      <label class="checkbox-field span-two"><input type="checkbox" name="active" value="1" checked> Available to participants</label>
+      <div><button class="button button-primary" type="submit">Add policy</button></div>
+    </form>
+  </section>
+
+  <div class="admin-policy-list">
+    <% countries.forEach((country) => { %>
+      <form method="post" action="/admin/countries/<%= country.id %>" class="panel form-section">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="panel-heading">
+          <div><p class="eyebrow"><%= country.code %></p><h2><%= country.name %></h2></div>
+          <span class="status-pill <%= country.active ? 'status-approved' : 'status-rejected' %>"><%= country.active ? 'Active' : 'Hidden' %></span>
+        </div>
+        <div class="form-grid">
+          <label>Name<input name="name" value="<%= country.name %>" required maxlength="120"></label>
+          <label>Sort order<input type="number" name="sort_order" value="<%= country.sortOrder %>"></label>
+          <label class="span-two">Ownership guidance<textarea name="ownership_rule" rows="2" maxlength="1200" required><%= country.ownershipRule %></textarea></label>
+          <label class="span-two">Transmission guidance<textarea name="transmission_rule" rows="2" maxlength="1200" required><%= country.transmissionRule %></textarea></label>
+          <label>Fulfilment mode<select name="fulfilment_mode"><% ['local','standard','customs','restricted','manual_review'].forEach((mode) => { %><option value="<%= mode %>" <%= country.fulfilmentMode === mode ? 'selected' : '' %>><%= statusLabel(mode) %></option><% }) %></select></label>
+          <label>Official source URL<input type="url" name="source_url" value="<%= country.sourceUrl %>" maxlength="500"></label>
+          <label class="span-two">Fulfilment note<textarea name="fulfilment_note" rows="2" maxlength="1200" required><%= country.fulfilmentNote %></textarea></label>
+          <label class="checkbox-field span-two"><input type="checkbox" name="active" value="1" <%= country.active ? 'checked' : '' %>> Available to participants</label>
+        </div>
+        <div><button class="button button-primary" type="submit">Save <%= country.name %></button></div>
+      </form>
+    <% }) %>
+  </div>
+</main>
+<%- include('../partials/footer') %>

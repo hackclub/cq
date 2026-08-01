@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="shop-hero">
+    <div><p class="eyebrow">Approved hours → real hardware</p><h1>CQ shop</h1><p>Spend the hertz earned from approved work. Each approved hour earns 5 hertz.</p></div>
+    <div class="hertz-balance"><span>YOUR BALANCE</span><strong><%= user.hertz %></strong><small>hertz</small></div>
+  </div>
+  <div class="shop-actions"><a href="/app/shop/cart">Cart (<%= cartCount %>)</a><a href="/app/shop/orders">Order history</a></div>
+  <div class="product-grid">
+    <% products.forEach((product) => { %>
+      <article class="product-card">
+        <div class="product-image"><img src="<%= product.image %>" alt=""></div>
+        <div class="product-copy"><p class="eyebrow"><%= product.category %></p><h2><%= product.name %></h2><p><%= product.description %></p></div>
+        <div class="product-buy">
+          <div><strong><%= product.price %> hertz</strong><span><%= product.stock %> available</span></div>
+          <form method="post" action="/app/shop/cart/<%= product.id %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="quantity" value="1">
+            <button class="button button-primary" type="submit" <%= product.stock < 1 ? 'disabled' : '' %>><%= product.stock < 1 ? 'Out of stock' : 'Add to cart' %></button>
+          </form>
+        </div>
+      </article>
+    <% }) %>
+  </div>
+</main>
+<%- include('../partials/footer') %>

@@ -1,0 +1,87 @@
+<%- include('partials/head') %>
+<main id="main">
+  <section class="hero">
+    <div class="shell hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">A Hack Club YSWS · now transmitting</p>
+        <h1>Build your way <em>onto the air.</em></h1>
+        <p class="hero-lede">Learn amateur radio, document a real build, get reviewed, and use your approved hours to claim the gear that takes you further.</p>
+        <div class="button-row">
+          <a class="button button-primary" href="/auth/login">Start with Hack Club</a>
+          <a class="button button-ghost" href="#how">See the signal path</a>
+        </div>
+        <p class="microcopy">Open internationally · no previous radio experience needed</p>
+      </div>
+      <div class="signal-card" aria-label="A radio signal travelling from your project to the International Space Station">
+        <div class="signal-topline"><span>LIVE PATH</span><span>145.990 → 437.800 MHz</span></div>
+        <div class="orbit">
+          <img src="/assets/ISS_picto.png" alt="International Space Station">
+          <span class="orbit-ring ring-one"></span>
+          <span class="orbit-ring ring-two"></span>
+          <span class="signal-dot"></span>
+        </div>
+        <div class="signal-log">
+          <span>PROJECT</span><b>→</b><span>CALLSIGN</span><b>→</b><span>ISS</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof-strip" aria-label="Program benefits">
+    <div class="shell proof-grid">
+      <div><strong>Covered</strong><span>exam and licence support</span></div>
+      <div><strong>5 hertz / approved hour</strong><span>spent in the CQ shop</span></div>
+      <div><strong>Real review</strong><span>through Hack Club</span></div>
+    </div>
+  </section>
+
+  <section class="section shell" id="how">
+    <div class="section-heading">
+      <p class="eyebrow">The signal path</p>
+      <h2>From curious to callsign.</h2>
+      <p>CQ keeps the whole build in one place: your plan, progress, evidence, review, hertz, and hardware.</p>
+    </div>
+    <div class="steps-grid">
+      <article class="step-card"><span>01</span><h3>Make a project</h3><p>Choose your licence path, link a public GitHub repo, and set your build goal.</p></article>
+      <article class="step-card"><span>02</span><h3>Log the work</h3><p>Complete milestones and add dated devlogs with time and concrete progress.</p></article>
+      <article class="step-card"><span>03</span><h3>Submit for review</h3><p>Your evidence is signed and sent to Hack Club reviewers. CQ tracks every decision automatically.</p></article>
+      <article class="step-card"><span>04</span><h3>Claim your gear</h3><p>Approved hours become hertz you can spend on radios, receivers, and antenna kits.</p></article>
+    </div>
+  </section>
+
+  <section class="section section-dark" id="radio">
+    <div class="shell split-feature">
+      <div>
+        <p class="eyebrow">The cool part</p>
+        <h2>Yes, you can hear space.</h2>
+        <p>The ISS cross-band repeater receives on 145.990 MHz FM with a 67 Hz tone and retransmits on 437.800 MHz FM. Start by listening; build a Yagi and the signal gets dramatically clearer.</p>
+        <div class="frequency-grid">
+          <div><small>UPLINK</small><strong>145.990</strong><span>MHz FM</span></div>
+          <div><small>DOWNLINK</small><strong>437.800</strong><span>MHz FM</span></div>
+        </div>
+      </div>
+      <div class="radio-stack">
+        <img src="/assets/antenna_img.png" alt="Directional antenna">
+        <div><strong>Antenna build</strong><span>20 hertz</span></div>
+        <img src="/assets/radio_img.png" alt="Handheld radio">
+        <div><strong>Handheld radio</strong><span>from 30 hertz</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section shell" id="safety">
+    <div class="safety-card">
+      <div class="safety-icon" aria-hidden="true">!</div>
+      <div><p class="eyebrow">Listen first</p><h2>Transmit only when licensed.</h2><p>Receiving amateur radio is a great place to begin. Transmitting requires the appropriate amateur radio licence and callsign for your country. CQ's milestones are designed to get you there safely.</p></div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="shell">
+      <p class="eyebrow">Your first contact starts here</p>
+      <h2>Ready to call CQ?</h2>
+      <a class="button button-light" href="/auth/login">Sign in with Hack Club</a>
+    </div>
+  </section>
+</main>
+<%- include('partials/footer') %>

@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Ari reviews</h1><p>Signed submissions, decisions, and replay-safe webhook delivery history.</p></div><span class="status-pill <%= ariConfigured ? 'status-approved' : 'status-rejected' %>"><%= ariConfigured ? 'Connected' : 'Not configured' %></span></div>
+  <%- include('nav') %>
+  <section class="panel table-wrap">
+    <table><thead><tr><th>Project</th><th>Ari ID</th><th>Phase</th><th>Decision</th><th>Last event</th><th>Updated</th></tr></thead><tbody>
+      <% submissions.forEach((item) => { %><tr><td><strong><%= item.project?.title || item.projectId %></strong><small><%= item.externalId %></small></td><td><%= item.ariId || '—' %></td><td><%= statusLabel(item.phase) %></td><td><%= item.decision ? statusLabel(item.decision) : 'Pending' %></td><td><%= item.event || '—' %></td><td><%= formatDateTime(item.updatedAt) %></td></tr><% }) %>
+    </tbody></table>
+  </section>
+  <section class="panel table-wrap">
+    <div class="panel-heading"><h2>Webhook deliveries</h2></div>
+    <table><thead><tr><th>Delivery ID</th><th>Event</th><th>External ID</th><th>Received</th></tr></thead><tbody>
+      <% deliveries.forEach((item) => { %><tr><td><code><%= item.id %></code></td><td><%= item.event %></td><td><%= item.payload.external_id %></td><td><%= formatDateTime(item.receivedAt) %></td></tr><% }) %>
+    </tbody></table>
+  </section>
+</main>
+<%- include('../partials/footer') %>

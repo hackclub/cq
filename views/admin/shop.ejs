@@ -1,0 +1,37 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Shop inventory</h1><p>Prices use whole hertz.</p></div></div>
+  <%- include('nav') %>
+  <section class="panel">
+    <div class="panel-heading"><h2>Add product</h2></div>
+    <form method="post" action="/admin/shop" class="inventory-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input name="name" placeholder="Product name" required>
+      <input name="category" placeholder="Category" required>
+      <input type="number" name="price" min="0" placeholder="Hertz" required>
+      <input type="number" name="stock" min="0" placeholder="Stock" required>
+      <input type="url" name="image" placeholder="Image URL">
+      <input type="number" name="sort_order" value="100" placeholder="Sort">
+      <textarea name="description" placeholder="Description" required></textarea>
+      <label class="checkbox-field"><input type="checkbox" name="active" value="1" checked> Active</label>
+      <button class="button button-primary" type="submit">Add product</button>
+    </form>
+  </section>
+  <div class="inventory-grid">
+    <% products.forEach((item) => { %>
+      <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <img src="<%= item.image %>" alt="">
+        <label>Name<input name="name" value="<%= item.name %>" required></label>
+        <label>Category<input name="category" value="<%= item.category %>" required></label>
+        <div class="form-grid"><label>Price<input type="number" name="price" min="0" value="<%= item.price %>" required></label><label>Stock<input type="number" name="stock" min="0" value="<%= item.stock %>" required></label></div>
+        <label>Image URL<input type="url" name="image" value="<%= item.image %>"></label>
+        <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
+        <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
+        <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
+        <button class="button button-primary" type="submit">Save product</button>
+      </form>
+    <% }) %>
+  </div>
+</main>
+<%- include('../partials/footer') %>

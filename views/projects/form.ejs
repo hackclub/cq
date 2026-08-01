@@ -1,0 +1,61 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading">
+    <div><p class="eyebrow"><%= editing ? 'Tune the details' : 'New signal' %></p><h1><%= editing ? `Edit ${project.title}` : 'Start a radio project' %></h1><p>Make the plan concrete now; you can refine it as the build changes.</p></div>
+    <% if (editing) { %><a class="button button-ghost" href="/app/projects/<%= project.id %>">Back to project</a><% } %>
+  </div>
+  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Check these details:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
+  <form method="post" action="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>" class="project-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <section class="panel form-section">
+      <div class="form-section-heading"><span>01</span><div><h2>The build</h2><p>What are you making, and where is the work?</p></div></div>
+      <div class="form-grid">
+        <label class="span-two">Project name<input name="title" value="<%= values.title || '' %>" required minlength="2" maxlength="80" placeholder="Portable satellite station"></label>
+        <label class="span-two">Description<textarea name="description" required minlength="20" maxlength="800" rows="4" placeholder="I’m building a portable 2m/70cm station to receive and eventually transmit through amateur satellites."><%= values.description || '' %></textarea></label>
+        <label class="span-two">Public GitHub repository<input type="url" name="repo_url" value="<%= values.repo_url || '' %>" required placeholder="https://github.com/you/project"></label>
+        <label>Project track<select name="track"><option value="hardware" <%= values.track !== 'software' ? 'selected' : '' %>>Electronics hardware</option><option value="software" <%= values.track === 'software' ? 'selected' : '' %>>Software</option></select><span class="field-help">Both tracks must directly relate to ham radio. Hardware projects can omit a demo URL.</span></label>
+        <label>Project type<select name="project_type" required>
+          <option value="">Choose one</option>
+          <% [['antenna','Antenna or feedline'],['radio-electronics','Radio electronics'],['sdr','Software-defined radio'],['digital-mode','Digital mode'],['satellite','Satellite or space radio'],['propagation','Propagation or RF analysis'],['station-tooling','Station software or tooling'],['other','Other ham-radio build']].forEach(([value, label]) => { %>
+            <option value="<%= value %>" <%= values.project_type === value ? 'selected' : '' %>><%= label %></option>
+          <% }) %>
+        </select></label>
+        <label class="span-two">How is this a ham-radio project?<textarea name="radio_relevance" required minlength="40" maxlength="800" rows="3" placeholder="Explain the radio problem, band, signal, protocol, station workflow, or electronics your project works with."><%= values.radio_relevance || '' %></textarea><span class="field-help">Studying or completing a course by itself is not a project. You must make working electronics or software.</span></label>
+        <label>Tags<input name="tags" value="<%= values.tags || '' %>" placeholder="antenna, satellites, SDR"><span class="field-help">Comma separated.</span></label>
+        <label class="span-two">AI statement <span class="optional">optional</span><textarea name="ai_statement" maxlength="500" rows="2" placeholder="What did AI help with, if anything?"><%= values.ai_statement || '' %></textarea></label>
+      </div>
+    </section>
+
+    <section class="panel form-section">
+      <div class="form-section-heading"><span>02</span><div><h2>Your location and radio path</h2><p>Rules for owning, importing, and transmitting with radios vary by country.</p></div></div>
+      <div class="form-grid">
+        <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %></option><% }) %></select></label>
+        <label>Licence goal<input name="license_goal" value="<%= values.license_goal || '' %>" placeholder="Foundation licence"></label>
+        <label>Callsign <span class="optional">when issued</span><input name="callsign" value="<%= values.callsign || '' %>" placeholder="VK7ABC"></label>
+        <label>Hackatime project keys<input name="hackatime_projects" value="<%= values.hackatime_projects || '' %>" placeholder="cq-radio, antenna-cad"><span class="field-help">Exact keys, comma separated. You can also prove time with work logs.</span></label>
+      </div>
+    </section>
+
+    <section class="panel form-section">
+      <div class="form-section-heading"><span>03</span><div><h2>Review evidence</h2><p>These can be added later, but they are required when you submit for review.</p></div></div>
+      <div class="form-grid">
+        <label class="span-two">Public thumbnail URL<input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://cdn.example.com/project.jpg"><span class="field-help">Use a public HTTP(S) image URL.</span></label>
+        <label class="span-two">Demo or video URL <span class="optional">required for software</span><input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."></label>
+        <fieldset class="span-two checkbox-group">
+          <legend>Evidence the reviewer should verify</legend>
+          <% const selectedEvidence = Array.isArray(values.evidence) ? values.evidence : ['commits', 'elapsed', 'devlog']; %>
+          <label><input type="checkbox" name="evidence" value="commits" <%= selectedEvidence.includes('commits') ? 'checked' : '' %>> Git commits</label>
+          <label><input type="checkbox" name="evidence" value="elapsed" <%= selectedEvidence.includes('elapsed') ? 'checked' : '' %>> Elapsed time</label>
+          <label><input type="checkbox" name="evidence" value="devlog" <%= selectedEvidence.includes('devlog') ? 'checked' : '' %>> Work logs</label>
+        </fieldset>
+        <label class="checkbox-field span-two"><input type="checkbox" name="is_update" value="1" <%= values.is_update ? 'checked' : '' %>> This is an update to an earlier ship</label>
+        <label class="span-two">Update note <span class="optional">only for updates</span><textarea name="update_message" maxlength="2000" rows="3" placeholder="What changed since the last review?"><%= values.update_message || '' %></textarea></label>
+      </div>
+    </section>
+    <div class="sticky-actions">
+      <a class="button button-ghost" href="<%= editing ? `/app/projects/${project.id}` : '/app/projects' %>">Cancel</a>
+      <button class="button button-primary" type="submit"><%= editing ? 'Save project' : 'Create project' %></button>
+    </div>
+  </form>
+</main>
+<%- include('../partials/footer') %>

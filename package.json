@@ -1,0 +1,27 @@
+{
+  "name": "cq-ysws",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CQ — build radio projects, earn your licence, and ship through Hack Club.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "check": "node --check src/server.js && node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "ejs": "^6.0.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jose": "^6.0.11"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.1"
+  }
+}

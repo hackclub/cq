@@ -1,0 +1,44 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading"><div><p class="eyebrow">CQ shop</p><h1>Your cart</h1><p>Orders are reviewed and fulfilled by the CQ team.</p></div><a class="button button-ghost" href="/app/shop">Keep shopping</a></div>
+  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Checkout needs attention:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
+  <% if (!cart.items.length) { %>
+    <div class="panel empty-state"><img src="/assets/radio_img.png" alt=""><h2>Your cart is quiet.</h2><p>Approved hours turn into hertz you can spend on real radio gear.</p><a class="button button-primary" href="/app/shop">Browse the shop</a></div>
+  <% } else { %>
+    <div class="checkout-layout">
+      <section class="panel cart-list">
+        <% cart.items.forEach((item) => { %>
+          <article>
+            <img src="<%= item.image %>" alt="">
+            <div><strong><%= item.name %></strong><span><%= item.price %> hertz each</span></div>
+            <form method="post" action="/app/shop/cart/<%= item.id %>/update">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <label><span class="sr-only">Quantity</span><input type="number" name="quantity" min="0" max="10" value="<%= item.quantity %>"></label>
+              <button class="text-button" type="submit">Update</button>
+            </form>
+            <strong><%= item.lineTotal %> hertz</strong>
+          </article>
+        <% }) %>
+        <div class="cart-total"><span>Total</span><strong><%= cart.total %> hertz</strong></div>
+        <p class="balance-note">Balance after order: <strong><%= user.hertz - cart.total %> hertz</strong></p>
+      </section>
+      <form class="panel form-stack" method="post" action="/app/shop/checkout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div><p class="eyebrow">Shipping</p><h2>Where should it go?</h2><p class="field-help">These fields are encrypted before Airtable receives them.</p></div>
+        <label>Full name<input name="shipping_name" value="<%= values.shipping_name || '' %>" required></label>
+        <label>Address line 1<input name="address_line_1" value="<%= values.address_line_1 || '' %>" required></label>
+        <label>Address line 2 <span class="optional">optional</span><input name="address_line_2" value="<%= values.address_line_2 || '' %>"></label>
+        <div class="form-grid">
+          <label>City<input name="city" value="<%= values.city || '' %>" required></label>
+          <label>State / region<input name="region" value="<%= values.region || '' %>" required></label>
+          <label>Postal code<input name="postal_code" value="<%= values.postal_code || '' %>" required></label>
+          <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %> · <%= statusLabel(country.fulfilmentMode) %></option><% }) %></select></label>
+        </div>
+        <p class="field-help">Radio availability, import requirements, and local fulfilment vary. The organizer will use the policy for your selected location and contact you if the exact item needs a manual check.</p>
+        <label>Notes <span class="optional">optional</span><textarea name="notes" rows="2"><%= values.notes || '' %></textarea></label>
+        <button class="button button-primary" type="submit" <%= cart.total > user.hertz ? 'disabled' : '' %>>Place order · <%= cart.total %> Hz</button>
+      </form>
+    </div>
+  <% } %>
+</main>
+<%- include('../partials/footer') %>
