@@ -92,7 +92,27 @@ async function activeCountries(store) {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export function projectRoutes({ store, config, ariClient, notifier }) {
+async function formContext(store, hackatimeClient, userId, force = false) {
+  const [countries, hackatime] = await Promise.all([
+    activeCountries(store),
+    hackatimeClient.projects(userId, { force }),
+  ]);
+  return { countries, hackatime };
+}
+
+function validateHackatimeSelection(input, hackatime) {
+  if (input.hackatimeProjects.length === 0) return [];
+  if (!hackatime.connected) return ["Connect Hackatime before linking coding projects."];
+  if (hackatime.error === "unavailable") {
+    return ["CQ could not verify those Hackatime projects. Refresh the list and try again."];
+  }
+  const available = new Set(hackatime.projects.map((project) => project.name));
+  return input.hackatimeProjects
+    .filter((name) => !available.has(name))
+    .map((name) => `“${name}” is not available in your connected Hackatime account.`);
+}
+
+export function projectRoutes({ store, config, ariClient, hackatimeClient, notifier }) {
   const router = Router();
   router.use(requireAuth);
 
@@ -118,19 +138,21 @@ export function projectRoutes({ store, config, ariClient, notifier }) {
   });
 
   router.get("/new", async (req, res) => {
+    const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: "Start a radio project", errors: [], values: {}, editing: false,
-      countries: await activeCountries(store),
+      ...context,
     });
   });
 
   router.post("/new", requireCsrf, async (req, res) => {
     const input = projectInput(req.body);
-    const errors = validateProject(input);
+    const context = await formContext(store, hackatimeClient, req.user.id);
+    const errors = [...validateProject(input), ...validateHackatimeSelection(input, context.hackatime)];
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: "Start a radio project", errors, values: req.body, editing: false,
-        countries: await activeCountries(store),
+        ...context,
       });
     }
     const id = randomId("cq_");
@@ -164,9 +186,10 @@ export function projectRoutes({ store, config, ariClient, notifier }) {
   router.get("/:id/edit", async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: `Edit ${project.title}`, errors: [], values: formValues(project), editing: true, project,
-      countries: await activeCountries(store),
+      ...context,
     });
   });
 
@@ -174,11 +197,12 @@ export function projectRoutes({ store, config, ariClient, notifier }) {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
     const input = projectInput(req.body);
-    const errors = validateProject(input);
+    const context = await formContext(store, hackatimeClient, req.user.id);
+    const errors = [...validateProject(input), ...validateHackatimeSelection(input, context.hackatime)];
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: `Edit ${project.title}`, errors, values: req.body, editing: true, project,
-        countries: await activeCountries(store),
+        ...context,
       });
     }
     await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project));

@@ -26,7 +26,20 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     status: async () => ({ ok: true, status: 200, body: { id: "AR-TEST", phase: "review", decision: null } }),
     withdraw: async () => ({ ok: true, status: 200, body: { status: "withdrawn" } }),
   };
-  const app = await createApp({ config, store, ariClient, logger: { info() {}, error() {} } });
+  const hackatimeClient = {
+    configured: () => true,
+    connection: async () => ({ configured: true, connected: true, account: { username: "admin-radio" } }),
+    projects: async () => ({
+      configured: true,
+      connected: true,
+      projects: [{ name: "iss-station", totalSeconds: 7200, hours: 2, mostRecentHeartbeat: null, languages: ["C++"], archived: false }],
+      fetchedAt: new Date().toISOString(),
+    }),
+    startConnection: async () => "https://hackatime.hackclub.com/oauth/authorize",
+    finishConnection: async () => ({ returnTo: "/app/profile" }),
+    disconnect: async () => {},
+  };
+  const app = await createApp({ config, store, ariClient, hackatimeClient, logger: { info() {}, error() {} } });
   const agent = request.agent(app);
 
   const home = await agent.get("/");
@@ -50,6 +63,8 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.match(dashboard.text, /Admin/);
 
   const newPage = await agent.get("/app/projects/new");
+  assert.match(newPage.text, /iss-station/);
+  assert.match(newPage.text, /2 hours/);
   const token = csrf(newPage.text);
   assert.ok(token);
   const create = await agent.post("/app/projects/new").type("form").send({

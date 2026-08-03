@@ -32,12 +32,40 @@
         <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %></option><% }) %></select></label>
         <label>Licence goal<input name="license_goal" value="<%= values.license_goal || '' %>" placeholder="Foundation licence"></label>
         <label>Callsign <span class="optional">when issued</span><input name="callsign" value="<%= values.callsign || '' %>" placeholder="VK7ABC"></label>
-        <label>Hackatime project keys<input name="hackatime_projects" value="<%= values.hackatime_projects || '' %>" placeholder="cq-radio, antenna-cad"><span class="field-help">Exact keys, comma separated. You can also prove time with work logs.</span></label>
       </div>
     </section>
 
     <section class="panel form-section">
-      <div class="form-section-heading"><span>03</span><div><h2>Review evidence</h2><p>These can be added later, but they are required when you submit for review.</p></div></div>
+      <div class="form-section-heading"><span>03</span><div><h2>Coding activity</h2><p>Select the Hackatime projects used for this build.</p></div></div>
+      <% const selectedHackatime = Array.isArray(values.hackatime_projects) ? values.hackatime_projects : String(values.hackatime_projects || '').split(',').map((value) => value.trim()).filter(Boolean); %>
+      <% if (hackatime.connected) { %>
+        <% if (hackatime.error === 'stale') { %><p class="config-note">Hackatime could not be reached, so this is your most recently saved project list.</p><% } %>
+        <% if (hackatime.projects.length) { %>
+          <fieldset class="hackatime-picker">
+            <legend class="sr-only">Hackatime projects</legend>
+            <% hackatime.projects.forEach((hackatimeProject) => { %>
+              <label class="hackatime-option">
+                <input type="checkbox" name="hackatime_projects" value="<%= hackatimeProject.name %>" <%= selectedHackatime.includes(hackatimeProject.name) ? 'checked' : '' %>>
+                <span><strong><%= hackatimeProject.name %></strong><small><%= hackatimeProject.hours %> hours<% if (hackatimeProject.languages.length) { %> · <%= hackatimeProject.languages.slice(0, 3).join(', ') %><% } %></small></span>
+              </label>
+            <% }) %>
+            <% selectedHackatime.filter((name) => !hackatime.projects.some((item) => item.name === name)).forEach((name) => { %>
+              <label class="hackatime-option unavailable"><input type="checkbox" name="hackatime_projects" value="<%= name %>" checked><span><strong><%= name %></strong><small>No longer returned by Hackatime</small></span></label>
+            <% }) %>
+          </fieldset>
+          <div class="picker-footer"><span class="field-help">Choose every coding project used for this build. Hardware-only work can be recorded with work logs.</span><button class="text-link" type="submit" formmethod="post" formaction="/app/hackatime/refresh" name="return_to" value="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>">Refresh list</button></div>
+        <% } else { %>
+          <div class="integration-prompt"><div><strong>No coding projects found</strong><p>Record some coding time in Hackatime, then refresh this list. Hardware-only work can still use CQ work logs.</p></div><button class="button button-ghost" type="submit" formmethod="post" formaction="/app/hackatime/refresh" name="return_to" value="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>">Refresh</button></div>
+        <% } %>
+      <% } else if (hackatime.configured) { %>
+        <div class="integration-prompt"><div><strong>Connect Hackatime</strong><p>CQ will automatically load your coding projects so you can select the ones used for this build.</p></div><a class="button button-primary" href="/app/hackatime/connect?return_to=<%= encodeURIComponent(editing ? `/app/projects/${project.id}/edit` : '/app/projects/new') %>">Connect</a></div>
+      <% } else { %>
+        <div class="integration-prompt"><div><strong>Hackatime is not configured yet</strong><p>You can create the project now and use timed work logs while the organizer finishes setup.</p></div></div>
+      <% } %>
+    </section>
+
+    <section class="panel form-section">
+      <div class="form-section-heading"><span>04</span><div><h2>Review evidence</h2><p>These can be added later, but they are required when you submit for review.</p></div></div>
       <div class="form-grid">
         <label class="span-two">Public thumbnail URL<input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://cdn.example.com/project.jpg"><span class="field-help">Use a public HTTP(S) image URL.</span></label>
         <label class="span-two">Demo or video URL <span class="optional">required for software</span><input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."></label>

@@ -47,3 +47,19 @@ test("Airtable receives ciphertext rather than sensitive document fields", async
   assert.equal(postBody.includes("1 Radio Road"), false);
   assert.deepEqual(await store.get("order", "one"), { id: "one", email: "maker@hackclub.com", address: "1 Radio Road" });
 });
+
+test("Airtable ignores incomplete placeholder rows", async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({
+    records: [
+      { id: "rec_blank", fields: {} },
+      { id: "rec_headers", fields: { Key: "Key", Type: "Type", Payload: "Payload" } },
+    ],
+  }), { status: 200 });
+  const store = new AirtableEncryptedStore({
+    ...config,
+    airtablePat: "pat_test",
+    airtableBaseId: "app_test",
+    airtableTableName: "CQ Data",
+  }, fetchImpl);
+  assert.deepEqual(await store.list("user"), []);
+});

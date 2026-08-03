@@ -10,5 +10,27 @@
     <div class="profile-readout"><span>Verification <strong><%= statusLabel(values.verificationStatus) %></strong></span><span>YSWS eligible <strong><%= values.yswsEligible === true ? 'Yes' : values.yswsEligible === false ? 'No' : 'Not reported' %></strong></span></div>
     <button class="button button-primary" type="submit">Save profile</button>
   </form>
+  <section class="panel integration-card">
+    <div>
+      <p class="eyebrow">Coding activity</p>
+      <h2>Hackatime</h2>
+      <% if (hackatime.connected) { %>
+        <p>Your account is connected. CQ can load your coding projects when you create or edit a project.</p>
+        <% if (hackatime.account?.username) { %><p class="integration-account">Connected as <strong><%= hackatime.account.username %></strong></p><% } %>
+      <% } else if (hackatime.configured) { %>
+        <p>Connect Hackatime to automatically find your coding projects and select the ones that belong to each CQ build.</p>
+      <% } else { %>
+        <p>The organizer still needs to configure the Hackatime connection.</p>
+      <% } %>
+    </div>
+    <div class="integration-actions">
+      <% if (hackatime.connected) { %>
+        <form method="post" action="/app/hackatime/refresh"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="return_to" value="/app/profile"><button class="button button-ghost" type="submit">Refresh projects</button></form>
+        <form method="post" action="/app/hackatime/disconnect"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Disconnect</button></form>
+      <% } else if (hackatime.configured) { %>
+        <a class="button button-primary" href="/app/hackatime/connect?return_to=%2Fapp%2Fprofile">Connect Hackatime</a>
+      <% } %>
+    </div>
+  </section>
 </main>
 <%- include('partials/footer') %>

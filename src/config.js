@@ -41,6 +41,12 @@ export function getConfig(overrides = {}) {
       overrides.hackClubRedirectUri ??
       process.env.HACKCLUB_REDIRECT_URI ??
       `${baseUrl}/auth/callback`,
+    hackatimeClientId: overrides.hackatimeClientId ?? process.env.HACKATIME_CLIENT_ID ?? "",
+    hackatimeClientSecret: overrides.hackatimeClientSecret ?? process.env.HACKATIME_CLIENT_SECRET ?? "",
+    hackatimeRedirectUri:
+      overrides.hackatimeRedirectUri ??
+      process.env.HACKATIME_REDIRECT_URI ??
+      `${baseUrl}/app/hackatime/callback`,
     devAuthBypass:
       !["production", "test"].includes(nodeEnv) &&
       String(overrides.devAuthBypass ?? process.env.DEV_AUTH_BYPASS ?? "false") === "true",

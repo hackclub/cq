@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { nowIso, setFlash } from "../utils.js";
 
-export function dashboardRoutes({ store }) {
+export function dashboardRoutes({ store, hackatimeClient }) {
   const router = Router();
   router.use(requireAuth);
 
@@ -41,8 +41,13 @@ export function dashboardRoutes({ store }) {
     });
   });
 
-  router.get("/profile", (req, res) => {
-    res.render("profile", { title: "Your profile", errors: [], values: req.user });
+  router.get("/profile", async (req, res) => {
+    res.render("profile", {
+      title: "Your profile",
+      errors: [],
+      values: req.user,
+      hackatime: await hackatimeClient.connection(req.user.id),
+    });
   });
 
   router.post("/profile", requireCsrf, async (req, res) => {
@@ -56,6 +61,7 @@ export function dashboardRoutes({ store }) {
         title: "Your profile",
         errors,
         values: { ...req.user, name, slackId },
+        hackatime: await hackatimeClient.connection(req.user.id),
       });
     }
     req.user.name = name;

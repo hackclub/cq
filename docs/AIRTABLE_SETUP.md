@@ -31,3 +31,9 @@ payload unrecoverable, while leaking it compromises the database.
 For local development without Airtable, CQ writes the same encrypted document
 format to `data/cq.local.json`. Production refuses to start without an explicit
 encryption key.
+
+If startup reports that a named Airtable record is not valid CQ ciphertext,
+either that row was entered manually or `DATA_ENCRYPTION_KEY` no longer matches
+the key that encrypted it. Delete only a clearly disposable placeholder row.
+For real CQ data, restore the original encryption key instead—changing the key
+cannot decrypt or migrate existing records.

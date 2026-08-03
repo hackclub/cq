@@ -80,7 +80,7 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       const messages = {
         "review.approved": `✅ *${project.title}* was approved! Open CQ to see the review and any hertz awarded for approved time.`,
         "review.changes": `🛠️ *${project.title}* was returned for changes.${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
-        "review.rejected": `⛔ *${project.title}* was denied.${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
+        "review.rejected": `⛔ Oh no! Unfortunately, *${project.title}* was denied. ${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
         "review.reverted": `↩️ The decision on *${project.title}* was reverted. Any reward from that decision has been removed while it is reconsidered.`,
         "review.requeued": `🔁 *${project.title}* is back in the review queue for a fresh look.`,
         "review.fraud": `🛡️ An additional integrity check finished for *${project.title}*. The CQ organizers will follow up if anything is needed.`,

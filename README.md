@@ -12,6 +12,8 @@ project.
   encrypted server sessions, CSRF protection, and admin roles
 - Project creation and editing, milestones, timed work logs, evidence, project
   updates, submission, status refresh, withdrawal, and decision history
+- Hackatime OAuth account linking and automatic, selectable project discovery;
+  access tokens and the short project cache are encrypted with all other records
 - Ari request signing, signed webhook verification, a five-minute replay window,
   idempotent delivery handling, approval ledger, and reversal handling
 - A real shop with encrypted shipping details, stock control, carts, locked
@@ -48,16 +50,19 @@ npm test
 1. Create a Hack Club Auth app and set its callback to
    `https://cq.hackclub.com/auth/callback`. Add the client ID, secret, and
    exact callback URI to the server environment.
-2. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md), generate a unique data
+2. Create a confidential Hackatime OAuth app under **My OAuth Apps**, set its
+   exact callback to `https://your-domain.example/app/hackatime/callback`, and
+   add its client ID and secret. CQ requests the `profile read` scopes.
+3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md), generate a unique data
    encryption key, and keep that key in the host's secret manager.
-3. Add the Ari program and signing secrets. Configure Ari's outgoing webhook URL
+4. Add the Ari program and signing secrets. Configure Ari's outgoing webhook URL
    as `https://your-domain.example/ari/webhook`.
-4. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
+5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
    then set `SLACK_BOT_TOKEN`. `SLACK_ADMIN_CHANNEL_ID` is optional and receives
    organizer-facing purchase notices.
-5. Set `ADMIN_EMAILS` to a comma-separated list of organizer Hack Club email
+6. Set `ADMIN_EMAILS` to a comma-separated list of organizer Hack Club email
    addresses. Those accounts receive the admin role when they sign in.
-6. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
+7. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
    `.env.example`.
 
 All credentials are server-only environment variables. Do not add `.env` to

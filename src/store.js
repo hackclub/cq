@@ -168,8 +168,22 @@ export class AirtableEncryptedStore extends BaseStore {
   }
 
   decode(record) {
-    const value = decryptRecord(record.fields.Payload, this.key);
-    this.cache.set(record.fields.Key, { recordId: record.id, value });
+    const key = String(record.fields?.Key || "").trim();
+    const type = String(record.fields?.Type || "").trim();
+    const payload = record.fields?.Payload;
+    // Airtable often starts a new table with an example or partially filled row.
+    // It is not application data unless its key and type match CQ's record format.
+    if (!key || !type || !payload || !key.startsWith(`${type}:`)) return null;
+    let value;
+    try {
+      value = decryptRecord(payload, this.key);
+    } catch (error) {
+      throw new Error(
+        `Airtable record “${key}” is not valid CQ ciphertext. Delete that row if it is a placeholder, or restore the DATA_ENCRYPTION_KEY that created it.`,
+        { cause: error },
+      );
+    }
+    this.cache.set(key, { recordId: record.id, value });
     return value;
   }
 
