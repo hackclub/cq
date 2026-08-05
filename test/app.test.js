@@ -46,6 +46,13 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(home.status, 200);
   assert.match(home.text, /Build your way/);
 
+  for (const weight of [400, 700]) {
+    const font = await agent.get(`/fonts/space-mono/space-mono-latin-${weight}-normal.woff2`);
+    assert.equal(font.status, 200);
+    assert.match(font.headers["content-type"], /font\/woff2/);
+    assert.ok(font.body.length > 10_000);
+  }
+
   const setup = await agent.get("/auth/login");
   assert.equal(setup.status, 503);
   assert.match(setup.text, /Local preview/);

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createRequire } from "node:module";
 import express from "express";
 import helmet from "helmet";
 import { createAriClient } from "./ari.js";
@@ -21,6 +22,11 @@ const consoleLogger = {
   info: (...args) => console.info(...args),
   error: (...args) => console.error(...args),
 };
+
+const require = createRequire(import.meta.url);
+const spaceMonoFilesPath = path.dirname(
+  require.resolve("@fontsource/space-mono/files/space-mono-latin-400-normal.woff2"),
+);
 
 export async function createApp({
   config, store = null, ariClient = null, hackatimeClient = null, slackNotifier = null, logger = consoleLogger, storeOptions = {},
@@ -64,7 +70,7 @@ export async function createApp({
   app.use("/ari/webhook", ariWebhookRoutes({ store: dataStore, config, notifier }));
   app.use(express.urlencoded({ extended: false, limit: "128kb" }));
   app.use("/fonts/space-mono", express.static(
-    path.join(config.projectRoot, "node_modules/@fontsource/space-mono/files"),
+    spaceMonoFilesPath,
     { maxAge: config.isProduction ? "1y" : 0, immutable: config.isProduction },
   ));
   app.use(express.static(path.join(config.projectRoot, "public"), { maxAge: config.isProduction ? "1d" : 0 }));
