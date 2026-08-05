@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
-import { projectInput, validateProject } from "../validation.js";
+import { isHttpUrl, projectInput, validateProject } from "../validation.js";
 
 const milestoneTemplates = [
   ["plan", "Choose your licence path and make a study plan"],
@@ -81,9 +81,32 @@ function readiness(project, journals, user) {
   const input = projectInput(formValues(project));
   const journalMinutes = journals.reduce((sum, journal) => sum + journal.minutes, 0);
   const errors = validateProject(input, { forSubmission: true, journalMinutes });
+  if (journals.some((journal) => !isHttpUrl(journal.imageUrl))) {
+    errors.push("Add a public progress image to every devlog.");
+  }
   if (!user.slackId) errors.push("Add your Hack Club Slack user ID to your profile.");
   if (user.yswsEligible !== true) errors.push("CQ could not confirm that your Hack Club account is currently YSWS eligible.");
   return { errors, journalMinutes };
+}
+
+function journalInput(body = {}) {
+  return {
+    entryDate: String(body.entry_date || ""),
+    minutes: Number.parseInt(body.minutes, 10),
+    text: String(body.text || "").trim().slice(0, 2000),
+    imageUrl: String(body.image_url || "").trim().slice(0, 500),
+  };
+}
+
+function validateJournal(input) {
+  const errors = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.entryDate)) errors.push("Choose a date for the devlog.");
+  if (!Number.isInteger(input.minutes) || input.minutes < 1 || input.minutes > 1440) {
+    errors.push("Enter between 1 and 1,440 minutes.");
+  }
+  if (input.text.length < 5) errors.push("Describe what changed in at least 5 characters.");
+  if (!isHttpUrl(input.imageUrl)) errors.push("Add a public HTTP or HTTPS progress image URL.");
+  return errors;
 }
 
 async function activeCountries(store) {
@@ -225,26 +248,41 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
   router.post("/:id/journals", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
-    const entryDate = String(req.body.entry_date || "");
-    const minutes = Number.parseInt(req.body.minutes, 10);
-    const text = String(req.body.text || "").trim().slice(0, 2000);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate) || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440 || text.length < 5) {
-      setFlash(res, "error", "Add a date, 1–1,440 minutes, and a short description.");
+    const input = journalInput(req.body);
+    const errors = validateJournal(input);
+    if (errors.length) {
+      setFlash(res, "error", errors[0]);
       return res.redirect(`/app/projects/${project.id}#work-log`);
     }
     const journal = {
       id: randomId("log_"),
       projectId: project.id,
-      entryDate,
-      minutes,
-      text,
+      ...input,
       createdAt: nowIso(),
+      updatedAt: nowIso(),
     };
     await store.put("journal", journal.id, journal);
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
-    setFlash(res, "success", "Work log added.");
+    setFlash(res, "success", "Devlog added.");
     res.redirect(`/app/projects/${project.id}#work-log`);
+  });
+
+  router.post("/:id/journals/:journalId/edit", requireCsrf, async (req, res) => {
+    const project = await ownedProject(store, req.params.id, req.user.id);
+    const journal = await store.get("journal", req.params.journalId);
+    if (!project || journal?.projectId !== project.id) return res.sendStatus(404);
+    const input = journalInput(req.body);
+    const errors = validateJournal(input);
+    if (errors.length) {
+      setFlash(res, "error", errors[0]);
+      return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
+    }
+    await store.put("journal", journal.id, { ...journal, ...input, updatedAt: nowIso() });
+    project.updatedAt = nowIso();
+    await store.put("project", project.id, project);
+    setFlash(res, "success", "Devlog updated.");
+    res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
   });
 
   router.post("/:id/journals/:journalId/delete", requireCsrf, async (req, res) => {
@@ -252,6 +290,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
     const journal = await store.get("journal", req.params.journalId);
     if (!project || journal?.projectId !== project.id) return res.sendStatus(404);
     await store.delete("journal", journal.id);
+    setFlash(res, "success", "Devlog removed.");
     res.redirect(`/app/projects/${project.id}#work-log`);
   });
 

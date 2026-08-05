@@ -6,7 +6,7 @@ function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
-export function adminRoutes({ store, ariClient, notifier }) {
+export function adminRoutes({ store, config, ariClient, hackatimeClient, notifier }) {
   const router = Router();
   router.use(requireAdmin);
 
@@ -28,6 +28,8 @@ export function adminRoutes({ store, ariClient, notifier }) {
       deliveries: sortNewest(deliveries).slice(0, 8),
       lowStock: products.filter((item) => item.stock <= 10).sort((a, b) => a.stock - b.stock),
       ariConfigured: ariClient.configured(),
+      hackatimeConfigured: hackatimeClient.configured(),
+      hackatimeRedirectUri: config.hackatimeRedirectUri,
     });
   });
 

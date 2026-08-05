@@ -249,10 +249,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
 .milestone-check { display: grid; place-items: center; width: 25px; height: 25px; border: 2px solid #abb2bd; border-radius: 50%; }
 .milestone.complete .milestone-check { background: var(--green); color: white; border-color: var(--green); }
 .journal-form { display: grid; grid-template-columns: 150px 100px minmax(0,1fr) auto; align-items: end; gap: 12px; }
+.journal-image-field { grid-column: 3/5; }
+.journal-text { grid-column: 1/4; }
+.journal-submit { grid-column: 4; grid-row: 2; }
 .journal-list { margin-top: 22px; }
 .journal-list article { position: relative; padding: 19px 0; border-top: 1px solid var(--line); }
 .journal-list article > div { display: flex; gap: 12px; color: var(--muted); font-size: 12px; }
 .journal-list p { margin-bottom: 4px; white-space: pre-wrap; }
+.journal-image { display: block; overflow: hidden; margin: 12px 0; border: 1px solid var(--line); border-radius: 14px; background: #e9edf1; }
+.journal-image img { display: block; width: 100%; max-height: 460px; object-fit: contain; }
+.missing-journal-image { margin: 12px 0; padding: 13px 15px; border: 1px solid #efafb9; border-radius: 10px; background: #fff3f5; color: #8d2233 !important; }
+.journal-edit { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #f4f5f5; }
+.journal-edit summary { cursor: pointer; font-weight: 700; }
+.journal-edit .form-grid { margin-top: 14px; }
 .text-button { padding: 0; border: 0; background: transparent; color: var(--red); font-weight: 700; }
 .danger-text { color: #a51f35; }
 .empty-inline { color: var(--muted); }
@@ -340,6 +349,10 @@ td small { display: block; color: var(--muted); }
 .error-signal { color: var(--red); font: 700 30px "Space Mono"; }
 .profile-readout { display: flex; gap: 12px; }
 .profile-readout span { display: grid; flex: 1; padding: 15px; background: #edf0f3; border-radius: 10px; color: var(--muted); font-size: 12px; }
+.oauth-setup-card { display: flex; align-items: center; justify-content: space-between; gap: 30px; margin-bottom: 20px; }
+.oauth-setup-card h2 { margin: 2px 0 6px; }
+.oauth-setup-card p { margin-bottom: 8px; }
+.oauth-setup-card code { display: block; overflow-wrap: anywhere; padding: 10px 12px; border-radius: 8px; background: #eef0f2; color: var(--ink-soft); }
 .integration-card { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-top: 20px; }
 .integration-card h2 { margin: 2px 0 8px; }
 .integration-card p { margin-bottom: 0; }
@@ -373,7 +386,8 @@ td small { display: block; color: var(--muted); }
   .steps-grid, .project-card-grid, .product-grid { grid-template-columns: repeat(2,1fr); }
   .project-sidebar { position: static; grid-template-columns: 1fr 1fr; }
   .journal-form { grid-template-columns: 1fr 1fr; }
-  .journal-text { grid-column: 1/-1; }
+  .journal-image-field, .journal-text { grid-column: 1/-1; }
+  .journal-submit { grid-column: auto; grid-row: auto; }
   .admin-metrics { grid-template-columns: repeat(2,1fr); }
   .inventory-form { grid-template-columns: repeat(2,1fr); }
   .inventory-form textarea { grid-column: span 2; }
@@ -399,7 +413,8 @@ td small { display: block; color: var(--muted); }
   .span-two { grid-column: auto; }
   .project-sidebar { grid-template-columns: 1fr; }
   .journal-form { grid-template-columns: 1fr; }
-  .journal-text { grid-column: auto; }
+  .journal-image-field, .journal-text { grid-column: auto; }
+  .oauth-setup-card { align-items: stretch; flex-direction: column; }
   .submission-status { grid-template-columns: 1fr; }
   .cart-list article { grid-template-columns: 50px 1fr auto; }
   .cart-list article form { grid-column: 2/3; }

@@ -94,7 +94,7 @@ export async function createApp({
   app.use("/app", dashboardRoutes({ store: dataStore, hackatimeClient: hackatime }));
   app.use("/app/projects", projectRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, notifier }));
   app.use("/app/shop", shopRoutes({ store: dataStore, notifier }));
-  app.use("/admin", adminRoutes({ store: dataStore, ariClient: ari, notifier }));
+  app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, notifier }));
 
   app.use((req, res) => {
     res.status(404).render("error", { title: "Signal lost", message: "That page is not on this frequency." });

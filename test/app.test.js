@@ -98,11 +98,46 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.doesNotMatch(projectPage.text, /\bAri\b/);
   const projectToken = csrf(projectPage.text);
 
+  const invalidDevlog = await agent.post(`${projectPath}/journals`).type("form").send({
+    _csrf: projectToken,
+    entry_date: "2026-08-05",
+    minutes: 45,
+    text: "Assembled the antenna elements.",
+  });
+  assert.equal(invalidDevlog.status, 302);
+  assert.equal((await store.list("journal")).length, 0);
+
+  const addDevlog = await agent.post(`${projectPath}/journals`).type("form").send({
+    _csrf: projectToken,
+    entry_date: "2026-08-05",
+    minutes: 45,
+    text: "Assembled the antenna elements and checked every connection.",
+    image_url: "https://example.com/antenna-progress.jpg",
+  });
+  assert.equal(addDevlog.status, 302);
+  const journal = (await store.list("journal"))[0];
+  assert.equal(journal.imageUrl, "https://example.com/antenna-progress.jpg");
+
+  const devlogPage = await agent.get(projectPath);
+  assert.match(devlogPage.text, /antenna-progress\.jpg/);
+  const editDevlog = await agent.post(`${projectPath}/journals/${journal.id}/edit`).type("form").send({
+    _csrf: csrf(devlogPage.text),
+    entry_date: "2026-08-05",
+    minutes: 50,
+    text: "Assembled the antenna elements, checked every connection, and measured continuity.",
+    image_url: "https://example.com/antenna-finished.jpg",
+  });
+  assert.equal(editDevlog.status, 302);
+  assert.equal((await store.get("journal", journal.id)).minutes, 50);
+  assert.equal((await store.get("journal", journal.id)).imageUrl, "https://example.com/antenna-finished.jpg");
+
   const submit = await agent.post(`${projectPath}/submit`).type("form").send({ _csrf: projectToken });
   assert.equal(submit.status, 302);
   const submissions = await store.list("submission");
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0].ariId, "AR-TEST");
+  assert.equal(submissions[0].payload.journals[0].image_url, "https://example.com/antenna-finished.jpg");
+  assert.match(submissions[0].payload.journals[0].text, /Progress image: https:\/\/example\.com\/antenna-finished\.jpg/);
 
   const webhookBody = JSON.stringify({
     event: "review.approved",
@@ -154,6 +189,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(adminProject.status, 200);
   assert.match(adminProject.text, /Eligibility and evidence/);
   assert.match(adminProject.text, /This station receives and decodes/);
+  assert.match(adminProject.text, /antenna-finished\.jpg/);
   const adminOrders = await agent.get("/admin/orders");
   assert.equal(adminOrders.status, 200);
   assert.match(adminOrders.text, /1 Radio Road/);

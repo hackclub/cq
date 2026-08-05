@@ -10,7 +10,7 @@ project.
 
 - Hack Club Auth OIDC sign-in with verified ID-token claims, state, nonce, PKCE,
   encrypted server sessions, CSRF protection, and admin roles
-- Project creation and editing, milestones, timed work logs, evidence, project
+- Project creation and editing, milestones, image-backed timed devlogs, evidence, project
   updates, submission, status refresh, withdrawal, and decision history
 - Hackatime OAuth account linking and automatic, selectable project discovery;
   access tokens and the short project cache are encrypted with all other records
@@ -64,6 +64,16 @@ npm test
    addresses. Those accounts receive the admin role when they sign in.
 7. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
    `.env.example`.
+
+Hackatime compares redirect URIs exactly. For the production domain in this
+repository, register this URI as its own line in **My OAuth Apps**:
+
+```text
+https://cq.rubensutton.hackclub.app/app/hackatime/callback
+```
+
+Do not add a trailing slash. The admin dashboard shows the callback CQ is
+currently using so it can be compared directly with Hackatime after deployment.
 
 All credentials are server-only environment variables. Do not add `.env` to
 source control.

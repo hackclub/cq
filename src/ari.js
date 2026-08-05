@@ -47,7 +47,8 @@ export function buildAriPayload({ project, user, journals, config, country = nul
     payload.journals = journals.map((journal) => ({
       at: journal.entryDate,
       minutes: journal.minutes,
-      text: journal.text,
+      text: journal.imageUrl ? `${journal.text}\nProgress image: ${journal.imageUrl}` : journal.text,
+      ...(journal.imageUrl ? { image_url: journal.imageUrl } : {}),
     }));
   }
   if (project.isUpdate || project.updateMessage) {
