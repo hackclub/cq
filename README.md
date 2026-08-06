@@ -115,6 +115,20 @@ dashboard start command must not be configured. Set the environment variables
 from `.env.example` in the platform's secret/environment settings; do not copy
 the local `.env` into the image.
 
+For a host that supports Docker Compose, `docker-compose.yml` builds the same
+image and passes through every documented setting. Locally, copy `.env.example`
+to `.env`, fill in the required production values, then run:
+
+```sh
+docker compose up --build -d
+docker compose logs -f cq
+```
+
+Stop it with `docker compose down`. `CQ_HOST_PORT` changes only the host-side
+port if port 3000 is already occupied; `PORT` controls the container port and
+defaults to 3000. Compose reads `.env` for substitution but Docker excludes it
+from the image.
+
 ## Country policies
 
 Country rules are seeded conservatively and can be edited under **Admin →
