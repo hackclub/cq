@@ -1,0 +1,32 @@
+services:
+  cq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${CQ_HOST_PORT:-3000}:${PORT:-3000}"
+    environment:
+      NODE_ENV: production
+      PORT: "${PORT:-3000}"
+      BASE_URL: "${BASE_URL:-http://localhost:3000}"
+      SESSION_COOKIE_NAME: "${SESSION_COOKIE_NAME:-cq_session}"
+      SESSION_DAYS: "${SESSION_DAYS:-14}"
+      HACKCLUB_CLIENT_ID: "${HACKCLUB_CLIENT_ID:-}"
+      HACKCLUB_CLIENT_SECRET: "${HACKCLUB_CLIENT_SECRET:-}"
+      HACKCLUB_REDIRECT_URI: "${HACKCLUB_REDIRECT_URI:-http://localhost:3000/auth/callback}"
+      HACKATIME_CLIENT_ID: "${HACKATIME_CLIENT_ID:-}"
+      HACKATIME_CLIENT_SECRET: "${HACKATIME_CLIENT_SECRET:-}"
+      HACKATIME_REDIRECT_URI: "${HACKATIME_REDIRECT_URI:-http://localhost:3000/app/hackatime/callback}"
+      DEV_AUTH_BYPASS: "false"
+      AIRTABLE_PAT: "${AIRTABLE_PAT:-}"
+      AIRTABLE_BASE_ID: "${AIRTABLE_BASE_ID:-}"
+      AIRTABLE_TABLE_NAME: "${AIRTABLE_TABLE_NAME:-CQ Data}"
+      DATA_ENCRYPTION_KEY: "${DATA_ENCRYPTION_KEY:-}"
+      ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
+      SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN:-}"
+      SLACK_ADMIN_CHANNEL_ID: "${SLACK_ADMIN_CHANNEL_ID:-}"
+      ARI_PROGRAM_ID: "${ARI_PROGRAM_ID:-}"
+      ARI_SIGNING_SECRET: "${ARI_SIGNING_SECRET:-}"
+      ARI_WEBHOOK_SECRET: "${ARI_WEBHOOK_SECRET:-}"
