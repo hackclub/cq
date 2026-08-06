@@ -78,6 +78,43 @@ currently using so it can be compared directly with Hackatime after deployment.
 All credentials are server-only environment variables. Do not add `.env` to
 source control.
 
+## Railpack deployment
+
+CQ is one server-rendered Node application, not a monorepo or a static export.
+The included `railpack.json` installs the locked dependencies with `npm ci` and
+starts the production server with `npm start`.
+
+If the hosting dashboard overrides repository settings, use:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | Leave empty |
+| Install command | `npm ci` |
+| Build command | Leave empty |
+| Output directory | Leave empty |
+| Start command | `npm start` |
+
+Do not use `apps/web`: that directory does not exist in this repository. Do not
+set an output directory, because doing so changes the deployment into a static
+site and prevents the Express server, authentication, webhooks, and Slack bot
+from running. The host must provide `PORT`; CQ already listens on it.
+
+### Docker deployment
+
+The production `Dockerfile` uses Node 20, installs only locked runtime
+dependencies, runs as the unprivileged `node` user, and checks `/healthz` for
+container health. On a platform with a Dockerfile builder:
+
+- select **Dockerfile** instead of Railpack;
+- leave the root directory empty;
+- leave install, build, output, and start overrides empty;
+- use `Dockerfile` as the Dockerfile path if the platform asks for one.
+
+The container starts the Express server itself, so a static output directory or
+dashboard start command must not be configured. Set the environment variables
+from `.env.example` in the platform's secret/environment settings; do not copy
+the local `.env` into the image.
+
 ## Country policies
 
 Country rules are seeded conservatively and can be edited under **Admin →

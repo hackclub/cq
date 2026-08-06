@@ -67,6 +67,7 @@ export async function createApp({
       },
     }),
   );
+  app.get("/healthz", (req, res) => res.status(200).type("text/plain").send("ok"));
   app.use("/ari/webhook", ariWebhookRoutes({ store: dataStore, config, notifier }));
   app.use(express.urlencoded({ extended: false, limit: "128kb" }));
   app.use("/fonts/space-mono", express.static(
