@@ -34,7 +34,7 @@
           <label>Postal code<input name="postal_code" value="<%= values.postal_code || '' %>" required></label>
           <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %> · <%= statusLabel(country.fulfilmentMode) %></option><% }) %></select></label>
         </div>
-        <p class="field-help">Radio availability, import requirements, and local fulfilment vary. The organizer will use the policy for your selected location and contact you if the exact item needs a manual check.</p>
+        <p class="field-help">Radio availability, ownership and import requirements vary. Transmitting radios also require CQ's readiness check before fulfilment. The organizer will review your location and contact you if the item, grant, or shipping route needs a manual check.</p>
         <label>Notes <span class="optional">optional</span><textarea name="notes" rows="2"><%= values.notes || '' %></textarea></label>
         <button class="button button-primary" type="submit" <%= cart.total > user.hertz ? 'disabled' : '' %>>Place order · <%= cart.total %> Hz</button>
       </form>

@@ -31,26 +31,30 @@
       </section>
 
       <section class="panel" id="work-log">
-        <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Devlog</h2></div><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %> hours</strong></div>
-        <form method="post" action="/app/projects/<%= project.id %>/journals" class="journal-form">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <label>Date<input type="date" name="entry_date" value="<%= new Date().toISOString().slice(0, 10) %>" required></label>
-          <label>Minutes<input type="number" name="minutes" min="1" max="1440" value="60" required></label>
-          <label class="journal-image-field">Progress image URL<input type="url" name="image_url" maxlength="500" required placeholder="https://example.com/progress.jpg"><span class="field-help">Paste a direct, publicly viewable image link.</span></label>
-          <label class="journal-text">What changed?<textarea name="text" rows="2" minlength="5" maxlength="2000" required placeholder="Cut and tuned the driven element; SWR is now 1.4 at 145.8 MHz."></textarea></label>
-          <button class="button button-primary journal-submit" type="submit">Add devlog</button>
-        </form>
+        <div class="panel-heading devlog-heading"><div><p class="eyebrow">Build story</p><h2>Devlog</h2><p>Post concrete progress as you make it. Every entry needs visual evidence.</p></div><div class="devlog-total"><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %></strong><span>hours logged</span></div></div>
+        <details class="devlog-composer" <%= !journals.length ? 'open' : '' %>>
+          <summary><span><b>＋</b><strong>Add a progress update</strong></span><small>title, notes, time and images</small></summary>
+          <form method="post" action="/app/projects/<%= project.id %>/journals" class="journal-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="journal-title">Update title<input name="title" minlength="3" maxlength="120" required placeholder="Tuned the antenna for 2 m"></label>
+            <label>Date<input type="date" name="entry_date" value="<%= new Date().toISOString().slice(0, 10) %>" required></label>
+            <label>Time spent <span class="optional">minutes</span><input type="number" name="minutes" min="1" max="1440" value="60" required></label>
+            <label class="journal-text">What changed?<textarea name="text" rows="5" minlength="5" maxlength="2000" required placeholder="Explain what you built, changed, tested, learned, or fixed. Specific details make the progress easy to review."></textarea></label>
+            <label class="journal-image-field">Evidence image links<textarea name="image_urls" rows="5" maxlength="4007" required placeholder="https://example.com/antenna-build.jpg&#10;https://example.com/swr-reading.jpg"></textarea><span class="field-help">One direct, publicly viewable image URL per line. At least one is required; up to eight are supported.</span></label>
+            <div class="journal-submit"><span>Devlogs become part of your project review evidence.</span><button class="button button-primary" type="submit">Post update</button></div>
+          </form>
+        </details>
         <% if (!journals.length) { %>
-          <p class="empty-inline">No devlogs yet. Add a concrete progress note and an image showing the work.</p>
+          <div class="devlog-empty"><span aria-hidden="true">↳</span><div><strong>Your build story starts here.</strong><p>Post the first thing you made, tested, or changed—not study notes on their own.</p></div></div>
         <% } else { %>
           <div class="journal-list">
-            <% journals.forEach((journal) => { %>
+            <% journals.forEach((journal, index) => { %>
               <article id="devlog-<%= journal.id %>">
-                <div><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div>
-                <% if (journal.imageUrl) { %><a class="journal-image" href="<%= journal.imageUrl %>" target="_blank" rel="noreferrer"><img src="<%= journal.imageUrl %>" alt="Progress evidence for the <%= formatDate(journal.entryDate) %> devlog" loading="lazy" referrerpolicy="no-referrer"></a><% } else { %><div class="missing-journal-image">This older devlog needs a progress image before submission.</div><% } %>
-                <p><%= journal.text %></p>
-                <details class="journal-edit"><summary>Edit devlog</summary><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/edit" class="form-grid"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label>Date<input type="date" name="entry_date" value="<%= journal.entryDate %>" required></label><label>Minutes<input type="number" name="minutes" min="1" max="1440" value="<%= journal.minutes %>" required></label><label class="span-two">Progress image URL<input type="url" name="image_url" maxlength="500" value="<%= journal.imageUrl || '' %>" required></label><label class="span-two">What changed?<textarea name="text" rows="3" minlength="5" maxlength="2000" required><%= journal.text %></textarea></label><button class="button button-primary" type="submit">Save devlog</button></form></details>
-                <form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/delete" data-confirm="Remove this devlog?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="text-button" type="submit">Remove</button></form>
+                <div class="devlog-marker"><span></span></div>
+                <header><div><span class="devlog-entry-number">UPDATE <%= String(journals.length - index).padStart(2, '0') %></span><h3><%= journal.title || 'Project update' %></h3></div><div class="devlog-meta"><time datetime="<%= journal.entryDate %>"><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header>
+                <p class="devlog-body"><%= journal.text %></p>
+                <% if (journal.imageUrls.length) { %><div class="devlog-gallery <%= journal.imageUrls.length === 1 ? 'single' : '' %>"><% journal.imageUrls.forEach((imageUrl, imageIndex) => { %><a class="journal-image" href="<%= imageUrl %>" target="_blank" rel="noreferrer"><img src="<%= imageUrl %>" alt="Evidence <%= imageIndex + 1 %> for <%= journal.title || 'project update' %>" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div><% } else { %><div class="missing-journal-image">This older devlog needs a progress image before submission.</div><% } %>
+                <details class="journal-edit"><summary>Manage update</summary><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/edit" class="form-grid"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label class="span-two">Title<input name="title" minlength="3" maxlength="120" value="<%= journal.title || 'Project update' %>" required></label><label>Date<input type="date" name="entry_date" value="<%= journal.entryDate %>" required></label><label>Minutes<input type="number" name="minutes" min="1" max="1440" value="<%= journal.minutes %>" required></label><label class="span-two">Evidence image links<textarea name="image_urls" rows="4" maxlength="4007" required><%= journal.imageUrls.join('\n') %></textarea></label><label class="span-two">What changed?<textarea name="text" rows="5" minlength="5" maxlength="2000" required><%= journal.text %></textarea></label><div class="button-row span-two"><button class="button button-primary" type="submit">Save update</button></div></form><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/delete" data-confirm="Remove this devlog?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="text-button danger-text" type="submit">Remove this update</button></form></details>
               </article>
             <% }) %>
           </div>

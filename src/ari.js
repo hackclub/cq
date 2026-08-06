@@ -44,12 +44,19 @@ export function buildAriPayload({ project, user, journals, config, country = nul
   };
   if (project.demoUrl) payload.demo_url = project.demoUrl;
   if (journals.length) {
-    payload.journals = journals.map((journal) => ({
-      at: journal.entryDate,
-      minutes: journal.minutes,
-      text: journal.imageUrl ? `${journal.text}\nProgress image: ${journal.imageUrl}` : journal.text,
-      ...(journal.imageUrl ? { image_url: journal.imageUrl } : {}),
-    }));
+    payload.journals = journals.map((journal) => {
+      const imageUrls = [...new Set(
+        (Array.isArray(journal.imageUrls) && journal.imageUrls.length ? journal.imageUrls : [journal.imageUrl]).filter(Boolean),
+      )];
+      const imageEvidence = imageUrls.map((url) => `Progress image: ${url}`).join("\n");
+      return {
+        at: journal.entryDate,
+        minutes: journal.minutes,
+        text: [journal.title, journal.text, imageEvidence].filter(Boolean).join("\n\n"),
+        ...(imageUrls[0] ? { image_url: imageUrls[0] } : {}),
+        ...(imageUrls.length ? { image_urls: imageUrls } : {}),
+      };
+    });
   }
   if (project.isUpdate || project.updateMessage) {
     payload.is_update = true;

@@ -115,6 +115,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     _csrf: projectToken,
     entry_date: "2026-08-05",
     minutes: 45,
+    title: "Built the antenna",
     text: "Assembled the antenna elements and checked every connection.",
     image_url: "https://example.com/antenna-progress.jpg",
   });
@@ -128,12 +129,17 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     _csrf: csrf(devlogPage.text),
     entry_date: "2026-08-05",
     minutes: 50,
+    title: "Finished the antenna",
     text: "Assembled the antenna elements, checked every connection, and measured continuity.",
-    image_url: "https://example.com/antenna-finished.jpg",
+    image_urls: "https://example.com/antenna-finished.jpg\nhttps://example.com/swr-reading.jpg",
   });
   assert.equal(editDevlog.status, 302);
   assert.equal((await store.get("journal", journal.id)).minutes, 50);
   assert.equal((await store.get("journal", journal.id)).imageUrl, "https://example.com/antenna-finished.jpg");
+  assert.deepEqual((await store.get("journal", journal.id)).imageUrls, [
+    "https://example.com/antenna-finished.jpg",
+    "https://example.com/swr-reading.jpg",
+  ]);
 
   const submit = await agent.post(`${projectPath}/submit`).type("form").send({ _csrf: projectToken });
   assert.equal(submit.status, 302);
@@ -141,6 +147,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0].ariId, "AR-TEST");
   assert.equal(submissions[0].payload.journals[0].image_url, "https://example.com/antenna-finished.jpg");
+  assert.equal(submissions[0].payload.journals[0].image_urls.length, 2);
   assert.match(submissions[0].payload.journals[0].text, /Progress image: https:\/\/example\.com\/antenna-finished\.jpg/);
 
   const webhookBody = JSON.stringify({

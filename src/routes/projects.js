@@ -72,7 +72,8 @@ async function details(store, projectId) {
   ]);
   return {
     milestones: milestones.filter((item) => item.projectId === projectId).sort((a, b) => a.sortOrder - b.sortOrder),
-    journals: journals.filter((item) => item.projectId === projectId).sort((a, b) => b.entryDate.localeCompare(a.entryDate)),
+    journals: journals.filter((item) => item.projectId === projectId).sort((a, b) =>
+      b.entryDate.localeCompare(a.entryDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))),
     submissions: submissions.filter((item) => item.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
 }
@@ -81,7 +82,7 @@ function readiness(project, journals, user) {
   const input = projectInput(formValues(project));
   const journalMinutes = journals.reduce((sum, journal) => sum + journal.minutes, 0);
   const errors = validateProject(input, { forSubmission: true, journalMinutes });
-  if (journals.some((journal) => !isHttpUrl(journal.imageUrl))) {
+  if (journals.some((journal) => journalImages(journal).length === 0)) {
     errors.push("Add a public progress image to every devlog.");
   }
   if (!user.slackId) errors.push("Add your Hack Club Slack user ID to your profile.");
@@ -89,12 +90,31 @@ function readiness(project, journals, user) {
   return { errors, journalMinutes };
 }
 
+function journalImages(journal = {}) {
+  const candidates = Array.isArray(journal.imageUrls) && journal.imageUrls.length
+    ? journal.imageUrls
+    : [journal.imageUrl];
+  return [...new Set(candidates.map((url) => String(url || "").trim()).filter(isHttpUrl))];
+}
+
+function parseImageUrls(body = {}) {
+  const submitted = String(body.image_urls || body.image_url || "");
+  return [...new Set(submitted
+    .split(/\r?\n/)
+    .map((url) => url.trim().slice(0, 500))
+    .filter(Boolean))]
+    .slice(0, 8);
+}
+
 function journalInput(body = {}) {
+  const imageUrls = parseImageUrls(body);
   return {
     entryDate: String(body.entry_date || ""),
     minutes: Number.parseInt(body.minutes, 10),
+    title: String(body.title || "").trim().slice(0, 120),
     text: String(body.text || "").trim().slice(0, 2000),
-    imageUrl: String(body.image_url || "").trim().slice(0, 500),
+    imageUrls,
+    imageUrl: imageUrls[0] || "",
   };
 }
 
@@ -104,8 +124,10 @@ function validateJournal(input) {
   if (!Number.isInteger(input.minutes) || input.minutes < 1 || input.minutes > 1440) {
     errors.push("Enter between 1 and 1,440 minutes.");
   }
+  if (input.title.length < 3) errors.push("Give this devlog a short title.");
   if (input.text.length < 5) errors.push("Describe what changed in at least 5 characters.");
-  if (!isHttpUrl(input.imageUrl)) errors.push("Add a public HTTP or HTTPS progress image URL.");
+  if (input.imageUrls.length === 0) errors.push("Add at least one public HTTP or HTTPS progress image URL.");
+  if (input.imageUrls.some((url) => !isHttpUrl(url))) errors.push("Every progress image must use a public HTTP or HTTPS URL.");
   return errors;
 }
 
@@ -200,6 +222,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
       title: project.title,
       project,
       ...projectDetails,
+      journals: projectDetails.journals.map((journal) => ({
+        ...journal,
+        imageUrls: journalImages(journal),
+      })),
       readiness: readiness(project, projectDetails.journals, req.user),
       ariConfigured: ariClient.configured(),
       country,

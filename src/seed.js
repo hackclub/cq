@@ -1,8 +1,9 @@
 const products = [
-  ["uv-k5", "Quansheng UV-K5", "A flexible dual-band handheld with a huge community firmware ecosystem.", 35, 40, "/assets/radio_img.png", "radios", 10],
-  ["uv-5r", "Baofeng UV-5R", "The classic beginner handheld: compact, well documented, and easy to experiment with.", 30, 40, "/assets/radio_img.png", "radios", 20],
+  ["uv-k5", "Quansheng UV-K5", "A flexible dual-band handheld with a huge community firmware ecosystem. A short radio-readiness check is required before fulfilment.", 35, 40, "/assets/radio_img.png", "radios", 10],
+  ["uv-5r", "Baofeng UV-5R", "The classic beginner handheld: compact, well documented, and easy to experiment with. A short radio-readiness check is required before fulfilment.", 30, 40, "/assets/radio_img.png", "radios", 20],
   ["yagi-kit", "Tape-measure Yagi kit", "Everything needed to build a portable directional antenna for satellites and the ISS.", 20, 60, "/assets/antenna_img.png", "build kits", 30],
   ["rtl-sdr", "RTL-SDR receiver", "Listen to repeaters, satellites, weather stations, and the ISS from a computer.", 45, 35, "/assets/sattelite.png", "receivers", 40],
+  ["licence-grant", "Amateur radio licence grant", "Funding toward your local amateur-radio exam or licence fees, issued as a grant through HCB. The amount and process depend on your country.", 100, 25, "/assets/waveform.jpeg", "licence support", 50],
 ];
 
 const countries = [
@@ -62,8 +63,10 @@ export async function seedStore(store) {
     store.list("product"),
     store.list("country"),
   ]);
-  if (!existingProducts.length) {
-    await Promise.all(products.map(async ([id, name, description, price, stock, image, category, sortOrder]) => {
+  const existingProductIds = new Set(existingProducts.map((product) => product.id));
+  const missingProducts = products.filter(([id]) => !existingProductIds.has(id));
+  if (missingProducts.length) {
+    await Promise.all(missingProducts.map(async ([id, name, description, price, stock, image, category, sortOrder]) => {
       await store.put("product", id, { id, name, description, price, stock, image, category, sortOrder, active: true });
     }));
   }
