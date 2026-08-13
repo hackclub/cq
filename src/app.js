@@ -3,8 +3,10 @@ import { createRequire } from "node:module";
 import express from "express";
 import helmet from "helmet";
 import { createAriClient } from "./ari.js";
-import { sessionMiddleware } from "./auth.js";
+import { hasPermission, isOrganizer, roleDefinitions, sessionMiddleware, userRoles } from "./auth.js";
+import { createCdnClient } from "./cdn.js";
 import { createHackatimeClient } from "./hackatime.js";
+import { renderMarkdown } from "./markdown.js";
 import { adminRoutes } from "./routes/admin.js";
 import { ariWebhookRoutes } from "./routes/ari-webhook.js";
 import { authRoutes } from "./routes/auth.js";
@@ -29,13 +31,14 @@ const spaceMonoFilesPath = path.dirname(
 );
 
 export async function createApp({
-  config, store = null, ariClient = null, hackatimeClient = null, slackNotifier = null, logger = consoleLogger, storeOptions = {},
+  config, store = null, ariClient = null, hackatimeClient = null, cdnClient = null, slackNotifier = null, logger = consoleLogger, storeOptions = {},
 } = {}) {
   if (!config) throw new Error("createApp requires config");
   const dataStore = store ?? await createStore(config, storeOptions);
   await seedStore(dataStore);
   const ari = ariClient ?? createAriClient(config);
   const hackatime = hackatimeClient ?? createHackatimeClient(config, dataStore);
+  const cdn = cdnClient ?? createCdnClient(config);
   const notifier = slackNotifier ?? createSlackNotifier(config, dataStore);
   const app = express();
 
@@ -49,6 +52,11 @@ export async function createApp({
   app.locals.formatDate = formatDate;
   app.locals.formatDateTime = formatDateTime;
   app.locals.statusLabel = statusLabel;
+  app.locals.renderMarkdown = renderMarkdown;
+  app.locals.hasPermission = hasPermission;
+  app.locals.isOrganizer = isOrganizer;
+  app.locals.roleDefinitions = roleDefinitions;
+  app.locals.userRoles = userRoles;
 
   app.set("view engine", "ejs");
   app.set("views", path.join(config.projectRoot, "views"));
@@ -93,7 +101,7 @@ export async function createApp({
   app.use("/auth", authRoutes({ store: dataStore, config }));
   app.use("/app/hackatime", hackatimeRoutes({ client: hackatime, logger }));
   app.use("/app", dashboardRoutes({ store: dataStore, hackatimeClient: hackatime }));
-  app.use("/app/projects", projectRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, notifier }));
+  app.use("/app/projects", projectRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, cdnClient: cdn, notifier }));
   app.use("/app/shop", shopRoutes({ store: dataStore, notifier }));
   app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, notifier }));
 

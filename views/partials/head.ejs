@@ -25,7 +25,7 @@
             <a class="<%= currentPath === '/app' ? 'active' : '' %>" href="/app">Dashboard</a>
             <a class="<%= currentPath.startsWith('/app/projects') ? 'active' : '' %>" href="/app/projects">Projects</a>
             <a class="<%= currentPath.startsWith('/app/shop') ? 'active' : '' %>" href="/app/shop">Shop <span class="nav-count"><%= cartCount %></span></a>
-            <% if (user.role === 'admin') { %><a class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin">Admin</a><% } %>
+            <% if (isOrganizer(user)) { %><a class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin">Organizer</a><% } %>
             <a href="/app/profile"><%= user.name %> · <%= user.hertz %> Hz</a>
             <form method="post" action="/auth/logout">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">

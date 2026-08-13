@@ -33,6 +33,7 @@ export function getConfig(overrides = {}) {
       .filter(Boolean),
     slackBotToken: overrides.slackBotToken ?? process.env.SLACK_BOT_TOKEN ?? "",
     slackAdminChannelId: overrides.slackAdminChannelId ?? process.env.SLACK_ADMIN_CHANNEL_ID ?? "",
+    hackClubCdnApiKey: overrides.hackClubCdnApiKey ?? process.env.HACKCLUB_CDN_API_KEY ?? "",
     sessionCookieName: overrides.sessionCookieName ?? process.env.SESSION_COOKIE_NAME ?? "cq_session",
     sessionDays: integer(overrides.sessionDays ?? process.env.SESSION_DAYS, 14),
     hackClubClientId: overrides.hackClubClientId ?? process.env.HACKCLUB_CLIENT_ID ?? "",

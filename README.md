@@ -10,8 +10,9 @@ project.
 
 - Hack Club Auth OIDC sign-in with verified ID-token claims, state, nonce, PKCE,
   encrypted server sessions, CSRF protection, and admin roles
-- Project creation and editing, milestones, image-backed timed devlogs, evidence, project
-  updates, submission, status refresh, withdrawal, and decision history
+- Project creation and editing, milestones, Markdown devlogs timed from new
+  linked-project Hackatime activity, drag-and-drop CDN image uploads, evidence,
+  project updates, submission, status refresh, withdrawal, and decision history
 - Hackatime OAuth account linking and automatic, selectable project discovery;
   access tokens and the short project cache are encrypted with all other records
 - Ari request signing, signed webhook verification, a five-minute replay window,
@@ -60,9 +61,12 @@ npm test
 5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
    then set `SLACK_BOT_TOKEN`. `SLACK_ADMIN_CHANNEL_ID` is optional and receives
    organizer-facing purchase notices.
-6. Set `ADMIN_EMAILS` to a comma-separated list of organizer Hack Club email
+6. Create a server API key in [Hack Club CDN](https://cdn.hackclub.com/api_keys)
+   and set `HACKCLUB_CDN_API_KEY`. CQ uses it for permanent devlog image uploads;
+   the key is never sent to participants' browsers.
+7. Set `ADMIN_EMAILS` to a comma-separated list of organizer Hack Club email
    addresses. Those accounts receive the admin role when they sign in.
-7. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
+8. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
    `.env.example`.
 
 Hackatime compares redirect URIs exactly. For the production domain in this

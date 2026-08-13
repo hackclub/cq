@@ -1305,6 +1305,144 @@ input:focus, select:focus, textarea:focus {
   grid-column: span 3;
 }
 
+.hackatime-earned {
+  display: flex;
+  align-items: center;
+  grid-column: 2/4;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid #e2c98b;
+  border-radius: 11px;
+  background: #fff8e6;
+}
+
+.hackatime-earned.ready {
+  border-color: #acdcca;
+  background: #eaf9f3;
+}
+
+.hackatime-earned>span {
+  color: var(--red);
+  font-size: 24px;
+}
+
+.hackatime-earned strong, .hackatime-earned p {
+  display: block;
+  margin: 0;
+}
+
+.hackatime-earned p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 700;
+}
+
+.image-dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  padding: 24px;
+  border: 2px dashed #b9c1cc;
+  border-radius: 13px;
+  text-align: center;
+  background: white;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.image-dropzone:hover, .image-dropzone.dragging {
+  border-color: var(--red);
+  background: #fff5f6;
+  transform: translateY(-1px);
+}
+
+.image-dropzone.uploading {
+  border-color: var(--cyan);
+  background: #effbf8;
+}
+
+.image-dropzone.disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.image-dropzone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 9px;
+  border-radius: 50%;
+  background: var(--red);
+  color: white;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.image-dropzone small {
+  margin-top: 5px;
+  color: var(--muted);
+}
+
+.upload-status {
+  min-height: 18px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.upload-preview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.upload-preview:empty {
+  display: none;
+}
+
+.upload-preview-item {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #e9edf1;
+}
+
+.upload-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-preview-item button {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: rgb(10 18 33 / 85%);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .journal-submit {
   display: flex;
   align-items: center;
@@ -1419,7 +1557,51 @@ input:focus, select:focus, textarea:focus {
   margin: 17px 0;
   color: #313947;
   line-height: 1.7;
-  white-space: pre-wrap;
+}
+
+.markdown-body>*:first-child {
+  margin-top: 0;
+}
+
+.markdown-body>*:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  margin: 1.25em 0 .45em;
+  letter-spacing: -.025em;
+}
+
+.markdown-body h1 { font-size: 26px; }
+.markdown-body h2 { font-size: 22px; }
+.markdown-body h3 { font-size: 18px; }
+
+.markdown-body pre, .markdown-body code {
+  font-family: "Space Mono", monospace;
+}
+
+.markdown-body code {
+  padding: .12em .35em;
+  border-radius: 5px;
+  background: #edf0f2;
+  font-size: .88em;
+}
+
+.markdown-body pre {
+  overflow-x: auto;
+  padding: 14px;
+  border-radius: 9px;
+  background: #101a2d;
+  color: #e9eef6;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-body blockquote {
+  margin: 16px 0;
 }
 
 .devlog-gallery {
@@ -2242,7 +2424,7 @@ td small {
     grid-template-columns: 1fr 1fr;
   }
 
-  .journal-title, .journal-image-field, .journal-text, .journal-submit {
+  .journal-title, .journal-image-field, .journal-text, .journal-submit, .hackatime-earned {
     grid-column: 1/-1;
   }
 
@@ -2349,7 +2531,7 @@ td small {
     grid-template-columns: 1fr;
   }
 
-  .journal-title, .journal-image-field, .journal-text, .journal-submit {
+  .journal-title, .journal-image-field, .journal-text, .journal-submit, .hackatime-earned {
     grid-column: 1;
   }
 
@@ -2372,6 +2554,10 @@ td small {
 
   .devlog-gallery {
     grid-template-columns: 1fr;
+  }
+
+  .upload-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .journal-image {

@@ -8,6 +8,7 @@ import {
   startOAuth,
   upsertUser,
   requireCsrf,
+  userRoles,
 } from "../auth.js";
 import { nowIso, randomId, safeReturnTo, setFlash } from "../utils.js";
 
@@ -67,6 +68,9 @@ export function authRoutes({ store, config }) {
     const users = await store.list("user");
     const existing = users.find((user) => user.email === email);
     const id = existing?.id ?? randomId("user_");
+    const roles = config.adminEmails.includes(email)
+      ? ["participant", "admin"]
+      : [...new Set(["participant", ...userRoles(existing || {}).filter((role) => role !== "participant")])];
     await store.put("user", id, {
       id,
       hackClubId: existing?.hackClubId ?? `dev!${id}`,
@@ -76,7 +80,8 @@ export function authRoutes({ store, config }) {
       verificationStatus: "verified",
       yswsEligible: true,
       hertz: existing?.hertz ?? 200,
-      role: config.adminEmails.includes(email) ? "admin" : existing?.role ?? "participant",
+      roles,
+      role: roles.includes("admin") ? "admin" : "participant",
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp,
     });

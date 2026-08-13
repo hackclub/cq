@@ -26,20 +26,25 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     status: async () => ({ ok: true, status: 200, body: { id: "AR-TEST", phase: "review", decision: null } }),
     withdraw: async () => ({ ok: true, status: 200, body: { status: "withdrawn" } }),
   };
+  let hackatimeSeconds = 7200;
   const hackatimeClient = {
     configured: () => true,
     connection: async () => ({ configured: true, connected: true, account: { username: "admin-radio" } }),
     projects: async () => ({
       configured: true,
       connected: true,
-      projects: [{ name: "iss-station", totalSeconds: 7200, hours: 2, mostRecentHeartbeat: null, languages: ["C++"], archived: false }],
+      projects: [{ name: "iss-station", totalSeconds: hackatimeSeconds, hours: hackatimeSeconds / 3600, mostRecentHeartbeat: null, languages: ["C++"], archived: false }],
       fetchedAt: new Date().toISOString(),
     }),
     startConnection: async () => "https://hackatime.hackclub.com/oauth/authorize",
     finishConnection: async () => ({ returnTo: "/app/profile" }),
     disconnect: async () => {},
   };
-  const app = await createApp({ config, store, ariClient, hackatimeClient, logger: { info() {}, error() {} } });
+  const cdnClient = {
+    configured: () => true,
+    upload: async (file) => ({ id: "cdn-test", filename: file.originalname, url: `https://cdn.hackclub.com/test/${file.originalname}` }),
+  };
+  const app = await createApp({ config, store, ariClient, hackatimeClient, cdnClient, logger: { info() {}, error() {} } });
   const agent = request.agent(app);
 
   const home = await agent.get("/");
@@ -102,6 +107,14 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.doesNotMatch(projectPage.text, /\bAri\b/);
   const projectToken = csrf(projectPage.text);
 
+  const upload = await agent.post(`${projectPath.replace(/\/cq_[^/]+$/, "")}/uploads/images`)
+    .set("x-csrf-token", projectToken)
+    .attach("images", Buffer.from("fake image"), { filename: "progress.png", contentType: "image/png" });
+  assert.equal(upload.status, 200);
+  assert.equal(upload.body.images[0].url, "https://cdn.hackclub.com/test/progress.png");
+
+  hackatimeSeconds = 9900;
+
   const invalidDevlog = await agent.post(`${projectPath}/journals`).type("form").send({
     _csrf: projectToken,
     entry_date: "2026-08-05",
@@ -113,28 +126,36 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
 
   const addDevlog = await agent.post(`${projectPath}/journals`).type("form").send({
     _csrf: projectToken,
-    entry_date: "2026-08-05",
-    minutes: 45,
     title: "Built the antenna",
-    text: "Assembled the antenna elements and checked every connection.",
+    text: "## Assembly\n\nAssembled the antenna elements and checked every connection. <script>alert('no')</script>",
     image_url: "https://example.com/antenna-progress.jpg",
   });
   assert.equal(addDevlog.status, 302);
   const journal = (await store.list("journal"))[0];
   assert.equal(journal.imageUrl, "https://example.com/antenna-progress.jpg");
+  assert.equal(journal.minutes, 45);
+  assert.equal(journal.hackatimeSeconds, 2700);
 
   const devlogPage = await agent.get(projectPath);
   assert.match(devlogPage.text, /antenna-progress\.jpg/);
+  assert.match(devlogPage.text, /<h2>Assembly<\/h2>/);
+  assert.doesNotMatch(devlogPage.text, /<script>alert/);
+  const noNewActivity = await agent.post(`${projectPath}/journals`).type("form").send({
+    _csrf: csrf(devlogPage.text),
+    title: "Duplicate activity",
+    text: "This should not claim the same Hackatime activity twice.",
+    image_url: "https://example.com/duplicate.jpg",
+  });
+  assert.equal(noNewActivity.status, 302);
+  assert.equal((await store.list("journal")).length, 1);
   const editDevlog = await agent.post(`${projectPath}/journals/${journal.id}/edit`).type("form").send({
     _csrf: csrf(devlogPage.text),
-    entry_date: "2026-08-05",
-    minutes: 50,
     title: "Finished the antenna",
     text: "Assembled the antenna elements, checked every connection, and measured continuity.",
     image_urls: "https://example.com/antenna-finished.jpg\nhttps://example.com/swr-reading.jpg",
   });
   assert.equal(editDevlog.status, 302);
-  assert.equal((await store.get("journal", journal.id)).minutes, 50);
+  assert.equal((await store.get("journal", journal.id)).minutes, 45);
   assert.equal((await store.get("journal", journal.id)).imageUrl, "https://example.com/antenna-finished.jpg");
   assert.deepEqual((await store.get("journal", journal.id)).imageUrls, [
     "https://example.com/antenna-finished.jpg",

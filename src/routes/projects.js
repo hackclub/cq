@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
@@ -36,8 +37,17 @@ function formValues(project) {
   };
 }
 
-function toProjectRecord(id, userId, input, existing = {}) {
+function hackatimeTotals(projectNames, availableProjects) {
+  const selected = new Set(projectNames);
+  return Object.fromEntries(availableProjects
+    .filter((project) => selected.has(project.name))
+    .map((project) => [project.name, Math.max(0, Number(project.totalSeconds) || 0)]));
+}
+
+function toProjectRecord(id, userId, input, existing = {}, availableHackatimeProjects = []) {
   const timestamp = nowIso();
+  const currentTotals = hackatimeTotals(input.hackatimeProjects, availableHackatimeProjects);
+  const existingBaseline = existing.hackatimeBaseline || {};
   return {
     id,
     userId,
@@ -47,6 +57,10 @@ function toProjectRecord(id, userId, input, existing = {}) {
     demoUrl: input.demoUrl,
     thumbnailUrl: input.thumbnailUrl,
     hackatimeProjects: input.hackatimeProjects,
+    hackatimeBaseline: Object.fromEntries(input.hackatimeProjects.map((name) => [
+      name,
+      Number.isFinite(existingBaseline[name]) ? existingBaseline[name] : (currentTotals[name] ?? 0),
+    ])),
     evidence: input.evidence.length ? input.evidence : ["commits", "elapsed", "devlog"],
     track: input.track,
     status: existing.status ?? "building",
@@ -75,6 +89,35 @@ async function details(store, projectId) {
     journals: journals.filter((item) => item.projectId === projectId).sort((a, b) =>
       b.entryDate.localeCompare(a.entryDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))),
     submissions: submissions.filter((item) => item.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  };
+}
+
+function hackatimeActivity(project, journals, hackatime) {
+  if (!project.hackatimeProjects.length) {
+    return { ready: false, reason: "Link at least one Hackatime project before posting a devlog.", seconds: 0, minutes: 0, currentTotals: {} };
+  }
+  if (!hackatime.connected) {
+    return { ready: false, reason: "Connect Hackatime before posting a devlog.", seconds: 0, minutes: 0, currentTotals: {} };
+  }
+  if (hackatime.error === "unavailable") {
+    return { ready: false, reason: "CQ could not refresh your Hackatime activity. Try again in a moment.", seconds: 0, minutes: 0, currentTotals: {} };
+  }
+  const currentTotals = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
+  const missing = project.hackatimeProjects.filter((name) => currentTotals[name] === undefined);
+  if (missing.length) {
+    return { ready: false, reason: `Hackatime no longer returned: ${missing.join(", ")}. Refresh or update the linked projects.`, seconds: 0, minutes: 0, currentTotals };
+  }
+  const previous = journals[0]?.hackatimeSnapshot || project.hackatimeBaseline || {};
+  const seconds = project.hackatimeProjects.reduce(
+    (sum, name) => sum + Math.max(0, currentTotals[name] - Math.max(0, Number(previous[name]) || 0)),
+    0,
+  );
+  return {
+    ready: seconds >= 60,
+    reason: seconds >= 60 ? "" : "No new Hackatime activity has appeared on the linked projects since your last devlog.",
+    seconds,
+    minutes: Math.round((seconds / 60) * 100) / 100,
+    currentTotals,
   };
 }
 
@@ -109,8 +152,6 @@ function parseImageUrls(body = {}) {
 function journalInput(body = {}) {
   const imageUrls = parseImageUrls(body);
   return {
-    entryDate: String(body.entry_date || ""),
-    minutes: Number.parseInt(body.minutes, 10),
     title: String(body.title || "").trim().slice(0, 120),
     text: String(body.text || "").trim().slice(0, 2000),
     imageUrls,
@@ -120,10 +161,6 @@ function journalInput(body = {}) {
 
 function validateJournal(input) {
   const errors = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.entryDate)) errors.push("Choose a date for the devlog.");
-  if (!Number.isInteger(input.minutes) || input.minutes < 1 || input.minutes > 1440) {
-    errors.push("Enter between 1 and 1,440 minutes.");
-  }
   if (input.title.length < 3) errors.push("Give this devlog a short title.");
   if (input.text.length < 5) errors.push("Describe what changed in at least 5 characters.");
   if (input.imageUrls.length === 0) errors.push("Add at least one public HTTP or HTTPS progress image URL.");
@@ -157,9 +194,27 @@ function validateHackatimeSelection(input, hackatime) {
     .map((name) => `“${name}” is not available in your connected Hackatime account.`);
 }
 
-export function projectRoutes({ store, config, ariClient, hackatimeClient, notifier }) {
+export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnClient, notifier }) {
   const router = Router();
+  const imageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024, files: 8 },
+    fileFilter: (req, file, callback) => callback(null, ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype)),
+  });
   router.use(requireAuth);
+
+  router.post("/uploads/images", imageUpload.array("images", 8), requireCsrf, async (req, res) => {
+    if (!cdnClient?.configured()) return res.status(503).json({ error: "Image uploads are not configured yet." });
+    if (!req.files?.length) return res.status(422).json({ error: "Choose at least one JPG, PNG, WebP, or GIF image." });
+    try {
+      const uploaded = [];
+      for (const file of req.files) uploaded.push(await cdnClient.upload(file));
+      return res.json({ images: uploaded });
+    } catch (error) {
+      req.app.locals.logger.error("Devlog image upload failed", error);
+      return res.status(502).json({ error: "The image upload failed. Please try again." });
+    }
+  });
 
   router.get("/", async (req, res) => {
     const [allProjects, milestones, journals] = await Promise.all([
@@ -201,7 +256,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
       });
     }
     const id = randomId("cq_");
-    const project = toProjectRecord(id, req.user.id, input);
+    const project = toProjectRecord(id, req.user.id, input, {}, context.hackatime.projects);
     await store.put("project", id, project);
     await Promise.all(milestoneTemplates.map(async ([slug, title], index) => {
       const milestone = { id: `${id}_${slug}`, projectId: id, slug, title, complete: false, sortOrder: index };
@@ -214,10 +269,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
   router.get("/:id", async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
-    const [projectDetails, country] = await Promise.all([
+    const [projectDetails, country, hackatime] = await Promise.all([
       details(store, project.id),
       store.get("country", project.countryCode),
+      hackatimeClient.projects(req.user.id, { force: true }),
     ]);
+    if (project.hackatimeProjects.length && !project.hackatimeBaseline) {
+      project.hackatimeBaseline = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
+      project.updatedAt = nowIso();
+      await store.put("project", project.id, project);
+    }
     res.render("projects/show", {
       title: project.title,
       project,
@@ -229,6 +290,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
       readiness: readiness(project, projectDetails.journals, req.user),
       ariConfigured: ariClient.configured(),
       country,
+      hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
+      imageUploadsConfigured: Boolean(cdnClient?.configured()),
     });
   });
 
@@ -254,7 +317,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
         ...context,
       });
     }
-    await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project));
+    await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project, context.hackatime.projects));
     setFlash(res, "success", "Project details saved.");
     res.redirect(`/app/projects/${project.id}`);
   });
@@ -280,16 +343,35 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, notif
       setFlash(res, "error", errors[0]);
       return res.redirect(`/app/projects/${project.id}#work-log`);
     }
-    const journal = {
-      id: randomId("log_"),
-      projectId: project.id,
-      ...input,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
-    await store.put("journal", journal.id, journal);
-    project.updatedAt = nowIso();
-    await store.put("project", project.id, project);
+    try {
+      await store.withLock(`devlog:${project.id}`, async () => {
+        const [freshDetails, hackatime] = await Promise.all([
+          details(store, project.id),
+          hackatimeClient.projects(req.user.id, { force: true }),
+        ]);
+        const activity = hackatimeActivity(project, freshDetails.journals, hackatime);
+        if (!activity.ready) throw new Error(activity.reason);
+        const timestamp = nowIso();
+        const journal = {
+          id: randomId("log_"),
+          projectId: project.id,
+          ...input,
+          entryDate: timestamp.slice(0, 10),
+          minutes: activity.minutes,
+          hackatimeSeconds: activity.seconds,
+          hackatimeSnapshot: activity.currentTotals,
+          hackatimeProjects: [...project.hackatimeProjects],
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        await store.put("journal", journal.id, journal);
+        project.updatedAt = timestamp;
+        await store.put("project", project.id, project);
+      });
+    } catch (error) {
+      setFlash(res, "error", error.message || "Could not calculate new Hackatime activity.");
+      return res.redirect(`/app/projects/${project.id}#work-log`);
+    }
     setFlash(res, "success", "Devlog added.");
     res.redirect(`/app/projects/${project.id}#work-log`);
   });

@@ -8,6 +8,56 @@ const tokenEndpoint = `${issuer}/oauth/token`;
 const userinfoEndpoint = `${issuer}/oauth/userinfo`;
 const jwks = createRemoteJWKSet(new URL(`${issuer}/oauth/discovery/keys`));
 
+export const roleDefinitions = {
+  reviewer: {
+    label: "Reviewer",
+    description: "Review projects, inspect submissions, and update project decisions.",
+    permissions: ["projects.review", "reviews.read"],
+  },
+  shop_editor: {
+    label: "Shop editor",
+    description: "Add products and manage shop pricing, stock, and availability.",
+    permissions: ["shop.manage"],
+  },
+  fulfilment_manager: {
+    label: "Fulfilment manager",
+    description: "Process, track, cancel, and refund participant orders.",
+    permissions: ["orders.manage"],
+  },
+  country_editor: {
+    label: "Country policy editor",
+    description: "Maintain country-specific radio guidance and fulfilment policies.",
+    permissions: ["countries.manage"],
+  },
+  support: {
+    label: "Support",
+    description: "Inspect Slack notification delivery and participant-facing operational issues.",
+    permissions: ["notifications.read"],
+  },
+  admin: {
+    label: "Administrator",
+    description: "Full access, including users, roles, hertz, and every organizer tool.",
+    permissions: ["*"],
+  },
+};
+
+export function userRoles(user = {}) {
+  const candidates = Array.isArray(user.roles) ? user.roles : [user.role];
+  return [...new Set(candidates.filter((role) => role === "participant" || roleDefinitions[role]))];
+}
+
+export function hasPermission(user, permission) {
+  const roles = userRoles(user);
+  return roles.some((role) => {
+    const permissions = roleDefinitions[role]?.permissions || [];
+    return permissions.includes("*") || permissions.includes(permission);
+  });
+}
+
+export function isOrganizer(user) {
+  return userRoles(user).some((role) => role !== "participant");
+}
+
 export function authConfigured(config) {
   return Boolean(config.hackClubClientId && config.hackClubClientSecret && config.hackClubRedirectUri);
 }
@@ -86,6 +136,10 @@ export async function upsertUser(store, config, profile) {
   const email = String(profile.email).toLowerCase();
   const existing = users.find((user) => user.hackClubId === profile.sub || user.email === email);
   const timestamp = nowIso();
+  const existingRoles = userRoles(existing || {});
+  const roles = config.adminEmails.includes(email)
+    ? [...new Set(["participant", ...existingRoles, "admin"])]
+    : [...new Set(["participant", ...existingRoles.filter((role) => role !== "participant")])];
   const user = {
     id: existing?.id ?? randomId("user_"),
     hackClubId: profile.sub,
@@ -96,7 +150,8 @@ export async function upsertUser(store, config, profile) {
     yswsEligible:
       typeof profile.ysws_eligible === "boolean" ? profile.ysws_eligible : existing?.yswsEligible ?? null,
     hertz: existing?.hertz ?? 0,
-    role: config.adminEmails.includes(email) ? "admin" : existing?.role ?? "participant",
+    roles,
+    role: roles.includes("admin") ? "admin" : "participant",
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
@@ -141,6 +196,7 @@ export function sessionMiddleware(store, config) {
       req.user = user;
       req.csrfToken = user ? session.csrfToken : null;
       res.locals.user = user;
+      res.locals.userRoles = userRoles(user || {});
       res.locals.csrfToken = req.csrfToken;
       next();
     } catch (error) {
@@ -154,14 +210,27 @@ export function requireAuth(req, res, next) {
   return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
 }
 
-export function requireAdmin(req, res, next) {
+export function requireOrganizer(req, res, next) {
   if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
-  if (req.user.role !== "admin") return res.status(403).render("error", {
-    title: "Admin frequency only",
+  if (!isOrganizer(req.user)) return res.status(403).render("error", {
+    title: "Organizer frequency only",
     message: "Your account does not have organizer access.",
   });
   next();
 }
+
+export function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
+    if (!hasPermission(req.user, permission)) return res.status(403).render("error", {
+      title: "Permission required",
+      message: "Your organizer roles do not allow this action.",
+    });
+    next();
+  };
+}
+
+export const requireAdmin = requirePermission("users.manage");
 
 export function requireCsrf(req, res, next) {
   const supplied = String(req.body?._csrf ?? req.get("x-csrf-token") ?? "");
