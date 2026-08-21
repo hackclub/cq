@@ -53,7 +53,14 @@ export function shopRoutes({ store, notifier }) {
       title: "Your cart",
       cart: await getCart(store, req.user.id),
       errors: [],
-      values: { shipping_name: req.user.name },
+      values: {
+        shipping_name: [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.name,
+        address_line_1: req.user.addressLine1 || "",
+        address_line_2: req.user.addressLine2 || "",
+        city: req.user.city || "",
+        region: req.user.region || "",
+        postal_code: req.user.postalCode || "",
+      },
       countries,
     });
   });

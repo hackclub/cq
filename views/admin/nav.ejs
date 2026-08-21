@@ -1,10 +1,10 @@
 <nav class="admin-tabs" aria-label="Admin sections">
   <a class="<%= currentPath === '/admin' ? 'active' : '' %>" href="/admin">Overview</a>
-  <a class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>" href="/admin/users">Users</a>
-  <a class="<%= currentPath.startsWith('/admin/projects') ? 'active' : '' %>" href="/admin/projects">Projects</a>
-  <a class="<%= currentPath.startsWith('/admin/reviews') ? 'active' : '' %>" href="/admin/reviews">Ari reviews</a>
-  <a class="<%= currentPath.startsWith('/admin/orders') ? 'active' : '' %>" href="/admin/orders">Orders</a>
-  <a class="<%= currentPath.startsWith('/admin/shop') ? 'active' : '' %>" href="/admin/shop">Shop</a>
-  <a class="<%= currentPath.startsWith('/admin/countries') ? 'active' : '' %>" href="/admin/countries">Countries</a>
-  <a class="<%= currentPath.startsWith('/admin/notifications') ? 'active' : '' %>" href="/admin/notifications">Slack</a>
+  <% if (hasPermission(user, 'users.manage')) { %><a class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>" href="/admin/users">Users</a><% } %>
+  <% if (hasPermission(user, 'projects.review')) { %><a class="<%= currentPath.startsWith('/admin/projects') ? 'active' : '' %>" href="/admin/projects">Projects</a><% } %>
+  <% if (hasPermission(user, 'reviews.read')) { %><a class="<%= currentPath.startsWith('/admin/reviews') ? 'active' : '' %>" href="/admin/reviews">Review queue</a><% } %>
+  <% if (hasPermission(user, 'orders.manage')) { %><a class="<%= currentPath.startsWith('/admin/orders') ? 'active' : '' %>" href="/admin/orders">Orders</a><% } %>
+  <% if (hasPermission(user, 'shop.manage')) { %><a class="<%= currentPath.startsWith('/admin/shop') ? 'active' : '' %>" href="/admin/shop">Shop</a><% } %>
+  <% if (hasPermission(user, 'countries.manage')) { %><a class="<%= currentPath.startsWith('/admin/countries') ? 'active' : '' %>" href="/admin/countries">Countries</a><% } %>
+  <% if (hasPermission(user, 'notifications.read')) { %><a class="<%= currentPath.startsWith('/admin/notifications') ? 'active' : '' %>" href="/admin/notifications">Slack</a><% } %>
 </nav>

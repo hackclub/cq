@@ -11,8 +11,9 @@ const milestoneTemplates = [
   ["licence", "Pass your amateur radio exam"],
   ["callsign", "Receive your callsign"],
   ["build", "Build and document a radio project"],
-  ["ship", "Prepare your project for review"],
+  ["ship", "Ship your project"],
 ];
+const milestoneTitles = Object.fromEntries(milestoneTemplates);
 
 async function ownedProject(store, projectId, userId) {
   const project = await store.get("project", projectId);
@@ -34,6 +35,9 @@ function formValues(project) {
     tags: project.tags.join(", "),
     is_update: project.isUpdate,
     update_message: project.updateMessage,
+    original_work: project.originalWork,
+    not_school_assignment: project.notSchoolAssignment,
+    not_paid_hack_club_work: project.notPaidHackClubWork,
   };
 }
 
@@ -73,6 +77,9 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     tags: input.tags,
     isUpdate: input.isUpdate,
     updateMessage: input.updateMessage,
+    originalWork: input.originalWork,
+    notSchoolAssignment: input.notSchoolAssignment,
+    notPaidHackClubWork: input.notPaidHackClubWork,
     createdAt: existing.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
@@ -85,7 +92,10 @@ async function details(store, projectId) {
     store.list("submission"),
   ]);
   return {
-    milestones: milestones.filter((item) => item.projectId === projectId).sort((a, b) => a.sortOrder - b.sortOrder),
+    milestones: milestones
+      .filter((item) => item.projectId === projectId)
+      .map((item) => ({ ...item, title: milestoneTitles[item.slug] || item.title }))
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     journals: journals.filter((item) => item.projectId === projectId).sort((a, b) =>
       b.entryDate.localeCompare(a.entryDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))),
     submissions: submissions.filter((item) => item.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -121,7 +131,17 @@ function hackatimeActivity(project, journals, hackatime) {
   };
 }
 
-function readiness(project, journals, user) {
+function submissionJournals(journals, submissions) {
+  const usedIds = new Set(submissions.flatMap((item) => item.journalIds || []));
+  if (usedIds.size) return journals.filter((journal) => !usedIds.has(journal.id));
+  if (submissions.length) {
+    const latestCreatedAt = submissions[0].createdAt;
+    return journals.filter((journal) => String(journal.createdAt || "") > latestCreatedAt);
+  }
+  return journals;
+}
+
+function readiness(project, journals, user, { hasPriorSubmission = false } = {}) {
   const input = projectInput(formValues(project));
   const journalMinutes = journals.reduce((sum, journal) => sum + journal.minutes, 0);
   const errors = validateProject(input, { forSubmission: true, journalMinutes });
@@ -130,6 +150,11 @@ function readiness(project, journals, user) {
   }
   if (!user.slackId) errors.push("Add your Hack Club Slack user ID to your profile.");
   if (user.yswsEligible !== true) errors.push("CQ could not confirm that your Hack Club account is currently YSWS eligible.");
+  if (![user.firstName, user.lastName, user.birthday, user.addressLine1, user.city, user.region, user.postalCode, user.addressCountry].every(Boolean)) {
+    errors.push("Complete your legal name, birthday, and address in your profile before submitting.");
+  }
+  if (hasPriorSubmission && journals.length === 0) errors.push("Add new devlogs before submitting a project update.");
+  if (hasPriorSubmission && !project.isUpdate) errors.push("Mark this as an update and describe the meaningful new work before resubmitting.");
   return { errors, journalMinutes };
 }
 
@@ -287,7 +312,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...journal,
         imageUrls: journalImages(journal),
       })),
-      readiness: readiness(project, projectDetails.journals, req.user),
+      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 }),
       ariConfigured: ariClient.configured(),
       country,
       hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
@@ -416,7 +441,12 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
     const projectDetails = await details(store, project.id);
-    const state = readiness(project, projectDetails.journals, req.user);
+    if (project.status === "rejected") {
+      setFlash(res, "error", "A denied project cannot be resubmitted unless an organizer reopens it.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
+    const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
+    const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
       return res.redirect(`/app/projects/${project.id}#submission`);
@@ -426,7 +456,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#submission`);
     }
     const country = await store.get("country", project.countryCode);
-    const payload = buildAriPayload({ project, user: req.user, journals: projectDetails.journals, config, country });
+    const payload = buildAriPayload({ project, user: req.user, journals: journalsForSubmission, config, country });
     const timestamp = nowIso();
     const submission = {
       id: randomId("ship_"),
@@ -438,6 +468,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       decision: null,
       event: null,
       review: null,
+      journalIds: journalsForSubmission.map((journal) => journal.id),
       attemptCount: 1,
       lastError: null,
       createdAt: timestamp,

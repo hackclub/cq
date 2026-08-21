@@ -21,7 +21,7 @@
       <a href="/app/projects">View all</a>
     </div>
     <% if (!projects.length) { %>
-      <div class="empty-state"><img src="/assets/sattelite.png" alt=""><h3>No projects transmitting yet.</h3><p>Build an antenna, radio circuit, SDR experiment, digital mode, or ham-radio software tool. Studying alone is not a project.</p><a class="button button-primary" href="/app/projects/new">Create your first project</a></div>
+      <div class="empty-state"><img src="/assets/sattelite.png" alt=""><h3>No projects transmitting yet.</h3><p>Your first project could be an antenna, radio circuit, SDR experiment, digital mode, or ham-radio software tool.</p><a class="button button-primary" href="/app/projects/new">Create your first project</a></div>
     <% } else { %>
       <div class="project-list">
         <% projects.forEach((project) => { %>

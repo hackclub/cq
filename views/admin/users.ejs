@@ -1,22 +1,21 @@
 <%- include('../partials/head') %>
 <main id="main" class="app-main shell">
-  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Users</h1><p>Identity fields are decrypted only inside the Node server.</p></div></div>
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Users and roles</h1><p>Give organizers only the access they need. Airtable records remain readable to authorized base collaborators.</p></div></div>
   <%- include('nav') %>
   <div class="panel table-wrap">
     <table>
-      <thead><tr><th>Participant</th><th>Verification</th><th>Hertz</th><th>Role</th><th>Adjust</th></tr></thead>
+      <thead><tr><th>Participant</th><th>Verification</th><th>Hertz</th><th>Roles and adjustment</th></tr></thead>
       <tbody>
         <% users.forEach((item) => { %>
           <tr>
             <td><strong><%= item.name %></strong><small><%= item.email %><br><%= item.slackId || 'No Slack ID' %></small></td>
             <td><%= statusLabel(item.verificationStatus) %><small><%= item.yswsEligible === true ? 'YSWS eligible' : item.yswsEligible === false ? 'Not eligible' : 'Eligibility unknown' %></small></td>
             <td><strong><%= item.hertz %></strong></td>
-            <td><span class="status-pill"><%= item.role %></span></td>
             <td>
-              <form method="post" action="/admin/users/<%= item.id %>" class="inline-admin-form">
+              <form method="post" action="/admin/users/<%= item.id %>" class="user-role-form">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="number" name="hertz_delta" value="0" step="0.01" aria-label="Hertz adjustment">
-                <select name="role" aria-label="Role"><option value="participant" <%= item.role === 'participant' ? 'selected' : '' %>>Participant</option><option value="admin" <%= item.role === 'admin' ? 'selected' : '' %>>Admin</option></select>
+                <div class="role-picker"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= userRoles(item).includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %></div>
+                <label class="compact-input">Hertz adjustment<input type="number" name="hertz_delta" value="0" step="0.01"></label>
                 <button class="button button-small" type="submit">Save</button>
               </form>
             </td>

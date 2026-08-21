@@ -23,6 +23,7 @@ services:
       AIRTABLE_PAT: "${AIRTABLE_PAT:-}"
       AIRTABLE_BASE_ID: "${AIRTABLE_BASE_ID:-}"
       AIRTABLE_TABLE_NAME: "${AIRTABLE_TABLE_NAME:-CQ Data}"
+      # Optional for Airtable; retained for encrypted local/legacy data migration.
       DATA_ENCRYPTION_KEY: "${DATA_ENCRYPTION_KEY:-}"
       ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
       SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN:-}"

@@ -1,0 +1,46 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <%- include('nav') %>
+  <div class="project-hero">
+    <div><p class="eyebrow">Review · <%= submission.id %></p><h1><%= project.title %></h1><p><%= project.description %></p></div>
+    <div class="button-row"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div>
+  </div>
+  <div class="review-workspace">
+    <div class="project-main-column">
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Submission</p><h2>What to verify</h2></div><span class="status-pill status-<%= submission.decision || submission.phase %>"><%= statusLabel(submission.decision || submission.phase) %></span></div>
+        <dl class="admin-detail-list">
+          <div><dt>Maker</dt><dd><%= maker?.name || 'Unknown' %> · <%= maker?.email || '' %></dd></div>
+          <div><dt>Type</dt><dd><%= statusLabel(project.track) %> · <%= statusLabel(project.projectType) %></dd></div>
+          <div><dt>Radio relevance</dt><dd><%= project.radioRelevance %></dd></div>
+          <div><dt>Hackatime projects</dt><dd><%= project.hackatimeProjects.join(', ') || 'None linked' %></dd></div>
+          <div><dt>Country</dt><dd><%= country?.name || project.countryCode %></dd></div>
+          <div><dt>Logged time</dt><dd><strong><%= Math.round((loggedMinutes / 60) * 100) / 100 %> hours</strong> (<%= loggedMinutes %> minutes)</dd></div>
+          <div><dt>AI statement</dt><dd><%= project.aiStatement || 'None supplied' %></dd></div>
+        </dl>
+      </section>
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Devlog</h2></div><strong><%= journals.length %> updates</strong></div>
+        <% if (!journals.length) { %><p class="empty-inline">No devlogs were attached.</p><% } %>
+        <div class="journal-list"><% journals.forEach((journal) => { const images = journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : []); %><article><header><h3><%= journal.title || 'Project update' %></h3><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((url) => { %><a class="journal-image" href="<%= url %>" target="_blank" rel="noreferrer"><img src="<%= url %>" alt="Progress evidence" loading="lazy"></a><% }) %></div></article><% }) %></div>
+      </section>
+      <% if (actions.length) { %><section class="panel"><div class="panel-heading"><h2>Audit trail</h2></div><div class="compact-list"><% actions.forEach((action) => { %><div><span><strong><%= action.reviewerName %> · <%= statusLabel(action.action) %></strong><small><%= action.internalNote || action.noteToMaker || '' %></small></span><time><%= formatDateTime(action.createdAt) %></time></div><% }) %></div></section><% } %>
+    </div>
+    <aside class="project-sidebar">
+      <section class="panel compact-panel"><p class="eyebrow">Assignment</p><strong><%= reviewers.find((item) => item.id === submission.assignedReviewerId)?.name || 'Unclaimed' %></strong><form method="post" action="/admin/reviews/<%= submission.id %>/claim"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="<%= submission.assignedReviewerId === user.id ? 'release' : 'claim' %>"><button class="button button-ghost" type="submit"><%= submission.assignedReviewerId === user.id ? 'Release' : submission.assignedReviewerId ? 'Take over' : 'Claim review' %></button></form></section>
+      <form method="post" action="/admin/reviews/<%= submission.id %>/decision" class="panel form-stack review-decision-form">
+        <div><p class="eyebrow">Decision</p><h2>Finish review</h2><p><a href="https://hackclub.gitbook.io/ysws-project-submission-guidelines/BLBRN8LIfoCZhFV6oMNR" target="_blank" rel="noreferrer">Open the current YSWS review policy ↗</a></p></div>
+        <label>Decision<select name="decision" required><option value="">Choose…</option><option value="approved" <%= submission.decision === 'approved' ? 'selected' : '' %>>Approve</option><option value="changes" <%= submission.decision === 'changes' ? 'selected' : '' %>>Return for changes</option><option value="rejected" <%= submission.decision === 'rejected' ? 'selected' : '' %>>Deny</option></select></label>
+        <fieldset class="review-checklist"><legend>YSWS approval checks</legend><label><input type="checkbox" name="radio_related" value="1" <%= submission.review?.criteria?.radioRelated ? 'checked' : '' %>> Genuinely related to amateur radio</label><label><input type="checkbox" name="shipped" value="1" <%= submission.review?.criteria?.shipped ? 'checked' : '' %>> Working MVP with a public demo/download/video requiring under two minutes of setup</label><label><input type="checkbox" name="public_source" value="1" <%= submission.review?.criteria?.publicSource ? 'checked' : '' %>> Public source, useful README, and incremental commits</label><label><input type="checkbox" name="reproducible" value="1" <%= submission.review?.criteria?.reproducible ? 'checked' : '' %>> Reproducible; hardware includes applicable BOM, schematic/wiring, editable CAD, and firmware</label><label><input type="checkbox" name="evidence_sufficient" value="1" <%= submission.review?.criteria?.evidenceSufficient ? 'checked' : '' %>> Screenshot, repository, Hackatime, and devlogs match the claimed work</label><label><input type="checkbox" name="eligible_work" value="1" <%= submission.review?.criteria?.eligibleWork ? 'checked' : '' %>> Original/attributed work; not a school assignment or paid Hack Club work</label><label><input type="checkbox" name="distinct_hours" value="1" <%= submission.review?.criteria?.distinctHours ? 'checked' : '' %>> Hours are genuine and not previously rewarded; when uncertain, reduced to supported time</label></fieldset>
+        <label>Technical review notes<textarea name="technical_note" rows="5" maxlength="3000"><%= submission.review?.technical_note || '' %></textarea><small>Required for approval. Record the concrete features and evidence you checked.</small></label>
+        <label>Approved minutes<input type="number" name="approved_minutes" min="0" max="<%= loggedMinutes %>" value="<%= submission.review?.approved_minutes ?? loggedMinutes %>"><small>Cannot exceed the <%= loggedMinutes %> minutes evidenced in devlogs.</small></label>
+        <label>Time adjustment reason<textarea name="time_note" rows="3" maxlength="2000"><%= submission.review?.time_note || '' %></textarea><small>Explain any reduction from the evidenced Hackatime total.</small></label>
+        <label>Message to participant<textarea name="note_to_maker" rows="5" maxlength="3000"><%= submission.review?.note_to_maker || '' %></textarea><small>Required when returning for changes or denying.</small></label>
+        <label>Private reviewer notes<textarea name="internal_note" rows="4" maxlength="3000"><%= submission.review?.internal_note || '' %></textarea><small>Only organizers can see this.</small></label>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="button button-primary" type="submit">Save decision</button>
+      </form>
+    </aside>
+  </div>
+</main>
+<%- include('../partials/footer') %>

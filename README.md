@@ -6,26 +6,31 @@ Eligible projects can be electronics hardware or software, but they must directl
 relate to ham radio. Studying or completing a course alone is not an eligible
 project.
 
+CQ's submission gate and reviewer checklist implement the current
+[Hack Club YSWS Project Submission Guidelines](https://hackclub.gitbook.io/ysws-project-submission-guidelines/BLBRN8LIfoCZhFV6oMNR),
+including shipped/reproducible projects, required evidence, eligibility exceptions,
+auditable hour decisions, and distinct hours for project updates.
+
 ## What is included
 
 - Hack Club Auth OIDC sign-in with verified ID-token claims, state, nonce, PKCE,
-  encrypted server sessions, CSRF protection, and admin roles
+  encrypted local server sessions, CSRF protection, and permission-based organizer roles
 - Project creation and editing, milestones, Markdown devlogs timed from new
   linked-project Hackatime activity, drag-and-drop CDN image uploads, evidence,
   project updates, submission, status refresh, withdrawal, and decision history
 - Hackatime OAuth account linking and automatic, selectable project discovery;
-  access tokens and the short project cache are encrypted with all other records
+  access tokens remain server-side in the access-controlled data store
 - Ari request signing, signed webhook verification, a five-minute replay window,
   idempotent delivery handling, approval ledger, and reversal handling
-- A real shop with encrypted shipping details, stock control, carts, locked
+- A real shop with access-controlled shipping details, stock control, carts, locked
   balance/stock checks, hertz balances, cancellation refunds, order history,
   and fulfilment tracking
 - Slack direct-message notifications for submission, review, requested changes,
   approval, denial, purchase, and order-status changes
-- An organizer dashboard for users, projects, Ari deliveries, products, orders,
-  hertz adjustments, and editable country policies
-- Airtable production storage with every application document encrypted using
-  AES-256-GCM before it leaves the Node server
+- An on-platform review queue with claiming, private notes, participant feedback,
+  decisions, approved-time rewards, audit history, and Slack notifications
+- Separate reviewer, shop editor, fulfilment, country editor, support, and admin roles
+- Airtable production storage using readable JSON documents protected by Airtable access controls
 
 ## Run locally
 
@@ -54,8 +59,8 @@ npm test
 2. Create a confidential Hackatime OAuth app under **My OAuth Apps**, set its
    exact callback to `https://your-domain.example/app/hackatime/callback`, and
    add its client ID and secret. CQ requests the `profile read` scopes.
-3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md), generate a unique data
-   encryption key, and keep that key in the host's secret manager.
+3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md). CQ stores readable JSON
+   in Airtable so authorized base collaborators can inspect operational data.
 4. Add the Ari program and signing secrets. Configure Ari's outgoing webhook URL
    as `https://your-domain.example/ari/webhook`.
 5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
@@ -146,12 +151,12 @@ advice. Organizers should periodically verify it against the linked regulator.
 
 ## Storage and security
 
-The Airtable table contains only a key, a coarse record type, ciphertext, and an
-updated timestamp. Names, emails, addresses, Slack IDs, project details, order
-contents, sessions, and review payloads all remain inside authenticated
-ciphertext.
+The Airtable table contains a key, entity type, readable JSON payload, and update
+timestamp. Airtable permissions are the security boundary, so access to the base
+must be limited to trusted organizers. CQ role permissions separately control
+which organizer screens are available through the website.
 
-Back up `DATA_ENCRYPTION_KEY` securely. Losing it makes the stored payloads
-unrecoverable; exposing it compromises the database. Rotate Hack Club, Slack,
-Ari, and Airtable credentials through the deployment secret manager rather than
-storing them in Airtable.
+`DATA_ENCRYPTION_KEY` is only needed for encrypted local-file storage and to read
+legacy Airtable rows created by older CQ versions. CQ rewrites those rows as
+plaintext JSON after a successful full table load. Rotate Hack Club, Slack,
+Ari, and Airtable credentials through the deployment secret manager.

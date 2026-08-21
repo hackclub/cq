@@ -41,11 +41,8 @@
       <section class="panel compact-panel"><p class="eyebrow">Maker</p><strong><%= maker?.name || 'Unknown' %></strong><p><%= maker?.email || '' %><br><%= maker?.slackId || 'No Slack ID' %></p></section>
       <section class="panel compact-panel"><p class="eyebrow">Radio path</p><dl><div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div><div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div><div><dt>Milestones</dt><dd><%= milestones.filter((item) => item.complete).length %>/<%= milestones.length %></dd></div></dl></section>
       <% if (country) { %><section class="panel compact-panel"><p class="eyebrow">Fulfilment</p><strong><%= statusLabel(country.fulfilmentMode) %></strong><p><%= country.fulfilmentNote %></p></section><% } %>
-      <form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <label>Status<select name="status"><% ['building','submitted','needs_changes','approved','rejected','archived'].forEach((status) => { %><option value="<%= status %>" <%= project.status === status ? 'selected' : '' %>><%= statusLabel(status) %></option><% }) %></select></label>
-        <button class="button button-primary" type="submit">Update project</button>
-      </form>
+      <% if (submissions[0]) { %><a class="button button-primary" href="/admin/reviews/<%= submissions[0].id %>">Open latest review</a><% } %>
+      <form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="<%= project.status === 'archived' ? 'building' : 'archived' %>"><button class="button button-ghost" type="submit"><%= project.status === 'archived' ? 'Restore project' : 'Archive project' %></button><small>Approval, changes, and denial decisions are made through the review queue.</small></form>
     </aside>
   </div>
 </main>

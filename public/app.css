@@ -323,6 +323,20 @@ button {
   font: 400 12px "Space Mono";
 }
 
+.sponsor-credit {
+  display: inline-flex;
+  gap: 6px;
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, .68);
+  font: 400 11px "Space Mono";
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.sponsor-credit strong {
+  color: white;
+}
+
 .signal-card {
   position: relative;
   min-height: 480px;
@@ -2625,5 +2639,75 @@ td small {
     scroll-behavior: auto !important;
     animation: none !important;
     transition: none !important;
+  }
+}
+
+.review-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 24px;
+  align-items: start;
+}
+
+.review-decision-form h2 {
+  margin: 4px 0 0;
+}
+
+.review-decision-form small,
+.compact-input {
+  display: block;
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.review-checklist {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.review-checklist label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  font-size: .88rem;
+}
+
+.role-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  min-width: 330px;
+}
+
+.role-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .82rem;
+  white-space: nowrap;
+}
+
+.user-role-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.compact-input input {
+  width: 115px;
+}
+
+@media (max-width: 900px) {
+  .review-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .role-picker {
+    min-width: 260px;
   }
 }

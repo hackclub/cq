@@ -12,8 +12,8 @@
       <div class="form-grid">
         <label class="span-two">Project name<input name="title" value="<%= values.title || '' %>" required minlength="2" maxlength="80" placeholder="Portable satellite station"></label>
         <label class="span-two">Description<textarea name="description" required minlength="20" maxlength="800" rows="4" placeholder="I’m building a portable 2m/70cm station to receive and eventually transmit through amateur satellites."><%= values.description || '' %></textarea></label>
-        <label class="span-two">Public GitHub repository<input type="url" name="repo_url" value="<%= values.repo_url || '' %>" required placeholder="https://github.com/you/project"></label>
-        <label>Project track<select name="track"><option value="hardware" <%= values.track !== 'software' ? 'selected' : '' %>>Electronics hardware</option><option value="software" <%= values.track === 'software' ? 'selected' : '' %>>Software</option></select><span class="field-help">Both tracks must directly relate to ham radio. Hardware projects can omit a demo URL.</span></label>
+        <label class="span-two">Public GitHub repository<input type="url" name="repo_url" value="<%= values.repo_url || '' %>" required placeholder="https://github.com/you/project"><span class="field-help">It needs a README explaining setup/use and commits that show the build progressing.</span></label>
+        <label>Project track<select name="track"><option value="hardware" <%= values.track !== 'software' ? 'selected' : '' %>>Electronics hardware</option><option value="software" <%= values.track === 'software' ? 'selected' : '' %>>Software</option></select><span class="field-help">Choose the track that best fits your ham-radio project.</span></label>
         <label>Project type<select name="project_type" required>
           <option value="">Choose one</option>
           <% [['antenna','Antenna or feedline'],['radio-electronics','Radio electronics'],['sdr','Software-defined radio'],['digital-mode','Digital mode'],['satellite','Satellite or space radio'],['propagation','Propagation or RF analysis'],['station-tooling','Station software or tooling'],['other','Other ham-radio build']].forEach(([value, label]) => { %>
@@ -65,10 +65,10 @@
     </section>
 
     <section class="panel form-section">
-      <div class="form-section-heading"><span>04</span><div><h2>Review evidence</h2><p>These can be added later, but they are required when you submit for review.</p></div></div>
+      <div class="form-section-heading"><span>04</span><div><h2>Show your project</h2><p>You can add these later, but you’ll need them when you’re ready to ship.</p></div></div>
       <div class="form-grid">
         <label class="span-two">Public thumbnail URL<input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://cdn.example.com/project.jpg"><span class="field-help">Use a public HTTP(S) image URL.</span></label>
-        <label class="span-two">Demo or video URL <span class="optional">required for software</span><input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."></label>
+        <label class="span-two">Public demo, download, or video URL<input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."><span class="field-help">At submission, anyone must be able to experience the project with under two minutes of setup. A source-only release page is not enough.</span></label>
         <fieldset class="span-two checkbox-group">
           <legend>Evidence the reviewer should verify</legend>
           <% const selectedEvidence = Array.isArray(values.evidence) ? values.evidence : ['commits', 'elapsed', 'devlog']; %>
@@ -78,6 +78,7 @@
         </fieldset>
         <label class="checkbox-field span-two"><input type="checkbox" name="is_update" value="1" <%= values.is_update ? 'checked' : '' %>> This is an update to an earlier ship</label>
         <label class="span-two">Update note <span class="optional">only for updates</span><textarea name="update_message" maxlength="2000" rows="3" placeholder="What changed since the last review?"><%= values.update_message || '' %></textarea></label>
+        <fieldset class="span-two checkbox-group"><legend>YSWS eligibility confirmations</legend><label><input type="checkbox" name="original_work" value="1" <%= values.original_work ? 'checked' : '' %>> This is my original work, with anything reused clearly attributed</label><label><input type="checkbox" name="not_school_assignment" value="1" <%= values.not_school_assignment ? 'checked' : '' %>> This was not made as a school assignment</label><label><input type="checkbox" name="not_paid_hack_club_work" value="1" <%= values.not_paid_hack_club_work ? 'checked' : '' %>> This was not made as paid Hack Club work</label></fieldset>
       </div>
     </section>
     <div class="sticky-actions">

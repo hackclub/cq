@@ -74,7 +74,7 @@
         <% if (readiness.errors.length) { %>
           <div class="readiness-list"><strong>Before you can ship:</strong><ul><% readiness.errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div>
         <% } else { %>
-          <div class="ready-banner"><span>✓</span><div><strong>Ready to submit</strong><p>Your build evidence is ready for Hack Club's project review queue.</p></div></div>
+          <div class="ready-banner"><span>✓</span><div><strong>Ready to ship</strong><p>Your project has everything it needs to ship.</p></div></div>
         <% } %>
         <% if (!ariConfigured) { %><div class="config-note">Organizer action needed: connect the project review service.</div><% } %>
 

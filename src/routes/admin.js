@@ -1,14 +1,23 @@
 import { Router } from "express";
-import { requireAdmin, requireCsrf } from "../auth.js";
+import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDefinitions, userRoles } from "../auth.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 
 function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
+function journalsForReview(submission, journals) {
+  const projectJournals = journals.filter((item) => item.projectId === submission.projectId);
+  if (submission.journalIds?.length) {
+    const included = new Set(submission.journalIds);
+    return projectJournals.filter((item) => included.has(item.id));
+  }
+  return projectJournals.filter((item) => !submission.createdAt || String(item.createdAt || "") <= submission.createdAt);
+}
+
 export function adminRoutes({ store, config, ariClient, hackatimeClient, notifier }) {
   const router = Router();
-  router.use(requireAdmin);
+  router.use(requireOrganizer);
 
   router.get("/", async (req, res) => {
     const [users, projects, orders, submissions, deliveries, products] = await Promise.all([
@@ -33,26 +42,31 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     });
   });
 
-  router.get("/users", async (req, res) => {
+  router.get("/users", requirePermission("users.manage"), async (req, res) => {
     const users = sortNewest(await store.list("user"));
-    res.render("admin/users", { title: "Manage users", users });
+    res.render("admin/users", { title: "Manage users", users, roleDefinitions });
   });
 
-  router.post("/users/:id", requireCsrf, async (req, res) => {
+  router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {
     const user = await store.get("user", req.params.id);
     if (!user) return res.sendStatus(404);
     const hertzDelta = Number.parseFloat(req.body.hertz_delta || "0");
     if (Number.isFinite(hertzDelta) && hertzDelta !== 0) {
       user.hertz = Math.max(0, Math.round((user.hertz + hertzDelta) * 100) / 100);
     }
-    if (["participant", "admin"].includes(req.body.role)) user.role = req.body.role;
+    const selected = Array.isArray(req.body.roles) ? req.body.roles : [req.body.roles].filter(Boolean);
+    let roles = [...new Set(["participant", ...selected.filter((role) => roleDefinitions[role])])];
+    if (config.adminEmails.includes(user.email)) roles = [...new Set([...roles, "admin"])];
+    if (user.id === req.user.id && userRoles(req.user).includes("admin")) roles = [...new Set([...roles, "admin"])];
+    user.roles = roles;
+    user.role = roles.includes("admin") ? "admin" : "participant";
     user.updatedAt = nowIso();
     await store.put("user", user.id, user);
     setFlash(res, "success", `${user.name} updated.`);
     res.redirect("/admin/users");
   });
 
-  router.get("/projects", async (req, res) => {
+  router.get("/projects", requirePermission("projects.review"), async (req, res) => {
     const [projects, users, submissions] = await Promise.all([
       store.list("project"), store.list("user"), store.list("submission"),
     ]);
@@ -64,7 +78,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     res.render("admin/projects", { title: "Manage projects", projects: rows });
   });
 
-  router.get("/projects/:id", async (req, res) => {
+  router.get("/projects/:id", requirePermission("projects.review"), async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);
     const [maker, country, milestones, journals, submissions] = await Promise.all([
@@ -85,36 +99,31 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     });
   });
 
-  router.post("/projects/:id", requireCsrf, async (req, res) => {
+  router.post("/projects/:id", requirePermission("projects.review"), requireCsrf, async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);
     const previousStatus = project.status;
-    if (["building", "submitted", "needs_changes", "approved", "rejected", "archived"].includes(req.body.status)) {
+    if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
     if (previousStatus !== project.status) {
       const user = await store.get("user", project.userId);
-      const event = {
-        submitted: "review.requeued",
-        needs_changes: "review.changes",
-        approved: "review.approved",
-        rejected: "review.rejected",
-      }[project.status];
+      const event = { submitted: "review.requeued" }[project.status];
       if (user && event) await notifier.projectDecision(user, project, event);
     }
     setFlash(res, "success", `${project.title} updated.`);
     res.redirect("/admin/projects");
   });
 
-  router.get("/orders", async (req, res) => {
+  router.get("/orders", requirePermission("orders.manage"), async (req, res) => {
     const [orders, users] = await Promise.all([store.list("order"), store.list("user")]);
     const rows = sortNewest(orders).map((order) => ({ ...order, maker: users.find((user) => user.id === order.userId) }));
     res.render("admin/orders", { title: "Manage orders", orders: rows });
   });
 
-  router.post("/orders/:id", requireCsrf, async (req, res) => {
+  router.post("/orders/:id", requirePermission("orders.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("order", req.params.id);
     if (!existing) return res.sendStatus(404);
     const allowedStatuses = ["received", "packing", "shipped", "fulfilled", "cancelled"];
@@ -144,6 +153,11 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
         current.refundedAt = timestamp;
       }
       current.status = requestedStatus;
+      if (requestedStatus === "fulfilled" && previousStatus !== "fulfilled") {
+        current.fulfilledById = req.user.id;
+        current.fulfilledByName = req.user.name;
+        current.fulfilledAt = timestamp;
+      }
       current.trackingUrl = String(req.body.tracking_url || "").trim().slice(0, 500);
       current.adminNote = String(req.body.admin_note || "").trim().slice(0, 1000);
       current.updatedAt = timestamp;
@@ -158,12 +172,12 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     res.redirect("/admin/orders");
   });
 
-  router.get("/shop", async (req, res) => {
+  router.get("/shop", requirePermission("shop.manage"), async (req, res) => {
     const products = (await store.list("product")).sort((a, b) => a.sortOrder - b.sortOrder);
     res.render("admin/shop", { title: "Manage shop", products });
   });
 
-  router.post("/shop", requireCsrf, async (req, res) => {
+  router.post("/shop", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const id = randomId("product_");
     const product = productInput(req.body, id);
     await store.put("product", id, product);
@@ -171,7 +185,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     res.redirect("/admin/shop");
   });
 
-  router.post("/shop/:id", requireCsrf, async (req, res) => {
+  router.post("/shop/:id", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("product", req.params.id);
     if (!existing) return res.sendStatus(404);
     await store.put("product", existing.id, { ...existing, ...productInput(req.body, existing.id) });
@@ -179,28 +193,155 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     res.redirect("/admin/shop");
   });
 
-  router.get("/reviews", async (req, res) => {
-    const [submissions, projects, deliveries] = await Promise.all([
-      store.list("submission"), store.list("project"), store.list("delivery"),
+  router.get("/reviews", requirePermission("reviews.read"), async (req, res) => {
+    const [submissions, projects, deliveries, users] = await Promise.all([
+      store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"),
     ]);
     const rows = sortNewest(submissions).map((submission) => ({
       ...submission,
       project: projects.find((project) => project.id === submission.projectId),
+      maker: users.find((user) => user.id === projects.find((project) => project.id === submission.projectId)?.userId),
+      reviewer: users.find((user) => user.id === submission.assignedReviewerId),
     }));
     res.render("admin/reviews", {
-      title: "Ari reviews and webhooks",
+      title: "Project review queue",
       submissions: rows,
       deliveries: sortNewest(deliveries),
       ariConfigured: ariClient.configured(),
     });
   });
 
-  router.get("/countries", async (req, res) => {
+  router.get("/reviews/:id", requirePermission("projects.review"), async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    if (!submission) return res.sendStatus(404);
+    const project = await store.get("project", submission.projectId);
+    if (!project) return res.sendStatus(404);
+    const [maker, country, journals, actions, reviewers] = await Promise.all([
+      store.get("user", project.userId), store.get("country", project.countryCode),
+      store.list("journal"), store.list("review_action"), store.list("user"),
+    ]);
+    const reviewJournals = journalsForReview(submission, journals).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+    res.render("admin/review-detail", {
+      title: `Review ${project.title}`, submission, project, maker, country,
+      journals: reviewJournals,
+      actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
+      reviewers,
+      loggedMinutes: reviewJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0),
+    });
+  });
+
+  router.post("/reviews/:id/claim", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    if (!submission) return res.sendStatus(404);
+    const release = req.body.action === "release";
+    if (!release && submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
+      setFlash(res, "error", "Another reviewer has already claimed this submission.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    submission.assignedReviewerId = release ? null : req.user.id;
+    submission.assignedAt = release ? null : nowIso();
+    if (!release && !submission.decision) submission.phase = "under_review";
+    submission.updatedAt = nowIso();
+    await store.put("submission", submission.id, submission);
+    await addReviewAction(store, submission, req.user, release ? "released" : "claimed");
+    const project = await store.get("project", submission.projectId);
+    const maker = project ? await store.get("user", project.userId) : null;
+    if (!release && project && maker) await notifier.projectUnderReview(maker, project);
+    setFlash(res, "success", release ? "Submission returned to the queue." : "Submission claimed.");
+    res.redirect(`/admin/reviews/${submission.id}`);
+  });
+
+  router.post("/reviews/:id/decision", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    if (!submission) return res.sendStatus(404);
+    if (submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
+      setFlash(res, "error", "This submission is claimed by another reviewer.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : "";
+    const noteToMaker = String(req.body.note_to_maker || "").trim().slice(0, 3000);
+    const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    const technicalNote = String(req.body.technical_note || "").trim().slice(0, 3000);
+    const timeNote = String(req.body.time_note || "").trim().slice(0, 2000);
+    const criteria = {
+      radioRelated: req.body.radio_related === "1",
+      shipped: req.body.shipped === "1",
+      publicSource: req.body.public_source === "1",
+      reproducible: req.body.reproducible === "1",
+      evidenceSufficient: req.body.evidence_sufficient === "1",
+      eligibleWork: req.body.eligible_work === "1",
+      distinctHours: req.body.distinct_hours === "1",
+    };
+    if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
+      setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (decision === "approved" && (!Object.values(criteria).every(Boolean) || technicalNote.length < 5)) {
+      setFlash(res, "error", "Confirm all approval checks and record the technical basis for approval.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    const precheckJournals = journalsForReview(submission, await store.list("journal"));
+    const precheckMinutes = precheckJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0);
+    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
+    if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
+      setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    await store.withLock(`review:${submission.id}`, async () => {
+      const project = await store.get("project", submission.projectId);
+      const journals = journalsForReview(submission, await store.list("journal"));
+      const loggedMinutes = journals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0);
+      const approvedMinutes = decision === "approved"
+        ? Math.min(loggedMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)))
+        : 0;
+      const timestamp = nowIso();
+      submission.phase = "reviewed";
+      submission.decision = decision;
+      submission.event = `review.${decision === "changes" ? "changes" : decision}`;
+      submission.review = {
+        ...(submission.review || {}), approved_minutes: approvedMinutes,
+        approved_hours: Math.round((approvedMinutes / 60) * 100) / 100,
+        note_to_maker: noteToMaker, internal_note: internalNote,
+        technical_note: technicalNote, time_note: timeNote, criteria,
+        reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp,
+      };
+      submission.assignedReviewerId = req.user.id;
+      submission.updatedAt = timestamp;
+      await store.put("submission", submission.id, submission);
+      project.status = { approved: "approved", changes: "needs_changes", rejected: "rejected" }[decision];
+      project.updatedAt = timestamp;
+      await store.put("project", project.id, project);
+
+      const existingLedger = await store.get("ledger", submission.id);
+      const desiredHertz = decision === "approved" ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100 : 0;
+      const previousHertz = Math.max(0, Number(existingLedger?.delta) || 0);
+      const maker = await store.get("user", project.userId);
+      if (maker && desiredHertz !== previousHertz) {
+        maker.hertz = Math.max(0, Math.round((maker.hertz + desiredHertz - previousHertz) * 100) / 100);
+        maker.updatedAt = timestamp;
+        await store.put("user", maker.id, maker);
+      }
+      if (desiredHertz > 0) {
+        await store.put("ledger", submission.id, {
+          id: submission.id, userId: project.userId, submissionId: submission.id,
+          delta: desiredHertz, reason: `CQ review by ${req.user.name}`, createdAt: existingLedger?.createdAt || timestamp, updatedAt: timestamp,
+        });
+      } else if (existingLedger) await store.delete("ledger", submission.id);
+      await addReviewAction(store, submission, req.user, decision, {
+        noteToMaker, internalNote, technicalNote, timeNote, criteria, approvedMinutes,
+      });
+      if (maker) await notifier.projectDecision(maker, project, submission.event, submission.review);
+    });
+    setFlash(res, "success", "Review decision saved and the participant was notified.");
+    res.redirect(`/admin/reviews/${submission.id}`);
+  });
+
+  router.get("/countries", requirePermission("countries.manage"), async (req, res) => {
     const countries = (await store.list("country")).sort((a, b) => a.sortOrder - b.sortOrder);
     res.render("admin/countries", { title: "Country policies", countries });
   });
 
-  router.get("/notifications", async (req, res) => {
+  router.get("/notifications", requirePermission("notifications.read"), async (req, res) => {
     const notifications = sortNewest(await store.list("notification"));
     res.render("admin/notifications", {
       title: "Slack notifications",
@@ -209,7 +350,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     });
   });
 
-  router.post("/countries", requireCsrf, async (req, res) => {
+  router.post("/countries", requirePermission("countries.manage"), requireCsrf, async (req, res) => {
     const code = String(req.body.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 10);
     if (!code || !String(req.body.name || "").trim()) {
       setFlash(res, "error", "Country code and name are required.");
@@ -220,7 +361,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     res.redirect("/admin/countries");
   });
 
-  router.post("/countries/:id", requireCsrf, async (req, res) => {
+  router.post("/countries/:id", requirePermission("countries.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("country", req.params.id);
     if (!existing) return res.sendStatus(404);
     await store.put("country", existing.id, countryInput(req.body, existing.id));
@@ -229,6 +370,17 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   });
 
   return router;
+}
+
+async function addReviewAction(store, submission, reviewer, action, details = {}) {
+  const timestamp = nowIso();
+  const record = {
+    id: randomId("review_"), submissionId: submission.id, projectId: submission.projectId,
+    reviewerId: reviewer.id, reviewerName: reviewer.name, action, ...details,
+    createdAt: timestamp, updatedAt: timestamp,
+  };
+  await store.put("review_action", record.id, record);
+  return record;
 }
 
 function productInput(body, id) {

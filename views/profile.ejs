@@ -5,8 +5,11 @@
   <form method="post" action="/app/profile" class="panel form-stack">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>Display name<input name="name" value="<%= values.name %>" required maxlength="100"></label>
+    <div class="form-grid"><label>Legal first name<input name="first_name" value="<%= values.firstName || '' %>" maxlength="80"></label><label>Legal last name<input name="last_name" value="<%= values.lastName || '' %>" maxlength="80"></label></div>
+    <label>Birthday<input type="date" name="birthday" value="<%= values.birthday || '' %>"><span class="field-help">Required when you ship your project.</span></label>
     <label>Hack Club email<input value="<%= values.email %>" disabled><span class="field-help">Managed by Hack Club Auth.</span></label>
     <label>Slack user ID<input name="slack_id" value="<%= values.slackId || '' %>" placeholder="U0123ABCD"><span class="field-help">Open your Slack profile → More → Copy member ID.</span></label>
+    <fieldset class="form-stack"><legend>Submission and fulfilment address</legend><label>Address line 1<input name="address_line_1" value="<%= values.addressLine1 || '' %>" maxlength="200"></label><label>Address line 2 <span class="optional">optional</span><input name="address_line_2" value="<%= values.addressLine2 || '' %>" maxlength="200"></label><div class="form-grid"><label>City<input name="city" value="<%= values.city || '' %>" maxlength="100"></label><label>State / province / region<input name="region" value="<%= values.region || '' %>" maxlength="100"></label><label>ZIP / postal code<input name="postal_code" value="<%= values.postalCode || '' %>" maxlength="30"></label><label>Country<input name="address_country" value="<%= values.addressCountry || '' %>" maxlength="100"></label></div><span class="field-help">Required when you ship a project and used to deliver prizes.</span></fieldset>
     <div class="profile-readout"><span>Verification <strong><%= statusLabel(values.verificationStatus) %></strong></span><span>YSWS eligible <strong><%= values.yswsEligible === true ? 'Yes' : values.yswsEligible === false ? 'No' : 'Not reported' %></strong></span></div>
     <button class="button button-primary" type="submit">Save profile</button>
   </form>

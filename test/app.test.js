@@ -88,6 +88,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     title: "Portable ISS station",
     description: "A portable dual-band station for receiving and contacting amateur satellites.",
     repo_url: "https://github.com/example/iss-station",
+    demo_url: "https://www.youtube.com/watch?v=radio-demo",
     thumbnail_url: "https://example.com/station.jpg",
     hackatime_projects: "iss-station",
     track: "hardware",
@@ -96,6 +97,9 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     country_code: "AU",
     license_goal: "Foundation",
     evidence: ["commits", "elapsed", "devlog"],
+    original_work: "1",
+    not_school_assignment: "1",
+    not_paid_hack_club_work: "1",
   });
   assert.equal(create.status, 302);
   assert.match(create.headers.location, /^\/app\/projects\/cq_/);
@@ -103,7 +107,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
 
   const projectPage = await agent.get(projectPath);
   assert.equal(projectPage.status, 200);
-  assert.match(projectPage.text, /Ready to submit/);
+  assert.match(projectPage.text, /Ready to ship/);
   assert.doesNotMatch(projectPage.text, /\bAri\b/);
   const projectToken = csrf(projectPage.text);
 
@@ -171,6 +175,37 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(submissions[0].payload.journals[0].image_urls.length, 2);
   assert.match(submissions[0].payload.journals[0].text, /Progress image: https:\/\/example\.com\/antenna-finished\.jpg/);
 
+  const reviewPage = await agent.get(`/admin/reviews/${submissions[0].id}`);
+  assert.equal(reviewPage.status, 200);
+  assert.match(reviewPage.text, /YSWS approval checks/);
+  const reviewToken = csrf(reviewPage.text);
+  const claim = await agent.post(`/admin/reviews/${submissions[0].id}/claim`).type("form").send({
+    _csrf: reviewToken,
+    action: "claim",
+  });
+  assert.equal(claim.status, 302);
+  const decision = await agent.post(`/admin/reviews/${submissions[0].id}/decision`).type("form").send({
+    _csrf: reviewToken,
+    decision: "approved",
+    approved_minutes: 60,
+    radio_related: "1",
+    shipped: "1",
+    public_source: "1",
+    reproducible: "1",
+    evidence_sufficient: "1",
+    eligible_work: "1",
+    distinct_hours: "1",
+    technical_note: "Verified the antenna build, measurements, repository, and functional radio outcome.",
+    time_note: "Approved the evidenced first hour.",
+    note_to_maker: "Strong documented build.",
+    internal_note: "All checks passed.",
+  });
+  assert.equal(decision.status, 302);
+  assert.equal((await store.get("project", projectPath.split("/").pop())).status, "approved");
+  assert.equal((await store.list("review_action")).length, 2);
+  // The form caps approval at the 45 minutes actually evidenced in devlogs.
+  assert.equal((await store.list("user"))[0].hertz, 203.75);
+
   const webhookBody = JSON.stringify({
     event: "review.approved",
     decision: "approved",
@@ -189,6 +224,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     .send(webhookBody);
   assert.equal(webhook.status, 200);
   assert.equal(webhook.body.duplicate, false);
+  // The external event reconciles the same ledger entry instead of double-awarding it.
   assert.equal((await store.get("user", (await store.list("user"))[0].id)).hertz, 205);
 
   const shop = await agent.get("/app/shop");

@@ -44,8 +44,11 @@ export function projectInput(body = {}) {
     callsign: text(body.callsign, 30).toUpperCase(),
     aiStatement: text(body.ai_statement, 500),
     tags: splitList(body.tags).slice(0, 10),
-    isUpdate: body.is_update === "1",
+    isUpdate: body.is_update === "1" || body.is_update === true,
     updateMessage: text(body.update_message, 2000),
+    originalWork: body.original_work === "1" || body.original_work === true,
+    notSchoolAssignment: body.not_school_assignment === "1" || body.not_school_assignment === true,
+    notPaidHackClubWork: body.not_paid_hack_club_work === "1" || body.not_paid_hack_club_work === true,
   };
 }
 
@@ -62,10 +65,12 @@ export function validateProject(input, { forSubmission = false, journalMinutes =
 
   if (forSubmission) {
     if (!isHttpUrl(input.thumbnailUrl)) errors.push("Add a public thumbnail image URL.");
-    if (input.track === "software" && !isHttpUrl(input.demoUrl)) {
-      errors.push("Software ships need a live demo or video URL.");
-    }
-    if (input.demoUrl && !isHttpUrl(input.demoUrl)) errors.push("The demo link must be an HTTP or HTTPS URL.");
+    if (!isHttpUrl(input.demoUrl)) errors.push("Add a public demo, download, or video where the shipped project can be experienced.");
+    if (/\.gif(?:$|[?#])/i.test(input.thumbnailUrl)) errors.push("The submission screenshot must be a still image, not an animated GIF.");
+    if (!input.originalWork) errors.push("Confirm this is original work and properly attributes anything it builds on.");
+    if (!input.notSchoolAssignment) errors.push("Confirm this project was not made as a school assignment.");
+    if (!input.notPaidHackClubWork) errors.push("Confirm this project was not made as paid Hack Club work.");
+    if (input.isUpdate && input.updateMessage.length < 20) errors.push("Describe the meaningful new work in this update.");
     if (input.hackatimeProjects.length === 0 && journalMinutes <= 0) {
       errors.push("Link a Hackatime project or add at least one timed work log.");
     }

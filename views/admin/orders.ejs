@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <main id="main" class="app-main shell">
-  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Orders</h1><p>Shipping details stay encrypted in Airtable and are revealed only here.</p></div></div>
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Orders</h1><p>Shipping details are stored in the access-controlled Airtable base and shown only to fulfilment staff.</p></div></div>
   <%- include('nav') %>
   <div class="order-admin-grid">
     <% orders.forEach((item) => { %>
@@ -9,6 +9,7 @@
         <div class="order-items"><% item.items.forEach((product) => { %><div><span><%= product.quantity %> × <%= product.name %></span><strong><%= product.unitPrice * product.quantity %> hertz</strong></div><% }) %></div>
         <address><%= item.shipping.shippingName %><br><%= item.shipping.addressLine1 %><% if (item.shipping.addressLine2) { %><br><%= item.shipping.addressLine2 %><% } %><br><%= item.shipping.city %>, <%= item.shipping.region %> <%= item.shipping.postalCode %><br><%= item.shipping.country %></address>
         <% if (item.refundedAt) { %><div class="config-note"><strong>Refunded:</strong> <%= formatDateTime(item.refundedAt) %>. Stock and hertz were restored.</div><% } %>
+        <% if (item.fulfilledAt) { %><div class="config-note"><strong>Fulfilled:</strong> by <%= item.fulfilledByName || 'an organizer' %> on <%= formatDateTime(item.fulfilledAt) %>.</div><% } %>
         <% if (item.shipping.countryPolicy) { %><div class="config-note"><strong><%= statusLabel(item.shipping.countryPolicy.fulfilmentMode) %>:</strong> <%= item.shipping.countryPolicy.fulfilmentNote %></div><% } %>
         <form method="post" action="/admin/orders/<%= item.id %>" class="form-stack">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">

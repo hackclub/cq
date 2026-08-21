@@ -27,7 +27,7 @@ test("encrypted local store supports put, list, get, and delete", async () => {
   assert.equal(await store.get("user", "one"), null);
 });
 
-test("Airtable receives ciphertext rather than sensitive document fields", async () => {
+test("Airtable receives readable JSON documents", async () => {
   const requests = [];
   const fetchImpl = async (url, options = {}) => {
     requests.push({ url: String(url), options });
@@ -43,8 +43,8 @@ test("Airtable receives ciphertext rather than sensitive document fields", async
   }, fetchImpl);
   await store.put("order", "one", { id: "one", email: "maker@hackclub.com", address: "1 Radio Road" });
   const postBody = requests.find((request) => request.options.method === "POST").options.body;
-  assert.equal(postBody.includes("maker@hackclub.com"), false);
-  assert.equal(postBody.includes("1 Radio Road"), false);
+  assert.equal(postBody.includes("maker@hackclub.com"), true);
+  assert.equal(postBody.includes("1 Radio Road"), true);
   assert.deepEqual(await store.get("order", "one"), { id: "one", email: "maker@hackclub.com", address: "1 Radio Road" });
 });
 
@@ -62,4 +62,28 @@ test("Airtable ignores incomplete placeholder rows", async () => {
     airtableTableName: "CQ Data",
   }, fetchImpl);
   assert.deepEqual(await store.list("user"), []);
+});
+
+test("Airtable legacy ciphertext is migrated to readable JSON after a full load", async () => {
+  const value = { id: "one", name: "Legacy Maker" };
+  const encrypted = encryptRecord(value, Buffer.from(keyBase64, "base64"));
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url: String(url), options });
+    if (!options.method) return new Response(JSON.stringify({ records: [
+      { id: "rec_legacy", fields: { Key: "user:one", Type: "user", Payload: encrypted } },
+    ] }), { status: 200 });
+    const sent = JSON.parse(options.body);
+    return new Response(JSON.stringify({ id: "rec_legacy", fields: sent.fields }), { status: 200 });
+  };
+  const store = new AirtableEncryptedStore({
+    ...config,
+    airtablePat: "pat_test",
+    airtableBaseId: "app_test",
+    airtableTableName: "CQ Data",
+  }, fetchImpl);
+  assert.deepEqual(await store.list("user"), [value]);
+  const migratedBody = requests.find((request) => request.options.method === "PATCH").options.body;
+  assert.match(migratedBody, /Legacy Maker/);
+  assert.doesNotMatch(migratedBody, /v1\./);
 });

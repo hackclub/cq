@@ -24,7 +24,7 @@
       </section>
       <form class="panel form-stack" method="post" action="/app/shop/checkout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <div><p class="eyebrow">Shipping</p><h2>Where should it go?</h2><p class="field-help">These fields are encrypted before Airtable receives them.</p></div>
+        <div><p class="eyebrow">Shipping</p><h2>Where should it go?</h2><p class="field-help">These details are stored in CQ's access-controlled Airtable base.</p></div>
         <label>Full name<input name="shipping_name" value="<%= values.shipping_name || '' %>" required></label>
         <label>Address line 1<input name="address_line_1" value="<%= values.address_line_1 || '' %>" required></label>
         <label>Address line 2 <span class="optional">optional</span><input name="address_line_2" value="<%= values.address_line_2 || '' %>"></label>

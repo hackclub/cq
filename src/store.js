@@ -2,13 +2,14 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-function encryptionKey(config) {
+function encryptionKey(config, { required = true } = {}) {
   if (config.dataEncryptionKey) {
     const key = Buffer.from(config.dataEncryptionKey, "base64");
     if (key.length !== 32) throw new Error("DATA_ENCRYPTION_KEY must decode to exactly 32 bytes.");
     return key;
   }
-  if (config.isProduction) throw new Error("DATA_ENCRYPTION_KEY is required in production.");
+  if (required && config.isProduction) throw new Error("DATA_ENCRYPTION_KEY is required in production for local encrypted storage.");
+  if (!required) return null;
   return crypto.createHash("sha256").update("cq-local-development-only").digest();
 }
 
@@ -33,9 +34,9 @@ export function decryptRecord(value, key) {
 }
 
 class BaseStore {
-  constructor(config) {
+  constructor(config, { encrypted = false } = {}) {
     this.config = config;
-    this.key = encryptionKey(config);
+    this.key = encryptionKey(config, { required: encrypted });
     this.locks = new Map();
   }
 
@@ -57,7 +58,7 @@ class BaseStore {
 
 export class LocalEncryptedStore extends BaseStore {
   constructor(config, { memory = false } = {}) {
-    super(config);
+    super(config, { encrypted: true });
     this.memory = memory;
     this.records = new Map();
     this.loaded = false;
@@ -122,8 +123,10 @@ export class LocalEncryptedStore extends BaseStore {
   }
 }
 
-export class AirtableEncryptedStore extends BaseStore {
+export class AirtableStore extends BaseStore {
   constructor(config, fetchImpl = fetch) {
+    // Airtable is the access-controlled database. New payloads are readable JSON.
+    // Keep an optional key only to read records written by older CQ deployments.
     super(config);
     this.fetch = fetchImpl;
     this.cache = new Map();
@@ -176,14 +179,18 @@ export class AirtableEncryptedStore extends BaseStore {
     if (!key || !type || !payload || !key.startsWith(`${type}:`)) return null;
     let value;
     try {
-      value = decryptRecord(payload, this.key);
+      value = String(payload).startsWith("v1.")
+        ? decryptRecord(payload, this.key)
+        : JSON.parse(payload);
     } catch (error) {
       throw new Error(
-        `Airtable record “${key}” is not valid CQ ciphertext. Delete that row if it is a placeholder, or restore the DATA_ENCRYPTION_KEY that created it.`,
+        String(payload).startsWith("v1.")
+          ? `Airtable record “${key}” is legacy encrypted data. Temporarily restore the DATA_ENCRYPTION_KEY that created it so CQ can read and rewrite it.`
+          : `Airtable record “${key}” does not contain valid JSON.`,
         { cause: error },
       );
     }
-    this.cache.set(key, { recordId: record.id, value });
+    this.cache.set(key, { recordId: record.id, value, legacyEncrypted: String(payload).startsWith("v1.") });
     return value;
   }
 
@@ -199,6 +206,13 @@ export class AirtableEncryptedStore extends BaseStore {
       offset = body.offset ?? "";
     } while (offset);
     this.cacheComplete = true;
+    // Complete the one-way migration after a successful full read. The key is
+    // retained only long enough to decode legacy rows; every rewrite is JSON.
+    for (const [key, record] of [...this.cache.entries()]) {
+      if (!record.legacyEncrypted) continue;
+      const separator = key.indexOf(":");
+      await this.put(key.slice(0, separator), key.slice(separator + 1), record.value);
+    }
   }
 
   async get(type, id) {
@@ -232,13 +246,13 @@ export class AirtableEncryptedStore extends BaseStore {
     const fields = {
       Key: key,
       Type: type,
-      Payload: encryptRecord(value, this.key),
+      Payload: JSON.stringify(value, null, 2),
       "Updated At": new Date().toISOString(),
     };
     const body = cached
       ? await this.request(`${this.tableUrl()}/${cached.recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
       : await this.request(this.tableUrl(), { method: "POST", body: JSON.stringify({ fields }) });
-    this.cache.set(key, { recordId: body.id, value });
+    this.cache.set(key, { recordId: body.id, value, legacyEncrypted: false });
     return value;
   }
 
@@ -254,13 +268,16 @@ export class AirtableEncryptedStore extends BaseStore {
   }
 }
 
+// Backwards-compatible export for deployments or tests importing the old name.
+export const AirtableEncryptedStore = AirtableStore;
+
 export async function createStore(config, options = {}) {
   if (config.isProduction && (!config.airtablePat || !config.airtableBaseId)) {
     throw new Error("Production requires AIRTABLE_PAT and AIRTABLE_BASE_ID.");
   }
   const store =
     config.airtablePat && config.airtableBaseId
-      ? new AirtableEncryptedStore(config, options.fetchImpl)
+      ? new AirtableStore(config, options.fetchImpl)
       : new LocalEncryptedStore(config, { memory: options.memory });
   await store.ready();
   return store;

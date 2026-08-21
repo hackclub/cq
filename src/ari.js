@@ -26,7 +26,18 @@ export function buildAriPayload({ project, user, journals, config, country = nul
     maker: {
       email: user.email,
       name: user.name,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      birthday: user.birthday,
       slack_id: user.slackId,
+      address: {
+        line_1: user.addressLine1,
+        line_2: user.addressLine2,
+        city: user.city,
+        state_province: user.region,
+        zip_postal_code: user.postalCode,
+        country: user.addressCountry,
+      },
     },
     repo_url: project.repoUrl,
     track: project.track,
@@ -166,33 +177,24 @@ export async function applyAriEvent(store, payload, deliveryId) {
       await store.put("project", project.id, project);
     }
 
-    if (event === "review.approved") {
-      const approvedMinutes = Math.max(0, Number(payload.review?.approved_minutes ?? 0));
-      const hertz = Math.round(((approvedMinutes * 5) / 60) * 100) / 100;
+    if (["review.approved", "review.changes", "review.rejected", "review.reverted", "review.requeued"].includes(event) && project) {
+      const approvedMinutes = event === "review.approved" ? Math.max(0, Number(payload.review?.approved_minutes ?? 0)) : 0;
+      const desiredHertz = Math.round(((approvedMinutes * 5) / 60) * 100) / 100;
       const ledger = await store.get("ledger", submission.id);
-      if (!ledger && project) {
-        const user = await store.get("user", project.userId);
-        user.hertz += hertz;
+      const previousHertz = Math.max(0, Number(ledger?.delta) || 0);
+      const user = await store.get("user", project.userId);
+      if (user && desiredHertz !== previousHertz) {
+        user.hertz = Math.max(0, Math.round((user.hertz + desiredHertz - previousHertz) * 100) / 100);
         user.updatedAt = timestamp;
         await store.put("user", user.id, user);
-        await store.put("ledger", submission.id, {
-          id: submission.id,
-          userId: user.id,
-          submissionId: submission.id,
-          delta: hertz,
-          reason: `Ari approval ${payload.id ?? submission.externalId}`,
-          createdAt: timestamp,
-        });
       }
-    }
-
-    if (["review.reverted", "review.requeued"].includes(event)) {
-      const ledger = await store.get("ledger", submission.id);
-      if (ledger) {
-        const user = await store.get("user", ledger.userId);
-        user.hertz = Math.max(0, user.hertz - Math.max(0, ledger.delta));
-        user.updatedAt = timestamp;
-        await store.put("user", user.id, user);
+      if (desiredHertz > 0) {
+        await store.put("ledger", submission.id, {
+          id: submission.id, userId: project.userId, submissionId: submission.id,
+          delta: desiredHertz, reason: `Review approval ${payload.id ?? submission.externalId}`,
+          createdAt: ledger?.createdAt || timestamp, updatedAt: timestamp,
+        });
+      } else if (ledger) {
         await store.delete("ledger", submission.id);
       }
     }

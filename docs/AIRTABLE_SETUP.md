@@ -1,9 +1,8 @@
 # Airtable setup
 
-CQ uses Airtable as its production source of truth. The Node server encrypts
-each record as a complete AES-256-GCM document before sending it to Airtable.
-Airtable only receives a record key, a coarse entity type, ciphertext, and an
-updated timestamp.
+CQ uses Airtable as its production source of truth. Records are stored as
+readable JSON so trusted base collaborators can inspect and support the program.
+Airtable access permissions are the database security boundary.
 
 Create a base and one table named `CQ Data` with these fields:
 
@@ -11,29 +10,23 @@ Create a base and one table named `CQ Data` with these fields:
 | --- | --- | --- |
 | `Key` | Single line text | Primary field |
 | `Type` | Single line text | Entity type, not sensitive |
-| `Payload` | Long text | Authenticated ciphertext |
+| `Payload` | Long text | Readable JSON document |
 | `Updated At` | Date with time | Include time |
 
 Create a Personal Access Token scoped only to this base with
 `data.records:read` and `data.records:write`. Put the full token and base ID in
 the server environment as `AIRTABLE_PAT` and `AIRTABLE_BASE_ID`.
 
-Generate the separate application encryption key:
+For local development without Airtable, CQ encrypts `data/cq.local.json`.
+`DATA_ENCRYPTION_KEY` is optional when Airtable is configured, but should be set
+for durable local-file data.
 
-```sh
-openssl rand -base64 32
-```
+Older CQ releases wrote `v1.…` encrypted Airtable payloads. If the base contains
+those rows, keep their original `DATA_ENCRYPTION_KEY` in the server environment.
+CQ reads them during startup and rewrites them as readable JSON after the full
+table has loaded successfully. Never delete live rows merely because they use
+the legacy format, and keep a backup until the one-way migration has completed.
 
-Store the result as `DATA_ENCRYPTION_KEY` in the server secret manager. Never
-put that key in Airtable. Back it up securely: losing it makes every encrypted
-payload unrecoverable, while leaking it compromises the database.
-
-For local development without Airtable, CQ writes the same encrypted document
-format to `data/cq.local.json`. Production refuses to start without an explicit
-encryption key.
-
-If startup reports that a named Airtable record is not valid CQ ciphertext,
-either that row was entered manually or `DATA_ENCRYPTION_KEY` no longer matches
-the key that encrypted it. Delete only a clearly disposable placeholder row.
-For real CQ data, restore the original encryption key instead—changing the key
-cannot decrypt or migrate existing records.
+Limit the Personal Access Token and base sharing to trusted organizers. The
+website's reviewer/shop/fulfilment roles do not replace Airtable's own access
+controls for people who can open the base directly.
