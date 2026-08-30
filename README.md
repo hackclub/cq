@@ -15,7 +15,7 @@ auditable hour decisions, and distinct hours for project updates.
 
 - Hack Club Auth OIDC sign-in with verified ID-token claims, state, nonce, PKCE,
   encrypted local server sessions, CSRF protection, and permission-based organizer roles
-- Project creation and editing, milestones, Markdown devlogs timed from new
+- Project creation and editing, Markdown devlogs timed from new
   linked-project Hackatime activity, drag-and-drop CDN image uploads, evidence,
   project updates, submission, status refresh, withdrawal, and decision history
 - Hackatime OAuth account linking and automatic, selectable project discovery;

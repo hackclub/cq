@@ -230,6 +230,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   const shop = await agent.get("/app/shop");
   const shopToken = csrf(shop.text);
   assert.equal(shop.status, 200);
+  assert.doesNotMatch(shop.text, /Issued through HCB after organizer review/);
   const add = await agent.post("/app/shop/cart/yagi-kit").type("form").send({ _csrf: shopToken, quantity: 1 });
   assert.equal(add.status, 302);
 
@@ -253,6 +254,10 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   const admin = await agent.get("/admin");
   assert.equal(admin.status, 200);
   assert.match(admin.text, /Admin dashboard/);
+  const adminUsers = await agent.get("/admin/users");
+  assert.equal(adminUsers.status, 200);
+  assert.match(adminUsers.text, /Users and roles/);
+  assert.match(adminUsers.text, /Reviewer/);
   const adminProject = await agent.get(`/admin/projects/${projectPath.split("/").pop()}`);
   assert.equal(adminProject.status, 200);
   assert.match(adminProject.text, /Eligibility and evidence/);

@@ -5,16 +5,6 @@ import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { isHttpUrl, projectInput, validateProject } from "../validation.js";
 
-const milestoneTemplates = [
-  ["plan", "Choose your licence path and make a study plan"],
-  ["listen", "Listen to a local repeater, satellite, or the ISS"],
-  ["licence", "Pass your amateur radio exam"],
-  ["callsign", "Receive your callsign"],
-  ["build", "Build and document a radio project"],
-  ["ship", "Ship your project"],
-];
-const milestoneTitles = Object.fromEntries(milestoneTemplates);
-
 async function ownedProject(store, projectId, userId) {
   const project = await store.get("project", projectId);
   return project?.userId === userId ? project : null;
@@ -86,16 +76,11 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
 }
 
 async function details(store, projectId) {
-  const [milestones, journals, submissions] = await Promise.all([
-    store.list("milestone"),
+  const [journals, submissions] = await Promise.all([
     store.list("journal"),
     store.list("submission"),
   ]);
   return {
-    milestones: milestones
-      .filter((item) => item.projectId === projectId)
-      .map((item) => ({ ...item, title: milestoneTitles[item.slug] || item.title }))
-      .sort((a, b) => a.sortOrder - b.sortOrder),
     journals: journals.filter((item) => item.projectId === projectId).sort((a, b) =>
       b.entryDate.localeCompare(a.entryDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))),
     submissions: submissions.filter((item) => item.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -242,22 +227,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   });
 
   router.get("/", async (req, res) => {
-    const [allProjects, milestones, journals] = await Promise.all([
+    const [allProjects, journals] = await Promise.all([
       store.list("project"),
-      store.list("milestone"),
       store.list("journal"),
     ]);
     const projects = allProjects
       .filter((project) => project.userId === req.user.id && project.status !== "archived")
-      .map((project) => {
-        const projectMilestones = milestones.filter((item) => item.projectId === project.id);
-        return {
-          ...project,
-          milestonesDone: projectMilestones.filter((item) => item.complete).length,
-          milestonesTotal: projectMilestones.length,
-          journalMinutes: journals.filter((item) => item.projectId === project.id).reduce((sum, item) => sum + item.minutes, 0),
-        };
-      })
+      .map((project) => ({
+        ...project,
+        journalMinutes: journals.filter((item) => item.projectId === project.id).reduce((sum, item) => sum + item.minutes, 0),
+      }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     res.render("projects/index", { title: "Your projects", projects });
   });
@@ -283,10 +262,6 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const id = randomId("cq_");
     const project = toProjectRecord(id, req.user.id, input, {}, context.hackatime.projects);
     await store.put("project", id, project);
-    await Promise.all(milestoneTemplates.map(async ([slug, title], index) => {
-      const milestone = { id: `${id}_${slug}`, projectId: id, slug, title, complete: false, sortOrder: index };
-      await store.put("milestone", milestone.id, milestone);
-    }));
     setFlash(res, "success", "Project created. Your path to the air is ready.");
     res.redirect(`/app/projects/${id}`);
   });
@@ -345,18 +320,6 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project, context.hackatime.projects));
     setFlash(res, "success", "Project details saved.");
     res.redirect(`/app/projects/${project.id}`);
-  });
-
-  router.post("/:id/milestones/:milestoneId", requireCsrf, async (req, res) => {
-    const project = await ownedProject(store, req.params.id, req.user.id);
-    if (!project) return res.sendStatus(404);
-    const milestone = await store.get("milestone", req.params.milestoneId);
-    if (!milestone || milestone.projectId !== project.id) return res.sendStatus(404);
-    milestone.complete = !milestone.complete;
-    await store.put("milestone", milestone.id, milestone);
-    project.updatedAt = nowIso();
-    await store.put("project", project.id, project);
-    res.redirect(`/app/projects/${project.id}#milestones`);
   });
 
   router.post("/:id/journals", requireCsrf, async (req, res) => {

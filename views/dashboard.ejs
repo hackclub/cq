@@ -28,7 +28,7 @@
           <a class="project-row" href="/app/projects/<%= project.id %>">
             <span class="status-dot status-<%= project.status %>"></span>
             <div><strong><%= project.title %></strong><span><%= project.description %></span></div>
-            <div class="project-row-meta"><span><%= project.milestonesDone %>/<%= project.milestonesTotal %> milestones</span><span><%= Math.round(project.journalMinutes / 60 * 10) / 10 %>h logged</span></div>
+            <div class="project-row-meta"><span><%= Math.round(project.journalMinutes / 60 * 10) / 10 %>h logged</span></div>
             <span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span>
           </a>
         <% }) %>

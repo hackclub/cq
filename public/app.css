@@ -946,23 +946,8 @@ button {
   color: var(--muted);
 }
 
-.progress {
-  align-self: end;
-  height: 7px;
-  margin-top: 24px;
-  background: #e4e6e5;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.progress span {
-  display: block;
-  height: 100%;
-  background: var(--cyan);
-}
-
 .project-card-foot {
-  margin-top: 9px;
+  margin-top: 24px;
 }
 
 .project-form {
@@ -1182,48 +1167,6 @@ input:focus, select:focus, textarea:focus {
 .safety-mini p {
   margin-bottom: 0;
   color: #7c4d56;
-}
-
-.milestone-list {
-  display: grid;
-  gap: 8px;
-}
-
-.milestone-list form {
-  margin: 0;
-}
-
-.milestone {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  width: 100%;
-  padding: 13px;
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-}
-
-.milestone.complete {
-  color: #557067;
-  background: #f0faf6;
-  border-color: #b8e4d4;
-}
-
-.milestone-check {
-  display: grid;
-  place-items: center;
-  width: 25px;
-  height: 25px;
-  border: 2px solid #abb2bd;
-  border-radius: 50%;
-}
-
-.milestone.complete .milestone-check {
-  background: var(--green);
-  color: white;
-  border-color: var(--green);
 }
 
 .devlog-heading {

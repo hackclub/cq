@@ -7,25 +7,19 @@ export function dashboardRoutes({ store, hackatimeClient }) {
   router.use(requireAuth);
 
   router.get("/", async (req, res) => {
-    const [allProjects, orders, milestones, journals] = await Promise.all([
+    const [allProjects, orders, journals] = await Promise.all([
       store.list("project"),
       store.list("order"),
-      store.list("milestone"),
       store.list("journal"),
     ]);
     const projects = allProjects
       .filter((project) => project.userId === req.user.id && project.status !== "archived")
-      .map((project) => {
-        const projectMilestones = milestones.filter((item) => item.projectId === project.id);
-        return {
-          ...project,
-          milestonesDone: projectMilestones.filter((item) => item.complete).length,
-          milestonesTotal: projectMilestones.length,
-          journalMinutes: journals
-            .filter((item) => item.projectId === project.id)
-            .reduce((sum, item) => sum + item.minutes, 0),
-        };
-      })
+      .map((project) => ({
+        ...project,
+        journalMinutes: journals
+          .filter((item) => item.projectId === project.id)
+          .reduce((sum, item) => sum + item.minutes, 0),
+      }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const latestOrder = orders
       .filter((order) => order.userId === req.user.id)

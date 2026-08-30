@@ -15,21 +15,6 @@
 
   <div class="project-layout">
     <div class="project-main-column">
-      <section class="panel" id="milestones">
-        <div class="panel-heading"><div><p class="eyebrow">Signal path</p><h2>Milestones</h2></div><strong><%= milestones.filter((item) => item.complete).length %>/<%= milestones.length %></strong></div>
-        <div class="milestone-list">
-          <% milestones.forEach((milestone) => { %>
-            <form method="post" action="/app/projects/<%= project.id %>/milestones/<%= milestone.id %>">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button type="submit" class="milestone <%= milestone.complete ? 'complete' : '' %>">
-                <span class="milestone-check"><%= milestone.complete ? '✓' : '' %></span>
-                <span><%= milestone.title %></span>
-              </button>
-            </form>
-          <% }) %>
-        </div>
-      </section>
-
       <section class="panel" id="work-log">
         <div class="panel-heading devlog-heading"><div><p class="eyebrow">Build story</p><h2>Devlog</h2><p>Post concrete progress as you make it. Every entry needs visual evidence.</p></div><div class="devlog-total"><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %></strong><span>hours logged</span></div></div>
         <details class="devlog-composer" <%= !journals.length ? 'open' : '' %>>

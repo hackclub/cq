@@ -13,8 +13,7 @@
           <div class="project-card-top"><span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span><span><%= project.track %></span></div>
           <h2><%= project.title %></h2>
           <p><%= project.description %></p>
-          <div class="progress"><span style="width: <%= project.milestonesTotal ? Math.round(project.milestonesDone / project.milestonesTotal * 100) : 0 %>%"></span></div>
-          <div class="project-card-foot"><span><%= project.milestonesDone %>/<%= project.milestonesTotal %> milestones</span><span><%= Math.round(project.journalMinutes / 6) / 10 %>h logged</span></div>
+          <div class="project-card-foot"><span><%= Math.round(project.journalMinutes / 6) / 10 %>h logged</span></div>
         </a>
       <% }) %>
     </div>

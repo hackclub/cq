@@ -15,7 +15,6 @@
         <div class="product-image"><img src="<%= product.image %>" alt=""></div>
         <div class="product-copy"><p class="eyebrow"><%= product.category %></p><h2><%= product.name %></h2><p><%= product.description %></p></div>
         <% if (product.category === 'radios') { %><p class="product-requirement"><span>✓</span> Radio-readiness check required before fulfilment</p><% } %>
-        <% if (product.id === 'licence-grant') { %><p class="product-requirement"><span>↗</span> Issued through HCB after organizer review</p><% } %>
         <div class="product-buy">
           <div><strong><%= product.price %> hertz</strong><span><%= product.stock %> available</span></div>
           <form method="post" action="/app/shop/cart/<%= product.id %>">

@@ -43,7 +43,8 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   });
 
   router.get("/users", requirePermission("users.manage"), async (req, res) => {
-    const users = sortNewest(await store.list("user"));
+    const users = sortNewest(await store.list("user"))
+      .map((item) => ({ ...item, roleKeys: userRoles(item) }));
     res.render("admin/users", { title: "Manage users", users, roleDefinitions });
   });
 
@@ -81,10 +82,9 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.get("/projects/:id", requirePermission("projects.review"), async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);
-    const [maker, country, milestones, journals, submissions] = await Promise.all([
+    const [maker, country, journals, submissions] = await Promise.all([
       store.get("user", project.userId),
       store.get("country", project.countryCode),
-      store.list("milestone"),
       store.list("journal"),
       store.list("submission"),
     ]);
@@ -93,7 +93,6 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
       project,
       maker,
       country,
-      milestones: milestones.filter((item) => item.projectId === project.id).sort((a, b) => a.sortOrder - b.sortOrder),
       journals: journals.filter((item) => item.projectId === project.id).sort((a, b) => b.entryDate.localeCompare(a.entryDate)),
       submissions: sortNewest(submissions.filter((item) => item.projectId === project.id)),
     });
