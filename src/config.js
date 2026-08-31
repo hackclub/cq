@@ -25,6 +25,8 @@ export function getConfig(overrides = {}) {
     localDataPath: path.resolve(projectRoot, overrides.localDataPath ?? "./data/cq.local.json"),
     airtablePat: overrides.airtablePat ?? process.env.AIRTABLE_PAT ?? "",
     airtableBaseId: overrides.airtableBaseId ?? process.env.AIRTABLE_BASE_ID ?? "",
+    airtableTablePrefix: overrides.airtableTablePrefix ?? process.env.AIRTABLE_TABLE_PREFIX ?? "CQ",
+    // Used only by the one-way migration script for older single-table deployments.
     airtableTableName: overrides.airtableTableName ?? process.env.AIRTABLE_TABLE_NAME ?? "CQ Data",
     dataEncryptionKey: overrides.dataEncryptionKey ?? process.env.DATA_ENCRYPTION_KEY ?? "",
     adminEmails: String(overrides.adminEmails ?? process.env.ADMIN_EMAILS ?? "")

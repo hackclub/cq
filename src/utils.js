@@ -74,7 +74,7 @@ export function readFlash(req, res) {
 
 export function statusLabel(status) {
   return String(status ?? "draft")
-    .replaceAll("_", " ")
+    .replace(/[._]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

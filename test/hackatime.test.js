@@ -11,7 +11,7 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-test("Hackatime OAuth stores its token encrypted and discovers selectable projects", async () => {
+test("Hackatime OAuth uses the configured store and discovers selectable projects", async () => {
   const config = getConfig({
     nodeEnv: "test",
     baseUrl: "https://cq.example",

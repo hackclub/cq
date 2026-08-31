@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { writeAudit } from "../audit.js";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { checkoutInput, validateCheckout } from "../validation.js";
@@ -146,6 +147,10 @@ export function shopRoutes({ store, notifier }) {
         return order;
       });
       const freshUser = await store.get("user", req.user.id);
+      await writeAudit(store, freshUser, {
+        action: "order.placed", entityType: "order", entityId: order.id,
+        summary: `Placed order ${order.id} for ${order.total} hertz.`, after: order,
+      });
       await Promise.all([
         notifier.orderPurchased(freshUser, order),
         notifier.adminPurchase(freshUser, order),

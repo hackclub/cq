@@ -123,6 +123,73 @@ export class LocalEncryptedStore extends BaseStore {
   }
 }
 
+export const airtableEntityTables = Object.freeze({
+  user: "Users",
+  project: "Projects",
+  journal: "Devlogs",
+  submission: "Submissions",
+  order: "Orders",
+  product: "Shop Products",
+  country: "Countries",
+  review_action: "Review Actions",
+  audit: "Audit Log",
+  ledger: "Hertz Ledger",
+  notification: "Slack Notifications",
+  delivery: "Ari Deliveries",
+  cart: "Carts",
+  session: "Sessions",
+  oauth: "OAuth States",
+  hackatime_oauth: "Hackatime OAuth States",
+  hackatime_token: "Hackatime Tokens",
+  hackatime_cache: "Hackatime Cache",
+});
+
+export function airtableTableName(prefix, type) {
+  const label = airtableEntityTables[type];
+  if (!label) throw new Error(`No Airtable table is configured for record type “${type}”.`);
+  return `${String(prefix || "CQ").trim()} ${label}`.trim();
+}
+
+function airtableSummary(type, value = {}) {
+  const text = (input, maximum = 500) => String(input ?? "").trim().slice(0, maximum);
+  const summaries = {
+    user: [value.name, userStatus(value), value.email],
+    project: [value.title, value.status, value.userId],
+    journal: [value.title || "Project update", `${Number(value.minutes) || 0} minutes`, value.projectId],
+    submission: [value.externalId || value.id, value.decision || value.phase, value.projectId],
+    order: [value.id, value.status, value.userId],
+    product: [value.name, value.active === false ? "Inactive" : "Active", value.category],
+    country: [value.name, value.fulfilmentMode, value.code || value.id],
+    review_action: [value.action, value.action, value.reviewerName || value.reviewerId],
+    audit: [value.summary || value.action, value.action, value.actorName || value.actorId],
+    ledger: [value.reason, `${Number(value.delta) || 0} hertz`, value.userId],
+    notification: [value.kind, value.status, value.userId || value.entityId],
+    delivery: [value.event || value.id, value.status || value.outcome, value.externalId],
+    cart: [value.productId || value.id, `${Number(value.quantity) || 0} items`, value.userId],
+    session: [value.id, value.expiresAt ? "Active" : "Stored", value.userId],
+    oauth: [value.id, "Pending", value.returnTo],
+    hackatime_oauth: [value.id, "Pending", value.userId],
+    hackatime_token: [value.account?.username || value.id, "Connected", value.userId || value.id],
+    hackatime_cache: [value.id, value.fetchedAt || "Cached", value.userId || value.id],
+  };
+  const [name, status, owner] = summaries[type] || [value.name || value.id, value.status, value.userId];
+  return { Name: text(name), Status: text(status), Owner: text(owner) };
+}
+
+export function airtableRecordFields(type, id, value, updatedAt = new Date().toISOString()) {
+  return {
+    ID: String(id),
+    ...airtableSummary(type, value),
+    Data: JSON.stringify(value, null, 2),
+    "Updated At": updatedAt,
+  };
+}
+
+function userStatus(value) {
+  const roles = Array.isArray(value.roles) ? value.roles : [value.role].filter(Boolean);
+  return roles.length ? roles.join(", ") : value.verificationStatus;
+}
+
 export class AirtableStore extends BaseStore {
   constructor(config, fetchImpl = fetch) {
     // Airtable is the access-controlled database. New payloads are readable JSON.
@@ -130,7 +197,7 @@ export class AirtableStore extends BaseStore {
     super(config);
     this.fetch = fetchImpl;
     this.cache = new Map();
-    this.cacheComplete = false;
+    this.loadedTypes = new Set();
     this.lastRequestAt = 0;
     this.requestChain = Promise.resolve();
   }
@@ -141,13 +208,15 @@ export class AirtableStore extends BaseStore {
     }
   }
 
-  tableUrl() {
-    return `https://api.airtable.com/v0/${encodeURIComponent(this.config.airtableBaseId)}/${encodeURIComponent(this.config.airtableTableName)}`;
+  tableUrl(type) {
+    const table = airtableTableName(this.config.airtableTablePrefix, type);
+    return `https://api.airtable.com/v0/${encodeURIComponent(this.config.airtableBaseId)}/${encodeURIComponent(table)}`;
   }
 
   async request(url, options = {}) {
     const perform = async () => {
-      const wait = Math.max(0, 220 - (Date.now() - this.lastRequestAt));
+      const interval = this.config.airtableRequestIntervalMs ?? 220;
+      const wait = Math.max(0, interval - (Date.now() - this.lastRequestAt));
       if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
       this.lastRequestAt = Date.now();
       const response = await this.fetch(url, {
@@ -170,13 +239,12 @@ export class AirtableStore extends BaseStore {
     return request;
   }
 
-  decode(record) {
-    const key = String(record.fields?.Key || "").trim();
-    const type = String(record.fields?.Type || "").trim();
-    const payload = record.fields?.Payload;
+  decode(type, record) {
+    const id = String(record.fields?.ID || "").trim();
+    const payload = record.fields?.Data;
     // Airtable often starts a new table with an example or partially filled row.
     // It is not application data unless its key and type match CQ's record format.
-    if (!key || !type || !payload || !key.startsWith(`${type}:`)) return null;
+    if (!id || !payload || (id === "ID" && payload === "Data")) return null;
     let value;
     try {
       value = String(payload).startsWith("v1.")
@@ -185,51 +253,44 @@ export class AirtableStore extends BaseStore {
     } catch (error) {
       throw new Error(
         String(payload).startsWith("v1.")
-          ? `Airtable record “${key}” is legacy encrypted data. Temporarily restore the DATA_ENCRYPTION_KEY that created it so CQ can read and rewrite it.`
-          : `Airtable record “${key}” does not contain valid JSON.`,
+          ? `Airtable ${type} record “${id}” is encrypted legacy data. Run the Airtable migration with its original DATA_ENCRYPTION_KEY.`
+          : `Airtable ${type} record “${id}” does not contain valid JSON.`,
         { cause: error },
       );
     }
-    this.cache.set(key, { recordId: record.id, value, legacyEncrypted: String(payload).startsWith("v1.") });
+    this.cache.set(`${type}:${id}`, { recordId: record.id, value });
     return value;
   }
 
-  async loadAll() {
-    if (this.cacheComplete) return;
+  async loadType(type) {
+    if (this.loadedTypes.has(type)) return;
     let offset = "";
     do {
-      const url = new URL(this.tableUrl());
+      const url = new URL(this.tableUrl(type));
       url.searchParams.set("pageSize", "100");
       if (offset) url.searchParams.set("offset", offset);
       const body = await this.request(url);
-      for (const record of body.records ?? []) this.decode(record);
+      for (const record of body.records ?? []) this.decode(type, record);
       offset = body.offset ?? "";
     } while (offset);
-    this.cacheComplete = true;
-    // Complete the one-way migration after a successful full read. The key is
-    // retained only long enough to decode legacy rows; every rewrite is JSON.
-    for (const [key, record] of [...this.cache.entries()]) {
-      if (!record.legacyEncrypted) continue;
-      const separator = key.indexOf(":");
-      await this.put(key.slice(0, separator), key.slice(separator + 1), record.value);
-    }
+    this.loadedTypes.add(type);
   }
 
   async get(type, id) {
     await this.ready();
     const key = `${type}:${id}`;
     if (this.cache.has(key)) return this.cache.get(key).value;
-    const formula = `{Key}='${key.replaceAll("'", "\\'")}'`;
-    const url = new URL(this.tableUrl());
+    const formula = `{ID}='${String(id).replaceAll("'", "\\'")}'`;
+    const url = new URL(this.tableUrl(type));
     url.searchParams.set("maxRecords", "1");
     url.searchParams.set("filterByFormula", formula);
     const body = await this.request(url);
-    return body.records?.[0] ? this.decode(body.records[0]) : null;
+    return body.records?.[0] ? this.decode(type, body.records[0]) : null;
   }
 
   async list(type) {
     await this.ready();
-    await this.loadAll();
+    await this.loadType(type);
     return [...this.cache.entries()]
       .filter(([key]) => key.startsWith(`${type}:`))
       .map(([, record]) => record.value);
@@ -243,16 +304,11 @@ export class AirtableStore extends BaseStore {
       await this.get(type, id);
       cached = this.cache.get(key);
     }
-    const fields = {
-      Key: key,
-      Type: type,
-      Payload: JSON.stringify(value, null, 2),
-      "Updated At": new Date().toISOString(),
-    };
+    const fields = airtableRecordFields(type, id, value);
     const body = cached
-      ? await this.request(`${this.tableUrl()}/${cached.recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-      : await this.request(this.tableUrl(), { method: "POST", body: JSON.stringify({ fields }) });
-    this.cache.set(key, { recordId: body.id, value, legacyEncrypted: false });
+      ? await this.request(`${this.tableUrl(type)}/${cached.recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+      : await this.request(this.tableUrl(type), { method: "POST", body: JSON.stringify({ fields }) });
+    this.cache.set(key, { recordId: body.id, value });
     return value;
   }
 
@@ -262,7 +318,7 @@ export class AirtableStore extends BaseStore {
     await this.get(type, id);
     const cached = this.cache.get(key);
     if (!cached) return false;
-    await this.request(`${this.tableUrl()}/${cached.recordId}`, { method: "DELETE" });
+    await this.request(`${this.tableUrl(type)}/${cached.recordId}`, { method: "DELETE" });
     this.cache.delete(key);
     return true;
   }

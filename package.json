@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "airtable:setup": "node scripts/setup-airtable.js",
     "test": "node --test",
     "check": "node --check src/server.js && node --test"
   },

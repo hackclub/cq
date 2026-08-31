@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDefinitions, userRoles } from "../auth.js";
+import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 
 function sortNewest(items) {
@@ -51,6 +52,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {
     const user = await store.get("user", req.params.id);
     if (!user) return res.sendStatus(404);
+    const before = structuredClone(user);
     const hertzDelta = Number.parseFloat(req.body.hertz_delta || "0");
     if (Number.isFinite(hertzDelta) && hertzDelta !== 0) {
       user.hertz = Math.max(0, Math.round((user.hertz + hertzDelta) * 100) / 100);
@@ -63,6 +65,11 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     user.role = roles.includes("admin") ? "admin" : "participant";
     user.updatedAt = nowIso();
     await store.put("user", user.id, user);
+    await writeAudit(store, req.user, {
+      action: "user.updated", entityType: "user", entityId: user.id,
+      summary: `Updated roles or hertz for ${user.name}.`, before, after: user,
+      metadata: { hertzDelta: Number.isFinite(hertzDelta) ? hertzDelta : 0 },
+    });
     setFlash(res, "success", `${user.name} updated.`);
     res.redirect("/admin/users");
   });
@@ -101,12 +108,17 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/projects/:id", requirePermission("projects.review"), requireCsrf, async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);
+    const before = structuredClone(project);
     const previousStatus = project.status;
     if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
+    await writeAudit(store, req.user, {
+      action: "project.status_updated", entityType: "project", entityId: project.id,
+      summary: `Changed ${project.title} from ${previousStatus} to ${project.status}.`, before, after: project,
+    });
     if (previousStatus !== project.status) {
       const user = await store.get("user", project.userId);
       const event = { submitted: "review.requeued" }[project.status];
@@ -125,6 +137,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/orders/:id", requirePermission("orders.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("order", req.params.id);
     if (!existing) return res.sendStatus(404);
+    const before = structuredClone(existing);
     const allowedStatuses = ["received", "packing", "shipped", "fulfilled", "cancelled"];
     const requestedStatus = allowedStatuses.includes(req.body.status) ? req.body.status : existing.status;
     if (existing.status === "cancelled" && requestedStatus !== "cancelled") {
@@ -167,6 +180,12 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
       const user = await store.get("user", order.userId);
       if (user) await notifier.orderUpdated(user, order);
     }
+    await writeAudit(store, req.user, {
+      action: order.status === "cancelled" ? "order.cancelled" : "order.updated",
+      entityType: "order", entityId: order.id,
+      summary: `Updated order ${order.id} from ${previousStatus} to ${order.status}.`, before, after: order,
+      metadata: { refunded: Boolean(order.refundedAt && !before.refundedAt) },
+    });
     setFlash(res, "success", order.status === "cancelled" ? `Order ${order.id} cancelled and refunded.` : `Order ${order.id} updated.`);
     res.redirect("/admin/orders");
   });
@@ -180,6 +199,10 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     const id = randomId("product_");
     const product = productInput(req.body, id);
     await store.put("product", id, product);
+    await writeAudit(store, req.user, {
+      action: "product.created", entityType: "product", entityId: product.id,
+      summary: `Added ${product.name} to the shop.`, after: product,
+    });
     setFlash(res, "success", `${product.name} added to the shop.`);
     res.redirect("/admin/shop");
   });
@@ -187,7 +210,12 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/shop/:id", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("product", req.params.id);
     if (!existing) return res.sendStatus(404);
-    await store.put("product", existing.id, { ...existing, ...productInput(req.body, existing.id) });
+    const updated = { ...existing, ...productInput(req.body, existing.id) };
+    await store.put("product", existing.id, updated);
+    await writeAudit(store, req.user, {
+      action: "product.updated", entityType: "product", entityId: updated.id,
+      summary: `Updated shop item ${updated.name}.`, before: existing, after: updated,
+    });
     setFlash(res, "success", `${req.body.name} updated.`);
     res.redirect("/admin/shop");
   });
@@ -232,6 +260,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/reviews/:id/claim", requirePermission("projects.review"), requireCsrf, async (req, res) => {
     const submission = await store.get("submission", req.params.id);
     if (!submission) return res.sendStatus(404);
+    const before = structuredClone(submission);
     const release = req.body.action === "release";
     if (!release && submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "Another reviewer has already claimed this submission.");
@@ -243,6 +272,11 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     submission.updatedAt = nowIso();
     await store.put("submission", submission.id, submission);
     await addReviewAction(store, submission, req.user, release ? "released" : "claimed");
+    await writeAudit(store, req.user, {
+      action: release ? "review.released" : "review.claimed",
+      entityType: "submission", entityId: submission.id,
+      summary: `${release ? "Released" : "Claimed"} review ${submission.id}.`, before, after: submission,
+    });
     const project = await store.get("project", submission.projectId);
     const maker = project ? await store.get("user", project.userId) : null;
     if (!release && project && maker) await notifier.projectUnderReview(maker, project);
@@ -253,6 +287,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/reviews/:id/decision", requirePermission("projects.review"), requireCsrf, async (req, res) => {
     const submission = await store.get("submission", req.params.id);
     if (!submission) return res.sendStatus(404);
+    const submissionBefore = structuredClone(submission);
     if (submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "This submission is claimed by another reviewer.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -329,6 +364,12 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
       await addReviewAction(store, submission, req.user, decision, {
         noteToMaker, internalNote, technicalNote, timeNote, criteria, approvedMinutes,
       });
+      await writeAudit(store, req.user, {
+        action: `review.${decision}`, entityType: "submission", entityId: submission.id,
+        summary: `Saved a ${decision} decision for ${project.title}.`,
+        before: submissionBefore, after: submission,
+        metadata: { projectId: project.id, approvedMinutes, previousHertz, awardedHertz: desiredHertz },
+      });
       if (maker) await notifier.projectDecision(maker, project, submission.event, submission.review);
     });
     setFlash(res, "success", "Review decision saved and the participant was notified.");
@@ -349,13 +390,23 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     });
   });
 
+  router.get("/audit", requirePermission("audit.read"), async (req, res) => {
+    const entries = sortNewest(await store.list("audit"));
+    res.render("admin/audit", { title: "Audit log", entries });
+  });
+
   router.post("/countries", requirePermission("countries.manage"), requireCsrf, async (req, res) => {
     const code = String(req.body.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 10);
     if (!code || !String(req.body.name || "").trim()) {
       setFlash(res, "error", "Country code and name are required.");
       return res.redirect("/admin/countries");
     }
-    await store.put("country", code, countryInput(req.body, code));
+    const country = countryInput(req.body, code);
+    await store.put("country", code, country);
+    await writeAudit(store, req.user, {
+      action: "country.created", entityType: "country", entityId: code,
+      summary: `Added the ${country.name} country policy.`, after: country,
+    });
     setFlash(res, "success", `${req.body.name} added.`);
     res.redirect("/admin/countries");
   });
@@ -363,7 +414,12 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   router.post("/countries/:id", requirePermission("countries.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("country", req.params.id);
     if (!existing) return res.sendStatus(404);
-    await store.put("country", existing.id, countryInput(req.body, existing.id));
+    const updated = countryInput(req.body, existing.id);
+    await store.put("country", existing.id, updated);
+    await writeAudit(store, req.user, {
+      action: "country.updated", entityType: "country", entityId: existing.id,
+      summary: `Updated the ${updated.name} country policy.`, before: existing, after: updated,
+    });
     setFlash(res, "success", `${req.body.name} policy updated.`);
     res.redirect("/admin/countries");
   });

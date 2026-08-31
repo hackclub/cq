@@ -96,7 +96,6 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     radio_relevance: "This station receives and decodes amateur-radio satellite signals on the two metre and seventy centimetre bands.",
     country_code: "AU",
     license_goal: "Foundation",
-    evidence: ["commits", "elapsed", "devlog"],
     original_work: "1",
     not_school_assignment: "1",
     not_paid_hack_club_work: "1",
@@ -104,6 +103,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(create.status, 302);
   assert.match(create.headers.location, /^\/app\/projects\/cq_/);
   const projectPath = create.headers.location;
+  assert.deepEqual((await store.get("project", projectPath.split("/").pop())).evidence, ["commits", "elapsed", "devlog"]);
 
   const projectPage = await agent.get(projectPath);
   assert.equal(projectPage.status, 200);
@@ -258,11 +258,23 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(adminUsers.status, 200);
   assert.match(adminUsers.text, /Users and roles/);
   assert.match(adminUsers.text, /Reviewer/);
+  const adminUser = (await store.list("user"))[0];
+  const updateUser = await agent.post(`/admin/users/${adminUser.id}`).type("form").send({
+    _csrf: csrf(adminUsers.text),
+    roles: ["reviewer", "admin"],
+    hertz_delta: 0,
+  });
+  assert.equal(updateUser.status, 302);
   const adminProject = await agent.get(`/admin/projects/${projectPath.split("/").pop()}`);
   assert.equal(adminProject.status, 200);
   assert.match(adminProject.text, /Eligibility and evidence/);
   assert.match(adminProject.text, /This station receives and decodes/);
   assert.match(adminProject.text, /antenna-finished\.jpg/);
+  const archiveProject = await agent.post(`/admin/projects/${projectPath.split("/").pop()}`).type("form").send({
+    _csrf: csrf(adminProject.text),
+    status: "archived",
+  });
+  assert.equal(archiveProject.status, 302);
   const adminOrders = await agent.get("/admin/orders");
   assert.equal(adminOrders.status, 200);
   assert.match(adminOrders.text, /1 Radio Road/);
@@ -278,7 +290,41 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   const adminCountries = await agent.get("/admin/countries");
   assert.equal(adminCountries.status, 200);
   assert.match(adminCountries.text, /Country policies/);
+  const updateCountry = await agent.post("/admin/countries/AU").type("form").send({
+    _csrf: csrf(adminCountries.text),
+    name: "Australia",
+    ownership_rule: "Receiving equipment may be owned when it complies with Australian rules.",
+    transmission_rule: "An appropriate amateur qualification and callsign are required before transmitting.",
+    fulfilment_mode: "local",
+    fulfilment_note: "Prefer local Australian fulfilment where stock permits.",
+    source_url: "https://www.acma.gov.au/amateur-radio",
+    sort_order: 10,
+    active: "1",
+  });
+  assert.equal(updateCountry.status, 302);
+  const adminShop = await agent.get("/admin/shop");
+  assert.equal(adminShop.status, 200);
+  const yagi = await store.get("product", "yagi-kit");
+  const updateProduct = await agent.post("/admin/shop/yagi-kit").type("form").send({
+    _csrf: csrf(adminShop.text),
+    name: yagi.name,
+    category: yagi.category,
+    price: yagi.price,
+    stock: yagi.stock,
+    image: yagi.image,
+    sort_order: yagi.sortOrder,
+    description: yagi.description,
+    active: "1",
+  });
+  assert.equal(updateProduct.status, 302);
   const adminNotifications = await agent.get("/admin/notifications");
   assert.equal(adminNotifications.status, 200);
   assert.match(adminNotifications.text, /Slack notifications/);
+  const adminAudit = await agent.get("/admin/audit");
+  assert.equal(adminAudit.status, 200);
+  assert.match(adminAudit.text, /Audit log/);
+  for (const action of ["User Updated", "Project Shipped", "Project Status Updated", "Order Placed", "Order Cancelled", "Product Updated", "Review Claimed", "Review Approved", "Country Updated"]) {
+    assert.match(adminAudit.text, new RegExp(action));
+  }
+  assert.ok((await store.list("audit")).length >= 7);
 });

@@ -38,6 +38,7 @@ test("approved events award hertz once and reverts remove them", async () => {
   await applyAriEvent(store, approved, "delivery_1");
   assert.equal((await store.get("user", "user_1")).hertz, 12.42);
   assert.equal((await store.get("project", "cq_1")).status, "approved");
+  assert.equal((await store.list("audit")).length, 1);
 
   await applyAriEvent(store, {
     event: "review.reverted",
@@ -48,4 +49,5 @@ test("approved events award hertz once and reverts remove them", async () => {
   }, "delivery_2");
   assert.equal((await store.get("user", "user_1")).hertz, 2);
   assert.equal((await store.get("project", "cq_1")).status, "building");
+  assert.equal((await store.list("audit")).length, 2);
 });

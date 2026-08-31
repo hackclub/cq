@@ -34,6 +34,11 @@ export const roleDefinitions = {
     description: "Inspect Slack notification delivery and participant-facing operational issues.",
     permissions: ["notifications.read"],
   },
+  auditor: {
+    label: "Audit viewer",
+    description: "Read the organizer audit log without changing program data.",
+    permissions: ["audit.read"],
+  },
   admin: {
     label: "Administrator",
     description: "Full access, including users, roles, hertz, and every organizer tool.",

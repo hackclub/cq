@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { writeAudit } from "./audit.js";
 import { nowIso, publicUrl } from "./utils.js";
 
 function safeEqualHex(left, right) {
@@ -149,6 +150,7 @@ export async function applyAriEvent(store, payload, deliveryId) {
     const duplicate = await store.get("delivery", deliveryId);
     if (duplicate) return { handled: true, duplicate: true };
     await store.put("delivery", deliveryId, { id: deliveryId, event, payload, receivedAt: timestamp });
+    const submissionBefore = structuredClone(submission);
     const phase =
       event === "review.requeued" ? "review" :
       event === "review.reverted" ? "reverted" :
@@ -198,6 +200,11 @@ export async function applyAriEvent(store, payload, deliveryId) {
         await store.delete("ledger", submission.id);
       }
     }
+    await writeAudit(store, { id: "ari", name: "Project review service" }, {
+      action: event || "review.event", entityType: "submission", entityId: submission.id,
+      summary: `Received ${event || "a review event"} for submission ${submission.id}.`,
+      before: submissionBefore, after: submission, metadata: { deliveryId, projectId: project?.id || null },
+    });
     return {
       handled: true,
       duplicate: false,

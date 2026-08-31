@@ -2032,6 +2032,19 @@ td small {
   color: var(--muted);
 }
 
+.audit-json {
+  width: min(640px, 70vw);
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #e8eefb;
+  background: #111827;
+  border-radius: 8px;
+  font: 400 11px/1.5 "Space Mono", monospace;
+}
+
 .inline-admin-form {
   display: flex;
   align-items: center;

@@ -1,0 +1,27 @@
+<%- include('../partials/head') %>
+<main id="main" class="app-main shell">
+  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Audit log</h1><p>A permanent record of sensitive organizer actions across CQ.</p></div></div>
+  <%- include('nav') %>
+  <% if (!entries.length) { %>
+    <section class="panel empty-state"><h2>No organizer actions yet.</h2><p>Role, hertz, order, review, shop, project-status, and country-policy changes will appear here.</p></section>
+  <% } else { %>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>When</th><th>Organizer</th><th>Action</th><th>Record</th><th>Summary</th><th>Details</th></tr></thead>
+        <tbody>
+          <% entries.forEach((entry) => { %>
+            <tr>
+              <td><time datetime="<%= entry.createdAt %>"><%= formatDateTime(entry.createdAt) %></time></td>
+              <td><strong><%= entry.actorName %></strong><small><%= entry.actorEmail || entry.actorId %></small></td>
+              <td><span class="status-pill"><%= statusLabel(entry.action) %></span></td>
+              <td><strong><%= statusLabel(entry.entityType) %></strong><small><%= entry.entityId %></small></td>
+              <td><%= entry.summary %></td>
+              <td><details><summary>View changes</summary><pre class="audit-json"><%= JSON.stringify({ before: entry.before, after: entry.after, metadata: entry.metadata }, null, 2) %></pre></details></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</main>
+<%- include('../partials/footer') %>

@@ -15,5 +15,8 @@ test("organizer roles grant only their declared permissions", () => {
 
   const admin = { role: "admin" };
   assert.equal(hasPermission(admin, "users.manage"), true);
+  const auditor = { roles: ["participant", "auditor"] };
+  assert.equal(hasPermission(auditor, "audit.read"), true);
+  assert.equal(hasPermission(auditor, "users.manage"), false);
   assert.deepEqual(userRoles({ role: "participant" }), ["participant"]);
 });

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import { writeAudit } from "../audit.js";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
@@ -456,6 +457,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       project.status = "submitted";
       project.updatedAt = nowIso();
       await store.put("project", project.id, project);
+      await writeAudit(store, req.user, {
+        action: "project.shipped", entityType: "submission", entityId: submission.id,
+        summary: `Shipped ${project.title}.`, after: submission, metadata: { projectId: project.id },
+      });
       await notifier.projectSubmitted(req.user, project);
       setFlash(res, "success", result.status === 200 ? "This exact version was already queued." : "Project submitted for review.");
     } catch (error) {
@@ -513,6 +518,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       project.status = "building";
       project.updatedAt = nowIso();
       await store.put("project", project.id, project);
+      await writeAudit(store, req.user, {
+        action: "project.withdrawn", entityType: "project", entityId: project.id,
+        summary: `Withdrew the open submission for ${project.title}.`, after: project,
+      });
       setFlash(res, "success", "The open review submission was withdrawn.");
     } catch (error) {
       req.app.locals.logger.error("Ari withdrawal failed", error);

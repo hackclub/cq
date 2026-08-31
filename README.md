@@ -30,7 +30,8 @@ auditable hour decisions, and distinct hours for project updates.
 - An on-platform review queue with claiming, private notes, participant feedback,
   decisions, approved-time rewards, audit history, and Slack notifications
 - Separate reviewer, shop editor, fulfilment, country editor, support, and admin roles
-- Airtable production storage using readable JSON documents protected by Airtable access controls
+- Separate Airtable tables with readable summary columns and unencrypted JSON documents
+- A centralized organizer audit log for roles, hertz, reviews, orders, shop items, projects, and country policies
 
 ## Run locally
 
@@ -59,8 +60,9 @@ npm test
 2. Create a confidential Hackatime OAuth app under **My OAuth Apps**, set its
    exact callback to `https://your-domain.example/app/hackatime/callback`, and
    add its client ID and secret. CQ requests the `profile read` scopes.
-3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md). CQ stores readable JSON
-   in Airtable so authorized base collaborators can inspect operational data.
+3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md), then run
+   `npm run airtable:setup`. CQ creates separate readable tables and safely copies
+   records from the older single-table layout without deleting the old data.
 4. Add the Ari program and signing secrets. Configure Ari's outgoing webhook URL
    as `https://your-domain.example/ari/webhook`.
 5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
@@ -151,12 +153,13 @@ advice. Organizers should periodically verify it against the linked regulator.
 
 ## Storage and security
 
-The Airtable table contains a key, entity type, readable JSON payload, and update
-timestamp. Airtable permissions are the security boundary, so access to the base
-must be limited to trusted organizers. CQ role permissions separately control
-which organizer screens are available through the website.
+Each Airtable entity table contains an ID, readable name/status/owner columns,
+an unencrypted formatted JSON document, and an update timestamp. Airtable
+permissions are the security boundary, so access to the base must be limited to
+trusted organizers. CQ role permissions separately control which organizer
+screens are available through the website.
 
 `DATA_ENCRYPTION_KEY` is only needed for encrypted local-file storage and to read
-legacy Airtable rows created by older CQ versions. CQ rewrites those rows as
-plaintext JSON after a successful full table load. Rotate Hack Club, Slack,
-Ari, and Airtable credentials through the deployment secret manager.
+legacy Airtable rows during the explicit migration command. The migration copies
+them as readable JSON and leaves the source rows untouched. Rotate Hack Club,
+Slack, Ari, and Airtable credentials through the deployment secret manager.

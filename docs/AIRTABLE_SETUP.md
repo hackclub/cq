@@ -1,32 +1,80 @@
 # Airtable setup
 
-CQ uses Airtable as its production source of truth. Records are stored as
-readable JSON so trusted base collaborators can inspect and support the program.
-Airtable access permissions are the database security boundary.
+CQ uses separate Airtable tables for each kind of record. Airtable data is not
+encrypted: each record has useful summary columns and a formatted, readable JSON
+document containing the complete application value. Airtable access permissions
+are the database security boundary.
 
-Create a base and one table named `CQ Data` with these fields:
+## Create or migrate the tables
 
-| Field | Airtable type | Notes |
+Set these server environment values:
+
+```env
+AIRTABLE_PAT=your_pat
+AIRTABLE_BASE_ID=your_base_id
+AIRTABLE_TABLE_PREFIX=CQ
+AIRTABLE_TABLE_NAME=CQ Data
+```
+
+`AIRTABLE_TABLE_PREFIX` keeps development and production tables separate. For
+example, `DEV CQ` creates `DEV CQ Users`, `DEV CQ Projects`, and so on.
+
+Temporarily grant the PAT `schema.bases:read`, `schema.bases:write`,
+`data.records:read`, and `data.records:write`, scoped only to the CQ base. Then
+run:
+
+```sh
+npm run airtable:setup
+```
+
+With Docker Compose, use:
+
+```sh
+docker compose run --rm cq npm run airtable:setup
+```
+
+The command is repeat-safe. It creates missing tables and copies records from
+the older `AIRTABLE_TABLE_NAME` table when present. Existing destination records
+are skipped, and the legacy table and its records are never edited or deleted.
+After setup, `schema.bases:write` can be removed from the PAT; the running app
+only needs record read/write access.
+
+If old rows begin with `v1.`, provide their original `DATA_ENCRYPTION_KEY` while
+running the migration. New Airtable records are always readable and unencrypted.
+
+## Tables and fields
+
+The prefix is followed by these table names:
+
+- Users, Projects, Devlogs, Submissions, Orders, Shop Products, and Countries
+- Review Actions, Audit Log, Hertz Ledger, Slack Notifications, and Ari Deliveries
+- Carts, Sessions, OAuth States, Hackatime OAuth States, Hackatime Tokens, and
+  Hackatime Cache
+
+Every table contains:
+
+| Field | Airtable type | Purpose |
 | --- | --- | --- |
-| `Key` | Single line text | Primary field |
-| `Type` | Single line text | Entity type, not sensitive |
-| `Payload` | Long text | Readable JSON document |
-| `Updated At` | Date with time | Include time |
+| `ID` | Single line text, primary | Stable CQ record ID |
+| `Name` | Single line text | Human-readable record name |
+| `Status` | Single line text | Current state or action |
+| `Owner` | Single line text | Related user, project, or organizer |
+| `Data` | Long text | Complete formatted JSON record |
+| `Updated At` | Date with time | Last CQ write |
 
-Create a Personal Access Token scoped only to this base with
-`data.records:read` and `data.records:write`. Put the full token and base ID in
-the server environment as `AIRTABLE_PAT` and `AIRTABLE_BASE_ID`.
+The `Name`, `Status`, and `Owner` fields make normal Airtable views useful while
+`Data` preserves the full application record without encryption.
 
-For local development without Airtable, CQ encrypts `data/cq.local.json`.
-`DATA_ENCRYPTION_KEY` is optional when Airtable is configured, but should be set
-for durable local-file data.
+## Launch rollout
 
-Older CQ releases wrote `v1.…` encrypted Airtable payloads. If the base contains
-those rows, keep their original `DATA_ENCRYPTION_KEY` in the server environment.
-CQ reads them during startup and rewrites them as readable JSON after the full
-table has loaded successfully. Never delete live rows merely because they use
-the legacy format, and keep a backup until the one-way migration has completed.
+1. Back up the legacy table or duplicate the base.
+2. Stop the CQ server so records cannot change during migration.
+3. Run `npm run airtable:setup` and inspect several records in each populated table.
+4. Start the updated CQ server and check `/healthz`.
+5. Sign in and test a project, devlog, review, shop order, role change, and audit entry.
+6. Keep the legacy table until after launch; do not delete it during the cutover.
 
-Limit the Personal Access Token and base sharing to trusted organizers. The
-website's reviewer/shop/fulfilment roles do not replace Airtable's own access
-controls for people who can open the base directly.
+Limit the PAT and base sharing to trusted organizers. Website roles control the
+organizer dashboard but do not grant or revoke direct access to the Airtable base.
+
+For local development without Airtable, CQ still encrypts `data/cq.local.json`.

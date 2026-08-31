@@ -69,13 +69,6 @@
       <div class="form-grid">
         <label class="span-two">Public thumbnail URL<input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://cdn.example.com/project.jpg"><span class="field-help">Use a public HTTP(S) image URL.</span></label>
         <label class="span-two">Public demo, download, or video URL<input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."><span class="field-help">At submission, anyone must be able to experience the project with under two minutes of setup. A source-only release page is not enough.</span></label>
-        <fieldset class="span-two checkbox-group">
-          <legend>Evidence the reviewer should verify</legend>
-          <% const selectedEvidence = Array.isArray(values.evidence) ? values.evidence : ['commits', 'elapsed', 'devlog']; %>
-          <label><input type="checkbox" name="evidence" value="commits" <%= selectedEvidence.includes('commits') ? 'checked' : '' %>> Git commits</label>
-          <label><input type="checkbox" name="evidence" value="elapsed" <%= selectedEvidence.includes('elapsed') ? 'checked' : '' %>> Elapsed time</label>
-          <label><input type="checkbox" name="evidence" value="devlog" <%= selectedEvidence.includes('devlog') ? 'checked' : '' %>> Work logs</label>
-        </fieldset>
         <label class="checkbox-field span-two"><input type="checkbox" name="is_update" value="1" <%= values.is_update ? 'checked' : '' %>> This is an update to an earlier ship</label>
         <label class="span-two">Update note <span class="optional">only for updates</span><textarea name="update_message" maxlength="2000" rows="3" placeholder="What changed since the last review?"><%= values.update_message || '' %></textarea></label>
         <fieldset class="span-two checkbox-group"><legend>YSWS eligibility confirmations</legend><label><input type="checkbox" name="original_work" value="1" <%= values.original_work ? 'checked' : '' %>> This is my original work, with anything reused clearly attributed</label><label><input type="checkbox" name="not_school_assignment" value="1" <%= values.not_school_assignment ? 'checked' : '' %>> This was not made as a school assignment</label><label><input type="checkbox" name="not_paid_hack_club_work" value="1" <%= values.not_paid_hack_club_work ? 'checked' : '' %>> This was not made as paid Hack Club work</label></fieldset>

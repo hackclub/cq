@@ -7,4 +7,5 @@
   <% if (hasPermission(user, 'shop.manage')) { %><a class="<%= currentPath.startsWith('/admin/shop') ? 'active' : '' %>" href="/admin/shop">Shop</a><% } %>
   <% if (hasPermission(user, 'countries.manage')) { %><a class="<%= currentPath.startsWith('/admin/countries') ? 'active' : '' %>" href="/admin/countries">Countries</a><% } %>
   <% if (hasPermission(user, 'notifications.read')) { %><a class="<%= currentPath.startsWith('/admin/notifications') ? 'active' : '' %>" href="/admin/notifications">Slack</a><% } %>
+  <% if (hasPermission(user, 'audit.read')) { %><a class="<%= currentPath.startsWith('/admin/audit') ? 'active' : '' %>" href="/admin/audit">Audit log</a><% } %>
 </nav>

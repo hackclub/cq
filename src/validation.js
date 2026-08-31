@@ -32,10 +32,7 @@ export function projectInput(body = {}) {
     demoUrl: text(body.demo_url, 500),
     thumbnailUrl: text(body.thumbnail_url, 500),
     hackatimeProjects: splitList(body.hackatime_projects).slice(0, 20),
-    evidence: ["commits", "elapsed", "devlog"].filter((key) => {
-      const selected = Array.isArray(body.evidence) ? body.evidence : [body.evidence];
-      return selected.includes(key);
-    }),
+    evidence: ["commits", "elapsed", "devlog"],
     track: body.track === "software" ? "software" : "hardware",
     projectType: allowedTypes.includes(body.project_type) ? body.project_type : "",
     radioRelevance: text(body.radio_relevance, 800),
