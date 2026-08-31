@@ -264,16 +264,24 @@ export class AirtableStore extends BaseStore {
 
   async loadType(type) {
     if (this.loadedTypes.has(type)) return;
-    let offset = "";
-    do {
-      const url = new URL(this.tableUrl(type));
-      url.searchParams.set("pageSize", "100");
-      if (offset) url.searchParams.set("offset", offset);
-      const body = await this.request(url);
-      for (const record of body.records ?? []) this.decode(type, record);
-      offset = body.offset ?? "";
-    } while (offset);
-    this.loadedTypes.add(type);
+    try {
+      let offset = "";
+      do {
+        const url = new URL(this.tableUrl(type));
+        url.searchParams.set("pageSize", "100");
+        if (offset) url.searchParams.set("offset", offset);
+        const body = await this.request(url);
+        for (const record of body.records ?? []) this.decode(type, record);
+        offset = body.offset ?? "";
+      } while (offset);
+      this.loadedTypes.add(type);
+    } catch (error) {
+      const table = airtableTableName(this.config.airtableTablePrefix, type);
+      throw new Error(
+        `CQ could not open the Airtable table “${table}”. Run “npm run airtable:setup” with the same AIRTABLE_TABLE_PREFIX, and confirm the PAT can read records in this base. Airtable said: ${error.message}`,
+        { cause: error },
+      );
+    }
   }
 
   async get(type, id) {

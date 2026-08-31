@@ -88,6 +88,14 @@ async function details(store, projectId) {
   };
 }
 
+async function submittedJournal(store, journalId) {
+  return (await store.list("submission")).some((item) => {
+    if (!(item.journalIds || []).includes(journalId)) return false;
+    if (!Array.isArray(item.journalSnapshots)) return true;
+    return !item.decision && !["withdrawn", "error"].includes(item.phase);
+  });
+}
+
 function hackatimeActivity(project, journals, hackatime) {
   if (!project.hackatimeProjects.length) {
     return { ready: false, reason: "Link at least one Hackatime project before posting a devlog.", seconds: 0, minutes: 0, currentTotals: {} };
@@ -290,6 +298,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       })),
       readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 }),
       ariConfigured: ariClient.configured(),
+      projectLocked: project.status === "submitted",
+      lockedJournalIds: [...new Set(projectDetails.submissions.flatMap((item) => {
+        const locksEvidence = !Array.isArray(item.journalSnapshots) || (!item.decision && !["withdrawn", "error"].includes(item.phase));
+        return locksEvidence ? item.journalIds || [] : [];
+      }))],
       country,
       hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
@@ -299,6 +312,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.get("/:id/edit", async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    if (project.status === "submitted") {
+      setFlash(res, "error", "This shipped version is locked while it is being reviewed.");
+      return res.redirect(`/app/projects/${project.id}`);
+    }
     const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: `Edit ${project.title}`, errors: [], values: formValues(project), editing: true, project,
@@ -309,6 +326,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.post("/:id/edit", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    if (project.status === "submitted") {
+      setFlash(res, "error", "This shipped version is locked while it is being reviewed.");
+      return res.redirect(`/app/projects/${project.id}`);
+    }
     const input = projectInput(req.body);
     const context = await formContext(store, hackatimeClient, req.user.id);
     const errors = [...validateProject(input), ...validateHackatimeSelection(input, context.hackatime)];
@@ -369,6 +390,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     const journal = await store.get("journal", req.params.journalId);
     if (!project || journal?.projectId !== project.id) return res.sendStatus(404);
+    if (await submittedJournal(store, journal.id)) {
+      setFlash(res, "error", "A devlog included in a shipped version cannot be changed.");
+      return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
+    }
     const input = journalInput(req.body);
     const errors = validateJournal(input);
     if (errors.length) {
@@ -386,6 +411,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     const journal = await store.get("journal", req.params.journalId);
     if (!project || journal?.projectId !== project.id) return res.sendStatus(404);
+    if (await submittedJournal(store, journal.id)) {
+      setFlash(res, "error", "A devlog included in a shipped version cannot be removed.");
+      return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
+    }
     await store.delete("journal", journal.id);
     setFlash(res, "success", "Devlog removed.");
     res.redirect(`/app/projects/${project.id}#work-log`);
@@ -394,6 +423,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.post("/:id/archive", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    if (project.status === "submitted") {
+      setFlash(res, "error", "Withdraw the open review before archiving this project.");
+      return res.redirect(`/app/projects/${project.id}`);
+    }
     project.status = "archived";
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
@@ -409,26 +442,29 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", "A denied project cannot be resubmitted unless an organizer reopens it.");
       return res.redirect(`/app/projects/${project.id}#submission`);
     }
+    if (project.status === "submitted") {
+      setFlash(res, "error", "This project already has an open review.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
     const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
     const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
       return res.redirect(`/app/projects/${project.id}#submission`);
     }
-    if (!ariClient.configured()) {
-      setFlash(res, "error", "The organizer still needs to connect CQ to the project review service.");
-      return res.redirect(`/app/projects/${project.id}#submission`);
-    }
     const country = await store.get("country", project.countryCode);
     const payload = buildAriPayload({ project, user: req.user, journals: journalsForSubmission, config, country });
     const timestamp = nowIso();
+    const usingAri = ariClient.configured();
     const submission = {
       id: randomId("ship_"),
       projectId: project.id,
       externalId: project.id,
       ariId: null,
       payload,
-      phase: "processing",
+      projectSnapshot: structuredClone(project),
+      journalSnapshots: structuredClone(journalsForSubmission),
+      phase: usingAri ? "processing" : "review",
       decision: null,
       event: null,
       review: null,
@@ -439,6 +475,19 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       updatedAt: timestamp,
     };
     await store.put("submission", submission.id, submission);
+    if (!usingAri) {
+      project.status = "submitted";
+      project.updatedAt = nowIso();
+      await store.put("project", project.id, project);
+      await writeAudit(store, req.user, {
+        action: "project.shipped", entityType: "submission", entityId: submission.id,
+        summary: `Shipped ${project.title} to the local review queue.`, after: submission,
+        metadata: { projectId: project.id, reviewMode: "local" },
+      });
+      await notifier.projectSubmitted(req.user, project);
+      setFlash(res, "success", "Project shipped! The CQ team will check it out soon.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
     try {
       const result = await ariClient.submit(payload);
       if (![200, 202].includes(result.status)) {
@@ -462,7 +511,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         summary: `Shipped ${project.title}.`, after: submission, metadata: { projectId: project.id },
       });
       await notifier.projectSubmitted(req.user, project);
-      setFlash(res, "success", result.status === 200 ? "This exact version was already queued." : "Project submitted for review.");
+      setFlash(res, "success", result.status === 200 ? "This exact version was already queued." : "Project shipped! The CQ team will check it out soon.");
     } catch (error) {
       req.app.locals.logger.error("Ari submission failed", error);
       submission.phase = "error";
@@ -483,6 +532,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const submission = submissions[0];
     if (!submission) {
       setFlash(res, "error", "This project has not been submitted for review yet.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
+    if (!ariClient.configured() || !submission.ariId) {
+      setFlash(res, "success", "Your latest review status is already up to date.");
       return res.redirect(`/app/projects/${project.id}#submission`);
     }
     try {
@@ -509,8 +562,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
     try {
-      const result = await ariClient.withdraw(project.id);
-      if (!result.ok) throw new Error(result.body?.message || result.body?.error || `The review service returned ${result.status}`);
+      if (ariClient.configured()) {
+        const result = await ariClient.withdraw(project.id);
+        if (!result.ok) throw new Error(result.body?.message || result.body?.error || `The review service returned ${result.status}`);
+      }
       const submissions = await store.list("submission");
       await Promise.all(submissions
         .filter((item) => item.projectId === project.id && !item.decision)

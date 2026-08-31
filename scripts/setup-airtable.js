@@ -59,7 +59,15 @@ export async function setupAirtable(config, fetchImpl = fetch) {
   };
 
   const metadataUrl = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(config.airtableBaseId)}/tables`;
-  const metadata = await request(metadataUrl);
+  let metadata;
+  try {
+    metadata = await request(metadataUrl);
+  } catch (error) {
+    throw new Error(
+      `CQ could not inspect the Airtable base. Give this PAT schema.bases:read, schema.bases:write, data.records:read, and data.records:write access to the selected base. Airtable said: ${error.message}`,
+      { cause: error },
+    );
+  }
   const existingNames = new Set((metadata.tables || []).map((table) => table.name));
   const created = [];
   for (const type of Object.keys(airtableEntityTables)) {

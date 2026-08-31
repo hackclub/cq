@@ -6,6 +6,7 @@ import { createAriClient } from "./ari.js";
 import { hasPermission, isOrganizer, roleDefinitions, sessionMiddleware, userRoles } from "./auth.js";
 import { createCdnClient } from "./cdn.js";
 import { createHackatimeClient } from "./hackatime.js";
+import { createGitHubClient } from "./github.js";
 import { renderMarkdown } from "./markdown.js";
 import { adminRoutes } from "./routes/admin.js";
 import { ariWebhookRoutes } from "./routes/ari-webhook.js";
@@ -31,13 +32,14 @@ const spaceMonoFilesPath = path.dirname(
 );
 
 export async function createApp({
-  config, store = null, ariClient = null, hackatimeClient = null, cdnClient = null, slackNotifier = null, logger = consoleLogger, storeOptions = {},
+  config, store = null, ariClient = null, hackatimeClient = null, githubClient = null, cdnClient = null, slackNotifier = null, logger = consoleLogger, storeOptions = {},
 } = {}) {
   if (!config) throw new Error("createApp requires config");
   const dataStore = store ?? await createStore(config, storeOptions);
   await seedStore(dataStore);
   const ari = ariClient ?? createAriClient(config);
   const hackatime = hackatimeClient ?? createHackatimeClient(config, dataStore);
+  const github = githubClient ?? createGitHubClient(config);
   const cdn = cdnClient ?? createCdnClient(config);
   const notifier = slackNotifier ?? createSlackNotifier(config, dataStore);
   const app = express();
@@ -103,7 +105,7 @@ export async function createApp({
   app.use("/app", dashboardRoutes({ store: dataStore, hackatimeClient: hackatime }));
   app.use("/app/projects", projectRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, cdnClient: cdn, notifier }));
   app.use("/app/shop", shopRoutes({ store: dataStore, notifier }));
-  app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, notifier }));
+  app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, githubClient: github, notifier }));
 
   app.use((req, res) => {
     res.status(404).render("error", { title: "Signal lost", message: "That page is not on this frequency." });

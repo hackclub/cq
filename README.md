@@ -28,6 +28,7 @@ auditable hour decisions, and distinct hours for project updates.
 - Slack direct-message notifications for submission, review, requested changes,
   approval, denial, purchase, and order-status changes
 - An on-platform review queue with claiming, private notes, participant feedback,
+  immutable submitted snapshots, GitHub commit history, claimed-time checks,
   decisions, approved-time rewards, audit history, and Slack notifications
 - Separate reviewer, shop editor, fulfilment, country editor, support, and admin roles
 - Separate Airtable tables with readable summary columns and unencrypted JSON documents
@@ -63,8 +64,9 @@ npm test
 3. Follow [the Airtable setup](docs/AIRTABLE_SETUP.md), then run
    `npm run airtable:setup`. CQ creates separate readable tables and safely copies
    records from the older single-table layout without deleting the old data.
-4. Add the Ari program and signing secrets. Configure Ari's outgoing webhook URL
-   as `https://your-domain.example/ari/webhook`.
+4. Ari is optional. With no Ari credentials, shipped projects enter CQ's local
+   review queue. If Ari is enabled later, add its program and signing secrets and
+   configure its outgoing webhook as `https://your-domain.example/ari/webhook`.
 5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
    then set `SLACK_BOT_TOKEN`. `SLACK_ADMIN_CHANNEL_ID` is optional and receives
    organizer-facing purchase notices.
@@ -83,8 +85,10 @@ repository, register this URI as its own line in **My OAuth Apps**:
 https://cq.rubensutton.hackclub.app/app/hackatime/callback
 ```
 
-Do not add a trailing slash. The admin dashboard shows the callback CQ is
-currently using so it can be compared directly with Hackatime after deployment.
+Do not add a trailing slash.
+
+Public GitHub repositories can be inspected without another credential. Setting
+the optional `GITHUB_TOKEN` raises the API rate limit for the reviewer dashboard.
 
 All credentials are server-only environment variables. Do not add `.env` to
 source control.

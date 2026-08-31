@@ -81,6 +81,22 @@ test("Airtable ignores incomplete placeholder rows", async () => {
   assert.deepEqual(await store.list("user"), []);
 });
 
+test("Airtable startup errors identify the missing table and setup command", async () => {
+  const store = new AirtableEncryptedStore({
+    ...config,
+    airtablePat: "pat_test",
+    airtableBaseId: "app_test",
+    airtableTablePrefix: "DEV CQ",
+    airtableRequestIntervalMs: 0,
+  }, async () => new Response(JSON.stringify({
+    error: { message: "Invalid permissions, or the requested model was not found." },
+  }), { status: 403 }));
+  await assert.rejects(
+    store.list("user"),
+    /DEV CQ Users.*npm run airtable:setup.*PAT can read records/s,
+  );
+});
+
 test("Airtable setup creates separate tables and safely migrates legacy ciphertext", async () => {
   const value = { id: "one", name: "Legacy Maker" };
   const encrypted = encryptRecord(value, Buffer.from(keyBase64, "base64"));

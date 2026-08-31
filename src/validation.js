@@ -1,4 +1,5 @@
 import { splitList } from "./utils.js";
+import { parseGitHubRepository } from "./github.js";
 
 function text(value, max = 2000) {
   return String(value ?? "").trim().slice(0, max);
@@ -14,13 +15,7 @@ export function isHttpUrl(value) {
 }
 
 export function isGithubRepo(value) {
-  try {
-    const url = new URL(value);
-    const parts = url.pathname.split("/").filter(Boolean);
-    return ["github.com", "www.github.com"].includes(url.hostname.toLowerCase()) && parts.length >= 2;
-  } catch {
-    return false;
-  }
+  return Boolean(parseGitHubRepository(value));
 }
 
 export function projectInput(body = {}) {

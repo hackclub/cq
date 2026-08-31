@@ -8,6 +8,7 @@ function sortNewest(items) {
 }
 
 function journalsForReview(submission, journals) {
+  if (Array.isArray(submission.journalSnapshots)) return structuredClone(submission.journalSnapshots);
   const projectJournals = journals.filter((item) => item.projectId === submission.projectId);
   if (submission.journalIds?.length) {
     const included = new Set(submission.journalIds);
@@ -16,14 +17,36 @@ function journalsForReview(submission, journals) {
   return projectJournals.filter((item) => !submission.createdAt || String(item.createdAt || "") <= submission.createdAt);
 }
 
-export function adminRoutes({ store, config, ariClient, hackatimeClient, notifier }) {
+function projectForReview(submission, currentProject) {
+  if (submission.projectSnapshot) return structuredClone(submission.projectSnapshot);
+  const payload = submission.payload || {};
+  return {
+    ...currentProject,
+    title: payload.title || currentProject.title,
+    description: payload.description || currentProject.description,
+    repoUrl: payload.repo_url || currentProject.repoUrl,
+    demoUrl: payload.demo_url || currentProject.demoUrl,
+    thumbnailUrl: payload.thumbnail_url || currentProject.thumbnailUrl,
+    track: payload.track || currentProject.track,
+    projectType: payload.meta?.["Project type"] || currentProject.projectType,
+    radioRelevance: payload.meta?.["Ham radio relevance"] || currentProject.radioRelevance,
+    hackatimeProjects: payload.hackatime_projects || currentProject.hackatimeProjects || [],
+    aiStatement: payload.meta?.["AI statement"] || currentProject.aiStatement,
+  };
+}
+
+export function adminRoutes({ store, config, ariClient, githubClient, notifier }) {
   const router = Router();
   router.use(requireOrganizer);
 
   router.get("/", async (req, res) => {
+    const canUsers = hasPermission(req.user, "users.manage");
+    const canReview = hasPermission(req.user, "projects.review");
+    const canOrders = hasPermission(req.user, "orders.manage");
+    const canShop = hasPermission(req.user, "shop.manage");
     const [users, projects, orders, submissions, deliveries, products] = await Promise.all([
-      store.list("user"), store.list("project"), store.list("order"),
-      store.list("submission"), store.list("delivery"), store.list("product"),
+      canUsers ? store.list("user") : [], canReview ? store.list("project") : [], canOrders ? store.list("order") : [],
+      canReview ? store.list("submission") : [], canUsers ? store.list("delivery") : [], canShop ? store.list("product") : [],
     ]);
     res.render("admin/index", {
       title: "Admin dashboard",
@@ -37,9 +60,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
       recentOrders: sortNewest(orders).slice(0, 8),
       deliveries: sortNewest(deliveries).slice(0, 8),
       lowStock: products.filter((item) => item.stock <= 10).sort((a, b) => a.stock - b.stock),
-      ariConfigured: ariClient.configured(),
-      hackatimeConfigured: hackatimeClient.configured(),
-      hackatimeRedirectUri: config.hackatimeRedirectUri,
+      reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });
   });
 
@@ -221,20 +242,26 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
   });
 
   router.get("/reviews", requirePermission("reviews.read"), async (req, res) => {
-    const [submissions, projects, deliveries, users] = await Promise.all([
-      store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"),
+    const [submissions, projects, deliveries, users, journals] = await Promise.all([
+      store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),
     ]);
-    const rows = sortNewest(submissions).map((submission) => ({
-      ...submission,
-      project: projects.find((project) => project.id === submission.projectId),
-      maker: users.find((user) => user.id === projects.find((project) => project.id === submission.projectId)?.userId),
-      reviewer: users.find((user) => user.id === submission.assignedReviewerId),
-    }));
+    const rows = sortNewest(submissions).map((submission) => {
+      const currentProject = projects.find((item) => item.id === submission.projectId);
+      const project = currentProject ? projectForReview(submission, currentProject) : null;
+      const submissionJournals = journalsForReview(submission, journals);
+      return {
+        ...submission, project,
+        maker: users.find((user) => user.id === project?.userId),
+        reviewer: users.find((user) => user.id === submission.assignedReviewerId),
+        devlogCount: submissionJournals.length,
+        claimedMinutes: submissionJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0),
+      };
+    });
     res.render("admin/reviews", {
       title: "Project review queue",
       submissions: rows,
       deliveries: sortNewest(deliveries),
-      ariConfigured: ariClient.configured(),
+      reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });
   });
 
@@ -243,16 +270,19 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     if (!submission) return res.sendStatus(404);
     const project = await store.get("project", submission.projectId);
     if (!project) return res.sendStatus(404);
-    const [maker, country, journals, actions, reviewers] = await Promise.all([
+    const reviewProject = projectForReview(submission, project);
+    const [maker, country, journals, actions, reviewers, github] = await Promise.all([
       store.get("user", project.userId), store.get("country", project.countryCode),
       store.list("journal"), store.list("review_action"), store.list("user"),
+      githubClient.repository(reviewProject.repoUrl),
     ]);
     const reviewJournals = journalsForReview(submission, journals).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
     res.render("admin/review-detail", {
-      title: `Review ${project.title}`, submission, project, maker, country,
+      title: `Review ${reviewProject.title}`, submission, project: reviewProject, maker, country,
       journals: reviewJournals,
       actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
       reviewers,
+      github,
       loggedMinutes: reviewJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0),
     });
   });
@@ -262,6 +292,10 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, notifie
     if (!submission) return res.sendStatus(404);
     const before = structuredClone(submission);
     const release = req.body.action === "release";
+    if (release && submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
+      setFlash(res, "error", "Only the assigned reviewer or an administrator can release this submission.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
     if (!release && submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "Another reviewer has already claimed this submission.");
       return res.redirect(`/admin/reviews/${submission.id}`);

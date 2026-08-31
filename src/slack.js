@@ -64,7 +64,7 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       return userMessage(
         user,
         "project.submitted",
-        `📡 *${project.title}* has been submitted for review. We’ll message you as it moves through the queue.\n${publicUrl(config, `/app/projects/${project.id}`)}`,
+        `📡 *${project.title}* has been shipped! We’ll message you when there’s an update.\n${publicUrl(config, `/app/projects/${project.id}`)}`,
         project.id,
       );
     },

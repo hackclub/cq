@@ -20,9 +20,27 @@
         </dl>
       </section>
       <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Repository evidence</p><h2>GitHub activity</h2></div><strong><%= github.available ? `${github.commits.length} recent commits` : 'Unavailable' %></strong></div>
+        <% if (!github.available) { %>
+          <div class="readiness-list"><strong>GitHub could not be checked automatically.</strong><p><%= github.error %></p><p>Open the repository manually before making a decision.</p></div>
+        <% } else { %>
+          <dl class="admin-detail-list repository-summary">
+            <div><dt>Repository</dt><dd><strong><%= github.slug %></strong><%= github.description ? ` · ${github.description}` : '' %></dd></div>
+            <div><dt>Default branch</dt><dd><code><%= github.defaultBranch %></code></dd></div>
+            <div><dt>Last push</dt><dd><%= formatDateTime(github.pushedAt) %></dd></div>
+            <div><dt>Licence</dt><dd><%= github.license %></dd></div>
+            <div><dt>Flags</dt><dd><%= github.fork ? 'Fork' : 'Original repository' %><%= github.archived ? ' · Archived' : '' %></dd></div>
+          </dl>
+          <div class="commit-list">
+            <% github.commits.forEach((commit) => { %><a href="<%= commit.url %>" target="_blank" rel="noreferrer"><code><%= commit.sha %></code><span><strong><%= commit.message %></strong><small><%= commit.author %> · <%= formatDateTime(commit.date) %><%= commit.verified ? ' · verified' : '' %></small></span></a><% }) %>
+          </div>
+          <% if (!github.commits.length) { %><p class="empty-inline">No commits were returned for the default branch.</p><% } %>
+        <% } %>
+      </section>
+      <section class="panel">
         <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Devlog</h2></div><strong><%= journals.length %> updates</strong></div>
         <% if (!journals.length) { %><p class="empty-inline">No devlogs were attached.</p><% } %>
-        <div class="journal-list"><% journals.forEach((journal) => { const images = journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : []); %><article><header><h3><%= journal.title || 'Project update' %></h3><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((url) => { %><a class="journal-image" href="<%= url %>" target="_blank" rel="noreferrer"><img src="<%= url %>" alt="Progress evidence" loading="lazy"></a><% }) %></div></article><% }) %></div>
+        <div class="journal-list"><% journals.forEach((journal) => { const images = journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : []); %><article><header><h3><%= journal.title || 'Project update' %></h3><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((url) => { %><a class="journal-image" href="<%= url %>" target="_blank" rel="noreferrer"><img src="<%= url %>" alt="Progress evidence" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div></article><% }) %></div>
       </section>
       <% if (actions.length) { %><section class="panel"><div class="panel-heading"><h2>Audit trail</h2></div><div class="compact-list"><% actions.forEach((action) => { %><div><span><strong><%= action.reviewerName %> · <%= statusLabel(action.action) %></strong><small><%= action.internalNote || action.noteToMaker || '' %></small></span><time><%= formatDateTime(action.createdAt) %></time></div><% }) %></div></section><% } %>
     </div>

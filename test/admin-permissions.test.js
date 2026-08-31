@@ -14,6 +14,10 @@ test("every organizer role can open only its assigned admin sections", async () 
   });
   const store = new LocalEncryptedStore(config, { memory: true });
   const app = await createApp({ config, store, logger: { info() {}, error() {} } });
+  const timestamp = "2026-08-30T00:00:00.000Z";
+  await store.put("project", "cq_sensitive", { id: "cq_sensitive", userId: "maker", title: "REVIEW PROJECT ONLY", status: "submitted", createdAt: timestamp, updatedAt: timestamp });
+  await store.put("order", "order_sensitive", { id: "ORDER FULFILMENT ONLY", userId: "maker", status: "received", total: 20, items: [], shipping: { shippingName: "Maker", addressLine1: "1 Test Road", addressLine2: "", city: "Hobart", region: "Tasmania", postalCode: "7000", countryCode: "AU", country: "Australia", notes: "" }, createdAt: timestamp, updatedAt: timestamp });
+  await store.put("product", "product_sensitive", { id: "product_sensitive", name: "SHOP INVENTORY ONLY", stock: 1, category: "gear", sortOrder: 1, active: true, createdAt: timestamp, updatedAt: timestamp });
   const cases = [
     ["reviewer", "/admin/reviews", "/admin/shop"],
     ["shop_editor", "/admin/shop", "/admin/orders"],
@@ -37,6 +41,11 @@ test("every organizer role can open only its assigned admin sections", async () 
     assert.equal(login.status, 302);
     assert.equal((await agent.get(allowed)).status, 200, `${role} should access ${allowed}`);
     if (denied) assert.equal((await agent.get(denied)).status, 403, `${role} should not access ${denied}`);
+    const overview = await agent.get("/admin");
+    assert.equal(overview.status, 200);
+    assert.equal(overview.text.includes("REVIEW PROJECT ONLY"), ["reviewer", "admin"].includes(role), `${role} project overview isolation`);
+    assert.equal(overview.text.includes("ORDER FULFILMENT ONLY"), ["fulfilment_manager", "admin"].includes(role), `${role} order overview isolation`);
+    assert.equal(overview.text.includes("SHOP INVENTORY ONLY"), ["shop_editor", "admin"].includes(role), `${role} shop overview isolation`);
   }
 
   const participant = request.agent(app);
