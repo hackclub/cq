@@ -5,6 +5,15 @@ services:
       dockerfile: Dockerfile
     init: true
     restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     ports:
       - "${CQ_HOST_PORT:-3000}:${PORT:-3000}"
     environment:
@@ -29,6 +38,7 @@ services:
       ADMIN_EMAILS: "${ADMIN_EMAILS:-}"
       SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN:-}"
       SLACK_ADMIN_CHANNEL_ID: "${SLACK_ADMIN_CHANNEL_ID:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
       HACKCLUB_CDN_API_KEY: "${HACKCLUB_CDN_API_KEY:-}"
       ARI_PROGRAM_ID: "${ARI_PROGRAM_ID:-}"
       ARI_SIGNING_SECRET: "${ARI_SIGNING_SECRET:-}"
