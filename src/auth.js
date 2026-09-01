@@ -83,7 +83,7 @@ export async function startOAuth(store, config, returnTo = "/app") {
   url.searchParams.set("client_id", config.hackClubClientId);
   url.searchParams.set("redirect_uri", config.hackClubRedirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid profile email slack_id verification_status");
+  url.searchParams.set("scope", "openid email name profile phone birthdate address verification_status slack_id basic_info");
   url.searchParams.set("state", state);
   url.searchParams.set("nonce", oauthState.nonce);
   url.searchParams.set("code_challenge", crypto.createHash("sha256").update(codeVerifier).digest("base64url"));
