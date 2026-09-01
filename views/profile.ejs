@@ -1,18 +1,17 @@
 <%- include('partials/head') %>
 <main id="main" class="app-main shell narrow-shell">
   <div class="page-heading"><div><p class="eyebrow">Identity</p><h1>Your profile</h1><p>Your Hack Club details link you to project reviews and Slack updates.</p></div></div>
-  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Check these details:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
-  <form method="post" action="/app/profile" class="panel form-stack">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <label>Display name<input name="name" value="<%= values.name %>" required maxlength="100"></label>
-    <div class="form-grid"><label>Legal first name<input name="first_name" value="<%= values.firstName || '' %>" maxlength="80"></label><label>Legal last name<input name="last_name" value="<%= values.lastName || '' %>" maxlength="80"></label></div>
-    <label>Birthday<input type="date" name="birthday" value="<%= values.birthday || '' %>"><span class="field-help">Required when you ship your project.</span></label>
-    <label>Hack Club email<input value="<%= values.email %>" disabled><span class="field-help">Managed by Hack Club Auth.</span></label>
-    <label>Slack user ID<input name="slack_id" value="<%= values.slackId || '' %>" placeholder="U0123ABCD"><span class="field-help">Open your Slack profile → More → Copy member ID.</span></label>
-    <fieldset class="form-stack"><legend>Submission and fulfilment address</legend><label>Address line 1<input name="address_line_1" value="<%= values.addressLine1 || '' %>" maxlength="200"></label><label>Address line 2 <span class="optional">optional</span><input name="address_line_2" value="<%= values.addressLine2 || '' %>" maxlength="200"></label><div class="form-grid"><label>City<input name="city" value="<%= values.city || '' %>" maxlength="100"></label><label>State / province / region<input name="region" value="<%= values.region || '' %>" maxlength="100"></label><label>ZIP / postal code<input name="postal_code" value="<%= values.postalCode || '' %>" maxlength="30"></label><label>Country<input name="address_country" value="<%= values.addressCountry || '' %>" maxlength="100"></label></div><span class="field-help">Required when you ship a project and used to deliver prizes.</span></fieldset>
+  <section class="panel form-stack">
+    <div><p class="eyebrow">Managed by Hack Club Auth</p><h2>Your details</h2><p>Update these details in Hack Club Auth, then refresh them here. CQ does not maintain a separate editable profile.</p></div>
+    <label>Display name<input value="<%= values.name %>" readonly aria-readonly="true"></label>
+    <div class="form-grid"><label>First name<input value="<%= values.firstName || '' %>" readonly aria-readonly="true"></label><label>Last name<input value="<%= values.lastName || '' %>" readonly aria-readonly="true"></label></div>
+    <div class="form-grid"><label>Birthday<input type="date" value="<%= values.birthday || '' %>" readonly aria-readonly="true"></label><label>Phone number<input value="<%= values.phoneNumber || '' %>" readonly aria-readonly="true"></label></div>
+    <label>Hack Club email<input value="<%= values.email %>" readonly aria-readonly="true"></label>
+    <label>Slack user ID<input value="<%= values.slackId || '' %>" readonly aria-readonly="true"></label>
+    <fieldset class="form-stack"><legend>Submission and fulfilment address</legend><label>Address line 1<input value="<%= values.addressLine1 || '' %>" readonly aria-readonly="true"></label><label>Address line 2<input value="<%= values.addressLine2 || '' %>" readonly aria-readonly="true"></label><div class="form-grid"><label>City<input value="<%= values.city || '' %>" readonly aria-readonly="true"></label><label>State / province / region<input value="<%= values.region || '' %>" readonly aria-readonly="true"></label><label>ZIP / postal code<input value="<%= values.postalCode || '' %>" readonly aria-readonly="true"></label><label>Country<input value="<%= values.addressCountry || '' %>" readonly aria-readonly="true"></label></div></fieldset>
     <div class="profile-readout"><span>Verification <strong><%= statusLabel(values.verificationStatus) %></strong></span><span>YSWS eligible <strong><%= values.yswsEligible === true ? 'Yes' : values.yswsEligible === false ? 'No' : 'Not reported' %></strong></span></div>
-    <button class="button button-primary" type="submit">Save profile</button>
-  </form>
+    <div class="button-row"><a class="button button-primary" href="https://auth.hackclub.com/">Update in Hack Club Auth ↗</a><a class="button button-ghost" href="/auth/login?return_to=%2Fapp%2Fprofile&amp;reauth=1">Refresh details</a></div>
+  </section>
   <section class="panel integration-card">
     <div>
       <p class="eyebrow">Coding activity</p>

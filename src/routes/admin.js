@@ -7,6 +7,22 @@ function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
+function sessionIsActive(session) {
+  return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
+}
+
+async function revokeSessions(store, sessions, actor) {
+  const revokedAt = nowIso();
+  for (const session of sessions.filter(sessionIsActive)) {
+    await store.put("session", session.id, {
+      ...session,
+      revokedAt,
+      revokedBy: actor.id,
+    });
+  }
+  return sessions.filter(sessionIsActive).length;
+}
+
 function journalsForReview(submission, journals) {
   if (Array.isArray(submission.journalSnapshots)) return structuredClone(submission.journalSnapshots);
   const projectJournals = journals.filter((item) => item.projectId === submission.projectId);
@@ -65,9 +81,39 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
   });
 
   router.get("/users", requirePermission("users.manage"), async (req, res) => {
-    const users = sortNewest(await store.list("user"))
-      .map((item) => ({ ...item, roleKeys: userRoles(item) }));
+    const [storedUsers, sessions] = await Promise.all([store.list("user"), store.list("session")]);
+    const users = sortNewest(storedUsers)
+      .map((item) => ({
+        ...item,
+        roleKeys: userRoles(item),
+        activeSessionCount: sessions.filter((session) => session.userId === item.id && sessionIsActive(session)).length,
+      }));
     res.render("admin/users", { title: "Manage users", users, roleDefinitions });
+  });
+
+  router.post("/users/sessions/revoke-all", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const count = await revokeSessions(store, await store.list("session"), req.user);
+    await writeAudit(store, req.user, {
+      action: "sessions.revoked_all", entityType: "session", entityId: "all",
+      summary: `Signed everyone out of CQ (${count} active session${count === 1 ? "" : "s"}).`,
+      metadata: { count },
+    });
+    setFlash(res, "success", `Signed everyone out of CQ. ${count} session${count === 1 ? "" : "s"} will require Hack Club Auth again.`);
+    res.redirect("/admin/users");
+  });
+
+  router.post("/users/:id/sessions/revoke", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const user = await store.get("user", req.params.id);
+    if (!user) return res.sendStatus(404);
+    const sessions = (await store.list("session")).filter((session) => session.userId === user.id);
+    const count = await revokeSessions(store, sessions, req.user);
+    await writeAudit(store, req.user, {
+      action: "user.sessions_revoked", entityType: "user", entityId: user.id,
+      summary: `Signed ${user.name} out of CQ (${count} active session${count === 1 ? "" : "s"}).`,
+      metadata: { count },
+    });
+    setFlash(res, "success", `${user.name} will need to sign in with Hack Club Auth again.`);
+    res.redirect("/admin/users");
   });
 
   router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {

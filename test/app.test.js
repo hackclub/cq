@@ -78,6 +78,12 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.match(dashboard.text, /Good to hear you/);
   assert.match(dashboard.text, /Admin/);
 
+  const profile = await agent.get("/app/profile");
+  assert.equal(profile.status, 200);
+  assert.match(profile.text, /Managed by Hack Club Auth/);
+  assert.match(profile.text, /Update in Hack Club Auth/);
+  assert.doesNotMatch(profile.text, /Save profile/);
+
   const newPage = await agent.get("/app/projects/new");
   assert.match(newPage.text, /iss-station/);
   assert.match(newPage.text, /2 hours/);

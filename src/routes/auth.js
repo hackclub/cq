@@ -16,9 +16,10 @@ export function authRoutes({ store, config }) {
   const router = Router();
 
   router.get("/login", async (req, res) => {
-    const returnTo = safeReturnTo(req.query.return_to);
-    if (req.user) return res.redirect(returnTo);
-    if (authConfigured(config)) return res.redirect(await startOAuth(store, config, returnTo));
+    const returnTo = safeReturnTo(req.query.return_to, "/app/profile");
+    const forceReauth = req.forceReauth || req.query.reauth === "1";
+    if (req.user && !forceReauth) return res.redirect(returnTo);
+    if (authConfigured(config)) return res.redirect(await startOAuth(store, config, returnTo, { forceReauth }));
     res.status(503).render("auth/setup", {
       title: "Sign in setup",
       returnTo,

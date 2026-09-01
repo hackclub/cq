@@ -2,9 +2,16 @@
 <main id="main" class="app-main shell">
   <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Users and roles</h1><p>Give organizers only the access they need. Airtable records remain readable to authorized base collaborators.</p></div></div>
   <%- include('nav') %>
+  <section class="panel compact-panel panel-heading">
+    <div><p class="eyebrow">Session control</p><h2>Sign everyone out</h2><p>Everyone, including you, will have to authenticate with Hack Club Auth again.</p></div>
+    <form method="post" action="/admin/users/sessions/revoke-all">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="button button-danger" type="submit">Sign everyone out</button>
+    </form>
+  </section>
   <div class="panel table-wrap">
     <table>
-      <thead><tr><th>Participant</th><th>Verification</th><th>Hertz</th><th>Roles and adjustment</th></tr></thead>
+      <thead><tr><th>Participant</th><th>Verification</th><th>Hertz</th><th>Roles and adjustment</th><th>Sessions</th></tr></thead>
       <tbody>
         <% users.forEach((item) => { %>
           <tr>
@@ -17,6 +24,13 @@
                 <div class="role-picker"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= item.roleKeys.includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %></div>
                 <label class="compact-input">Hertz adjustment<input type="number" name="hertz_delta" value="0" step="0.01"></label>
                 <button class="button button-small" type="submit">Save</button>
+              </form>
+            </td>
+            <td>
+              <strong><%= item.activeSessionCount %> active</strong>
+              <form method="post" action="/admin/users/<%= item.id %>/sessions/revoke">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button class="button button-danger button-small" type="submit" <%= item.activeSessionCount ? '' : 'disabled' %>>Sign out</button>
               </form>
             </td>
           </tr>

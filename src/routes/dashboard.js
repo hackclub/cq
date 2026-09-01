@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requireCsrf } from "../auth.js";
-import { nowIso, setFlash } from "../utils.js";
+import { requireAuth } from "../auth.js";
 
 export function dashboardRoutes({ store, hackatimeClient }) {
   const router = Router();
@@ -42,41 +41,6 @@ export function dashboardRoutes({ store, hackatimeClient }) {
       values: req.user,
       hackatime: await hackatimeClient.connection(req.user.id),
     });
-  });
-
-  router.post("/profile", requireCsrf, async (req, res) => {
-    const name = String(req.body.name || "").trim().slice(0, 100);
-    const slackId = String(req.body.slack_id || "").trim().toUpperCase().slice(0, 20);
-    const profile = {
-      firstName: String(req.body.first_name || "").trim().slice(0, 80),
-      lastName: String(req.body.last_name || "").trim().slice(0, 80),
-      birthday: String(req.body.birthday || "").trim().slice(0, 10),
-      addressLine1: String(req.body.address_line_1 || "").trim().slice(0, 200),
-      addressLine2: String(req.body.address_line_2 || "").trim().slice(0, 200),
-      city: String(req.body.city || "").trim().slice(0, 100),
-      region: String(req.body.region || "").trim().slice(0, 100),
-      postalCode: String(req.body.postal_code || "").trim().slice(0, 30),
-      addressCountry: String(req.body.address_country || "").trim().slice(0, 100),
-    };
-    const errors = [];
-    if (name.length < 2) errors.push("Add the name reviewers should see.");
-    if (slackId && !/^U[A-Z0-9]{6,}$/.test(slackId)) errors.push("That does not look like a Slack user ID.");
-    if (profile.birthday && !/^\d{4}-\d{2}-\d{2}$/.test(profile.birthday)) errors.push("Use a valid birthday in YYYY-MM-DD format.");
-    if (errors.length) {
-      return res.status(422).render("profile", {
-        title: "Your profile",
-        errors,
-        values: { ...req.user, name, slackId, ...profile },
-        hackatime: await hackatimeClient.connection(req.user.id),
-      });
-    }
-    req.user.name = name;
-    req.user.slackId = slackId;
-    Object.assign(req.user, profile);
-    req.user.updatedAt = nowIso();
-    await store.put("user", req.user.id, req.user);
-    setFlash(res, "success", "Profile updated.");
-    res.redirect("/app/profile");
   });
 
   return router;

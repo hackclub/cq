@@ -67,7 +67,7 @@ export function authConfigured(config) {
   return Boolean(config.hackClubClientId && config.hackClubClientSecret && config.hackClubRedirectUri);
 }
 
-export async function startOAuth(store, config, returnTo = "/app") {
+export async function startOAuth(store, config, returnTo = "/app/profile", { forceReauth = false } = {}) {
   const state = randomId("state_");
   const codeVerifier = crypto.randomBytes(48).toString("base64url");
   const oauthState = {
@@ -88,6 +88,7 @@ export async function startOAuth(store, config, returnTo = "/app") {
   url.searchParams.set("nonce", oauthState.nonce);
   url.searchParams.set("code_challenge", crypto.createHash("sha256").update(codeVerifier).digest("base64url"));
   url.searchParams.set("code_challenge_method", "S256");
+  if (forceReauth) url.searchParams.set("prompt", "login");
   return url.toString();
 }
 
@@ -145,22 +146,29 @@ export async function upsertUser(store, config, profile) {
   const roles = config.adminEmails.includes(email)
     ? [...new Set(["participant", ...existingRoles, "admin"])]
     : [...new Set(["participant", ...existingRoles.filter((role) => role !== "participant")])];
+  const hasClaim = (name) => Object.prototype.hasOwnProperty.call(profile, name);
+  const claimedText = (name, fallback = "") => hasClaim(name) ? String(profile[name] ?? "").trim() : fallback;
+  const addressClaimed = hasClaim("address");
+  const address = profile.address && typeof profile.address === "object" ? profile.address : {};
+  const street = String(address.street_address ?? "").split(/\r?\n/);
+  const addressValue = (name, fallback = "") => addressClaimed ? String(address[name] ?? "").trim() : fallback;
   const user = {
     id: existing?.id ?? randomId("user_"),
     hackClubId: profile.sub,
     email,
-    name: String(profile.name || profile.nickname || "").trim() || email.split("@")[0],
-    firstName: existing?.firstName || String(profile.given_name || "").trim(),
-    lastName: existing?.lastName || String(profile.family_name || "").trim(),
-    birthday: existing?.birthday || "",
-    addressLine1: existing?.addressLine1 || "",
-    addressLine2: existing?.addressLine2 || "",
-    city: existing?.city || "",
-    region: existing?.region || "",
-    postalCode: existing?.postalCode || "",
-    addressCountry: existing?.addressCountry || "",
-    slackId: String(profile.slack_id || existing?.slackId || ""),
-    verificationStatus: String(profile.verification_status || existing?.verificationStatus || "unknown"),
+    name: claimedText("name", existing?.name) || claimedText("nickname", existing?.name) || email.split("@")[0],
+    firstName: claimedText("given_name", existing?.firstName || ""),
+    lastName: claimedText("family_name", existing?.lastName || ""),
+    phoneNumber: claimedText("phone_number", existing?.phoneNumber || ""),
+    birthday: claimedText("birthdate", existing?.birthday || ""),
+    addressLine1: addressClaimed ? String(street.shift() ?? "").trim() : existing?.addressLine1 || "",
+    addressLine2: addressClaimed ? street.join("\n").trim() : existing?.addressLine2 || "",
+    city: addressValue("locality", existing?.city || ""),
+    region: addressValue("region", existing?.region || ""),
+    postalCode: addressValue("postal_code", existing?.postalCode || ""),
+    addressCountry: addressValue("country", existing?.addressCountry || ""),
+    slackId: claimedText("slack_id", existing?.slackId || ""),
+    verificationStatus: claimedText("verification_status", existing?.verificationStatus || "unknown") || "unknown",
     yswsEligible:
       typeof profile.ysws_eligible === "boolean" ? profile.ysws_eligible : existing?.yswsEligible ?? null,
     hertz: existing?.hertz ?? 0,
@@ -204,9 +212,10 @@ export function sessionMiddleware(store, config) {
       const token = parseCookies(req.headers.cookie)[config.sessionCookieName];
       const session = token ? await store.get("session", hash(token)) : null;
       const user =
-        session && new Date(session.expiresAt).getTime() > Date.now()
+        session && !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now()
           ? await store.get("user", session.userId)
           : null;
+      req.forceReauth = Boolean(session?.revokedAt);
       req.user = user;
       req.csrfToken = user ? session.csrfToken : null;
       res.locals.user = user;
@@ -221,11 +230,11 @@ export function sessionMiddleware(store, config) {
 
 export function requireAuth(req, res, next) {
   if (req.user) return next();
-  return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
+  return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}${req.forceReauth ? "&reauth=1" : ""}`);
 }
 
 export function requireOrganizer(req, res, next) {
-  if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
+  if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}${req.forceReauth ? "&reauth=1" : ""}`);
   if (!isOrganizer(req.user)) return res.status(403).render("error", {
     title: "Organizer frequency only",
     message: "Your account does not have organizer access.",
@@ -235,7 +244,7 @@ export function requireOrganizer(req, res, next) {
 
 export function requirePermission(permission) {
   return (req, res, next) => {
-    if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}`);
+    if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}${req.forceReauth ? "&reauth=1" : ""}`);
     if (!hasPermission(req.user, permission)) return res.status(403).render("error", {
       title: "Permission required",
       message: "Your organizer roles do not allow this action.",
