@@ -1,22 +1,11 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="page-heading">
-    <div><p class="eyebrow">Your workshop</p><h1>Projects</h1><p>Every radio build, work log, and project review in one place.</p></div>
-    <a class="button button-primary" href="/app/projects/new">+ New project</a>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">MEMORY BANK / PROJECTS</span><h1>Active signals</h1></div><div class="headright"><a class="button" href="/app/projects/new">+ New project</a></div></header>
+  <div class="appbody">
+    <div class="shoptools"><span class="filter active">ALL / <%= String(projects.length).padStart(2, '0') %></span></div>
+    <% if (!projects.length) { %><div class="empty-screen"><div><h2>NO PROJECTS STORED</h2><p>Build a listening setup, antenna, APRS tracker, RF circuit, SDR experiment, or ham-radio software tool.</p><a class="button" href="/app/projects/new">Create project</a></div></div><% } else { %>
+      <div class="rows"><% projects.forEach((project) => { %><a class="row" href="/app/projects/<%= project.id %>"><i class="sig"></i><div><b><%= project.title %></b><br><span><%= project.description %></span></div><span><%= Math.round(project.journalMinutes / 6) / 10 %> h logged / <%= project.track %></span><em class="tag"><%= statusLabel(project.status) %></em><b class="arrow">›</b></a><% }) %></div>
+    <% } %>
   </div>
-  <% if (!projects.length) { %>
-    <div class="panel empty-state"><img src="/assets/antenna_img.png" alt=""><h2>Start your first signal.</h2><p>Build a listening setup, antenna, APRS tracker, RF circuit, SDR experiment, or ham-radio software tool. Studying alone does not count.</p><a class="button button-primary" href="/app/projects/new">Create a project</a></div>
-  <% } else { %>
-    <div class="project-card-grid">
-      <% projects.forEach((project) => { %>
-        <a class="project-card" href="/app/projects/<%= project.id %>">
-          <div class="project-card-top"><span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span><span><%= project.track %></span></div>
-          <h2><%= project.title %></h2>
-          <p><%= project.description %></p>
-          <div class="project-card-foot"><span><%= Math.round(project.journalMinutes / 6) / 10 %>h logged</span></div>
-        </a>
-      <% }) %>
-    </div>
-  <% } %>
-</main>
+</section>
 <%- include('../partials/footer') %>

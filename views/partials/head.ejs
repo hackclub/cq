@@ -1,44 +1,28 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0b1324">
-    <meta name="description" content="Build ham-radio electronics or software, document the work, and earn gear through Hack Club.">
-    <meta property="og:title" content="CQ — get on the air">
-    <meta property="og:description" content="Make ham-radio hardware or software, submit it for review, and earn radio gear with Hack Club.">
-    <meta property="og:type" content="website">
-    <title><%= title %> · CQ</title>
-    <link rel="stylesheet" href="/app.css">
-  </head>
-  <body class="<%= typeof bodyClass === 'string' ? bodyClass : '' %>">
-    <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-header">
-      <div class="shell header-inner">
-        <a class="brand" href="<%= user ? '/app' : '/' %>" aria-label="CQ home">
-          <span class="brand-mark" aria-hidden="true">CQ</span>
-          <span class="brand-tagline">A Hack Club Radio YSWS</span>
-        </a>
-        <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
-        <nav class="site-nav" id="site-nav" aria-label="Primary navigation">
-          <% if (user) { %>
-            <a class="<%= currentPath === '/app' ? 'active' : '' %>" href="/app">Dashboard</a>
-            <a class="<%= currentPath.startsWith('/app/projects') ? 'active' : '' %>" href="/app/projects">Projects</a>
-            <a class="<%= currentPath.startsWith('/app/shop') ? 'active' : '' %>" href="/app/shop">Shop <span class="nav-count"><%= cartCount %></span></a>
-            <% if (isOrganizer(user)) { %><a class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin">Organizer</a><% } %>
-            <a href="/app/profile"><%= user.name %> · <%= user.hertz %> Hz</a>
-            <form method="post" action="/auth/logout">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="nav-button" type="submit">Sign out</button>
-            </form>
-          <% } else { %>
-            <a href="/#how">How it works</a>
-            <a href="/#radio">Why radio?</a>
-            <a class="button button-small" href="/auth/login">Sign in with Hack Club</a>
-          <% } %>
-        </nav>
-      </div>
-    </header>
-    <% if (flash) { %>
-      <div class="shell flash flash-<%= flash.type %>" role="status"><%= flash.message %></div>
-    <% } %>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#353636">
+  <meta name="description" content="Build ham-radio electronics or software, document the work, and earn gear through Hack Club.">
+  <meta property="og:title" content="CQ — get on the air">
+  <meta property="og:description" content="Make ham-radio hardware or software, submit it for review, and earn radio gear with Hack Club.">
+  <meta property="og:type" content="website">
+  <title><%= title %> · CQ</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body class="<%= typeof bodyClass === 'string' ? bodyClass : '' %>">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <% const channel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' ? ['005.000', 'MEM 02 / STATION'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
+  <div class="desk">
+    <section class="radio">
+      <i class="screw tl" aria-hidden="true"></i><i class="screw tr" aria-hidden="true"></i><i class="screw bl" aria-hidden="true"></i><i class="screw br" aria-hidden="true"></i>
+      <header class="top">
+        <a class="radio-logo" href="<%= user ? '/app' : '/' %>"><b>CQ</b><span>/ HC-03</span></a>
+        <span class="top-model">SOFTWARE DEFINED RADIO INTERFACE</span>
+        <span class="right"><%= user ? `${user.hertz} HZ` : 'PUBLIC BAND' %></span>
+        <strong data-utc-clock>--:--:-- UTC</strong>
+        <% if (user) { %><form method="post" action="/auth/logout" class="top-logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit">SIGN OUT</button></form><% } %>
+      </header>
+      <div class="display">
+        <% if (flash) { %><div class="toast show flash-<%= flash.type %>" role="status"><%= flash.message %></div><% } %>

@@ -1,6 +1,7 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="page-heading"><div><p class="eyebrow">CQ shop</p><h1><%= order ? `Order ${order.id}` : 'Order history' %></h1></div><a class="button button-ghost" href="/app/shop">Back to shop</a></div>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">FULFILMENT LOG</span><h1><%= order ? `Order ${order.id}` : 'Your orders' %></h1></div><a class="button ghost headright" href="/app/shop">← Shop</a></header>
+  <div class="appbody">
   <% if (order) { %>
     <section class="panel order-detail">
       <div class="order-status-line"><span class="status-pill status-<%= order.status %>"><%= statusLabel(order.status) %></span><span><%= formatDateTime(order.createdAt) %></span><strong><%= order.total %> hertz</strong></div>
@@ -14,5 +15,6 @@
   <% } else { %>
     <div class="panel table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody><% orders.forEach((item) => { %><tr><td><a href="/app/shop/orders/<%= item.id %>"><%= item.id %></a></td><td><%= formatDate(item.createdAt) %></td><td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span></td><td><%= item.total %> hertz</td></tr><% }) %></tbody></table></div>
   <% } %>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

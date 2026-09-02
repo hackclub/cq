@@ -1,30 +1,11 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="shop-hero">
-    <div><p class="eyebrow">Approved hours → real hardware</p><h1>CQ shop</h1><p>Spend the hertz earned from approved work. Each approved hour earns 5 hertz.</p></div>
-    <div class="hertz-balance"><span>YOUR BALANCE</span><strong><%= user.hertz %></strong><small>hertz</small></div>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">HERTZ → HARDWARE</span><h1>CQ shop</h1></div><div class="headright"><div class="readout"><span>AVAILABLE</span><b><%= Number(user.hertz).toFixed(3) %> Hz</b></div><a class="button ghost" href="/app/shop/cart">CART / <%= cartCount %></a></div></header>
+  <div class="appbody">
+    <div class="shoptools"><span class="filter active">ALL / <%= products.length %></span><a class="filter" href="/app/shop/orders">ORDER LOG</a></div>
+    <% if (!products.length) { %><div class="empty-screen"><div><h2>NO STOCK ON THIS BAND</h2><p>Check back later.</p></div></div><% } else { %><div class="products">
+      <% products.forEach((product) => { %><article class="product"><div class="product-img"><img src="<%= product.image %>" alt=""></div><span class="eyebrow"><%= product.category %> / <%= product.stock %> AVAILABLE</span><h3><%= product.name %></h3><p><%= product.description %></p><% if (product.category === 'radios') { %><p class="product-note">READINESS CHECK REQUIRED</p><% } %><div class="product-foot"><b><%= Number(product.price).toFixed(3) %> Hz</b><form method="post" action="/app/shop/cart/<%= product.id %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="quantity" value="1"><button class="add" type="submit" <%= product.stock < 1 ? 'disabled' : '' %>><%= product.stock < 1 ? 'OUT' : 'ADD / +' %></button></form></div></article><% }) %>
+    </div><% } %>
   </div>
-  <div class="shop-actions"><a href="/app/shop/cart">Cart (<%= cartCount %>)</a><a href="/app/shop/orders">Order history</a></div>
-  <div class="shop-program-note">
-    <div><strong>Choosing a transmitting radio?</strong><span>You earn it with approved project work, then complete the short radio-readiness check before fulfilment.</span></div>
-    <div><strong>Choosing licence support?</strong><span>It is issued as a grant through HCB and adjusted to your country’s real exam or licence process.</span></div>
-  </div>
-  <div class="product-grid">
-    <% products.forEach((product) => { %>
-      <article class="product-card">
-        <div class="product-image"><img src="<%= product.image %>" alt=""></div>
-        <div class="product-copy"><p class="eyebrow"><%= product.category %></p><h2><%= product.name %></h2><p><%= product.description %></p></div>
-        <% if (product.category === 'radios') { %><p class="product-requirement"><span>✓</span> Radio-readiness check required before fulfilment</p><% } %>
-        <div class="product-buy">
-          <div><strong><%= product.price %> hertz</strong><span><%= product.stock %> available</span></div>
-          <form method="post" action="/app/shop/cart/<%= product.id %>">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <input type="hidden" name="quantity" value="1">
-            <button class="button button-primary" type="submit" <%= product.stock < 1 ? 'disabled' : '' %>><%= product.stock < 1 ? 'Out of stock' : 'Add to cart' %></button>
-          </form>
-        </div>
-      </article>
-    <% }) %>
-  </div>
-</main>
+</section>
 <%- include('../partials/footer') %>

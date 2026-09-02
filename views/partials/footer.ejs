@@ -1,16 +1,28 @@
-    <footer class="site-footer">
-      <div class="shell footer-inner">
-        <div>
-          <strong>CQ</strong>
-          <p>Study. Build. Transmit.</p>
-        </div>
-        <div class="footer-links">
-          <a href="https://hackclub.com" target="_blank" rel="noreferrer">Hack Club</a>
-          <a href="https://hackclub.slack.com" target="_blank" rel="noreferrer">Slack</a>
-          <a href="/#safety">Radio safety</a>
-        </div>
       </div>
-    </footer>
-    <script src="/app.js" defer></script>
-  </body>
+      <% const footerChannel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' ? ['005.000', 'MEM 02 / STATION'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
+      <nav class="softkeys" aria-label="Main navigation">
+        <% if (user) { %>
+          <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/"><b>F1</b>HOME</a>
+          <a class="<%= currentPath === '/app' ? 'active' : '' %>" href="/app"><b>F2</b>STATION</a>
+          <a class="<%= currentPath.startsWith('/app/projects') ? 'active' : '' %>" href="/app/projects"><b>F3</b>PROJECTS</a>
+          <a class="<%= currentPath.startsWith('/app/shop') && !currentPath.startsWith('/app/shop/orders') ? 'active' : '' %>" href="/app/shop"><b>F4</b>SHOP<%= cartCount ? ` / ${cartCount}` : '' %></a>
+          <a class="<%= currentPath.startsWith('/app/shop/orders') ? 'active' : '' %>" href="/app/shop/orders"><b>F5</b>ORDERS</a>
+          <a class="<%= currentPath.startsWith('/app/profile') ? 'active' : '' %>" href="/app/profile"><b>F6</b>PROFILE</a>
+          <% if (isOrganizer(user)) { %><a class="<%= currentPath.startsWith('/admin') ? 'active' : '' %>" href="/admin"><b>F7</b>ORGANIZER</a><% } %>
+        <% } else { %>
+          <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/"><b>F1</b>HOME</a>
+          <a href="/#how"><b>F2</b>HOW</a>
+          <a href="/#rewards"><b>F3</b>REWARDS</a>
+          <a href="/#radio"><b>F4</b>RADIO</a>
+          <a href="/#safety"><b>F5</b>SAFETY</a>
+          <a href="/auth/login"><b>F6</b>SIGN IN</a>
+        <% } %>
+      </nav>
+      <footer class="status" aria-hidden="true">
+        <span><i class="led"></i>PWR</span><span>RX <b><%= footerChannel[0] %></b> MHz</span><span><%= footerChannel[1] %></span><span>MODE <b>FM</b></span><span>S ▂▃▄▅▆▇</span>
+      </footer>
+    </section>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
 </html>

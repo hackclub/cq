@@ -1,101 +1,23 @@
 <%- include('partials/head') %>
-<main id="main">
-  <section class="hero">
-    <div class="shell hero-grid">
-      <div class="hero-copy">
-        <p class="eyebrow">A Hack Club YSWS · now transmitting</p>
-        <p class="sponsor-credit">Supported by <strong>Arcade W</strong></p>
-        <h1>Build your way <em>onto the air.</em></h1>
-        <p class="hero-lede">Learn amateur radio, build something real, document your progress, and ship projects to earn gear that takes you further.</p>
-        <div class="button-row">
-          <a class="button button-primary" href="/auth/login">Start with Hack Club</a>
-          <a class="button button-ghost" href="#how">See the signal path</a>
-        </div>
-        <p class="microcopy">Open internationally · no previous radio experience needed</p>
-      </div>
-      <div class="signal-card" aria-label="A radio signal travelling from your project to the International Space Station">
-        <div class="signal-topline"><span>LIVE PATH</span><span>145.990 → 437.800 MHz</span></div>
-        <div class="orbit">
-          <img src="/assets/ISS_picto.png" alt="International Space Station">
-          <span class="orbit-ring ring-one"></span>
-          <span class="orbit-ring ring-two"><span class="signal-orbit"><span class="signal-dot"></span></span></span>
-        </div>
-        <div class="signal-log">
-          <span>PROJECT</span><b>→</b><span>CALLSIGN</span><b>→</b><span>ISS</span>
-        </div>
-      </div>
+<section id="main" class="screen-page home-screen">
+  <div class="scope" aria-label="Radio spectrum tuned to the ISS repeater">
+    <div class="freq">145.990.000 <small>MHz / FM</small></div>
+    <div class="wave" aria-hidden="true"><svg viewBox="0 0 900 180" preserveAspectRatio="none"><path d="M0 90 L85 90 L104 87 L112 94 L122 82 L132 101 L142 69 L151 113 L162 51 L173 132 L184 25 L195 151 L206 43 L217 125 L229 61 L240 111 L250 73 L260 101 L272 84 L285 94 L338 90 L410 90 L425 87 L437 95 L451 76 L464 106 L478 54 L491 128 L504 31 L517 147 L530 42 L543 132 L556 62 L569 113 L583 77 L597 101 L612 85 L629 94 L690 90 L900 90"/></svg></div>
+    <div class="scale"><span>145.960</span><span>145.975</span><span>145.990</span><span>146.005</span><span>146.020</span></div>
+    <div class="rxlog"><span>MODE FM / FILTER 12.5K / SQL 018</span><span>SIGNAL SOURCE: CQ / HACK CLUB</span></div>
+  </div>
+  <div class="homecopy">
+    <p class="eyebrow">CQ CQ CQ DE HACK CLUB</p>
+    <h1>Build your way onto the air.</h1>
+    <p>Build amateur-radio hardware or software, log your progress, and earn real equipment. No previous radio experience needed.</p>
+    <div class="actions"><a class="button" href="/auth/login">Tune in</a><a class="button ghost" href="#how">Program info</a></div>
+    <p class="sponsor-credit">A HACK CLUB RADIO YSWS · SUPPORTED BY <strong>ARCADE W</strong></p>
+    <div class="mini-info" id="how">
+      <div><b>BUILD</b><span>Make something related to amateur radio.</span></div>
+      <div id="rewards"><b>5 HERTZ / HOUR</b><span>Ship projects and choose equipment.</span></div>
+      <div id="radio"><b>GET ON AIR</b><span>Radios, receivers, kits and licence support.</span></div>
     </div>
-  </section>
-
-  <section class="proof-strip" aria-label="Program benefits">
-    <div class="shell proof-grid">
-      <div><strong>Covered</strong><span>exam and licence support</span></div>
-      <div><strong>5 hertz / hour</strong><span>spent in the CQ shop</span></div>
-      <div><strong>Real projects</strong><span>built by you</span></div>
-    </div>
-  </section>
-
-  <section class="section shell" id="how">
-    <div class="section-heading">
-      <p class="eyebrow">The signal path</p>
-      <h2>From curious to callsign.</h2>
-      <p>Turn an idea into a working radio project, share the journey, and get closer to going on air.</p>
-    </div>
-    <div class="steps-grid">
-      <article class="step-card"><span>01</span><h3>Make a project</h3><p>Build electronics or software that is directly related to ham radio. Studying by itself does not count.</p></article>
-      <article class="step-card"><span>02</span><h3>Share your progress</h3><p>Document your project as it comes together with devlogs and photos from along the way.</p></article>
-      <article class="step-card"><span>03</span><h3>Ship your project</h3><p>Finish your build and show us what you made.</p></article>
-      <article class="step-card"><span>04</span><h3>Choose a prize</h3><p>Every hour you spend building earns 5 hertz. Use them for radios, receivers, build kits, or licence support.</p></article>
-    </div>
-  </section>
-
-  <section class="section reward-section" id="rewards">
-    <div class="shell reward-layout">
-      <div class="section-heading">
-        <p class="eyebrow">Earn it, then get ready</p>
-        <h2>Ship projects. Earn your radio.</h2>
-        <p>Build and ship ham-radio projects to earn hertz, then use them to choose a radio. If you choose one that can transmit, you’ll complete a short readiness check before receiving it.</p>
-      </div>
-      <div class="reward-cards">
-        <article><span>RADIO</span><h3>Earn → check → fulfil</h3><p>Earn the hertz, choose the radio, complete the readiness check, and we’ll help get it to you.</p></article>
-        <article><span>LICENCE</span><h3>Earn → grant → exam</h3><p>Licence funding is a shop prize issued as a grant through HCB. Costs and the local exam process vary, so higher-cost licences take more project time.</p></article>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section-dark" id="radio">
-    <div class="shell split-feature">
-      <div>
-        <p class="eyebrow">The cool part</p>
-        <h2>Yes, you can hear space.</h2>
-        <p>The ISS cross-band repeater receives on 145.990 MHz FM with a 67 Hz tone and retransmits on 437.800 MHz FM. Start by listening; build a Yagi and the signal gets dramatically clearer.</p>
-        <div class="frequency-grid">
-          <div><small>UPLINK</small><strong>145.990</strong><span>MHz FM</span></div>
-          <div><small>DOWNLINK</small><strong>437.800</strong><span>MHz FM</span></div>
-        </div>
-      </div>
-      <div class="radio-stack">
-        <img src="/assets/antenna_img.png" alt="Directional antenna">
-        <div><strong>Antenna build</strong><span>20 hertz</span></div>
-        <img src="/assets/radio_img.png" alt="Handheld radio">
-        <div><strong>Handheld radio</strong><span>from 30 hertz</span></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section shell" id="safety">
-    <div class="safety-card">
-      <div class="safety-icon" aria-hidden="true">!</div>
-      <div><p class="eyebrow">Listen first</p><h2>Transmit only when licensed.</h2><p>Receiving, owning, importing, and transmitting are treated differently around the world. You are responsible for following current local rules and must not transmit until you have the required licence and callsign.</p></div>
-    </div>
-  </section>
-
-  <section class="cta-band">
-    <div class="shell">
-      <p class="eyebrow">Your first contact starts here</p>
-      <h2>Ready to call CQ?</h2>
-      <a class="button button-light" href="/auth/login">Sign in with Hack Club</a>
-    </div>
-  </section>
-</main>
+    <p class="sponsor-credit" id="safety">LISTEN FREELY · TRANSMIT ONLY WHEN LICENSED · FOLLOW YOUR LOCAL RULES</p>
+  </div>
+</section>
 <%- include('partials/footer') %>

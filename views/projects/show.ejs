@@ -1,19 +1,17 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="project-hero">
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
     <div>
-      <div class="project-meta-line"><span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span><span><%= project.track %></span><span>Updated <%= formatDate(project.updatedAt) %></span></div>
+      <span class="eyebrow">PROJECT / <%= project.id %> / <%= statusLabel(project.status) %></span>
       <h1><%= project.title %></h1>
-      <p><%= project.description %></p>
-      <div class="tag-row"><% project.tags.forEach((tag) => { %><span><%= tag %></span><% }) %></div>
     </div>
-    <div class="button-row">
+    <div class="headright">
       <a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a>
       <% if (!projectLocked) { %><a class="button button-primary" href="/app/projects/<%= project.id %>/edit">Edit project</a><% } else { %><span class="status-pill status-submitted">Shipped version locked</span><% } %>
     </div>
-  </div>
+  </header>
 
-  <div class="project-layout">
+  <div class="appbody"><div class="project-layout">
     <div class="project-main-column">
       <section class="panel" id="work-log">
         <div class="panel-heading devlog-heading"><div><p class="eyebrow">Build story</p><h2>Devlog</h2><p>Post concrete progress as you make it. Every entry needs visual evidence.</p></div><div class="devlog-total"><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %></strong><span>hours logged</span></div></div>
@@ -116,6 +114,6 @@
         <button class="text-button danger-text" type="submit">Archive project</button>
       </form>
     </aside>
-  </div>
-</main>
+  </div></div>
+</section>
 <%- include('../partials/footer') %>

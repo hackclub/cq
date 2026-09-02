@@ -1,6 +1,16 @@
 const menuButton = document.querySelector(".menu-button");
 const navigation = document.querySelector(".site-nav");
 
+const utcClock = document.querySelector("[data-utc-clock]");
+if (utcClock) {
+  const updateClock = () => {
+    const now = new Date();
+    utcClock.textContent = `${now.toISOString().slice(11, 19)} UTC`;
+  };
+  updateClock();
+  window.setInterval(updateClock, 1000);
+}
+
 menuButton?.addEventListener("click", () => {
   const expanded = menuButton.getAttribute("aria-expanded") === "true";
   menuButton.setAttribute("aria-expanded", String(!expanded));

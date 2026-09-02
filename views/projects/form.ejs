@@ -1,83 +1,36 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="page-heading">
-    <div><p class="eyebrow"><%= editing ? 'Tune the details' : 'New signal' %></p><h1><%= editing ? `Edit ${project.title}` : 'Start a radio project' %></h1><p>Make the plan concrete now; you can refine it as the build changes.</p></div>
-    <% if (editing) { %><a class="button button-ghost" href="/app/projects/<%= project.id %>">Back to project</a><% } %>
-  </div>
-  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Check these details:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
-  <form method="post" action="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>" class="project-form">
-    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-    <section class="panel form-section">
-      <div class="form-section-heading"><span>01</span><div><h2>The build</h2><p>What are you making, and where is the work?</p></div></div>
-      <div class="form-grid">
-        <label class="span-two">Project name<input name="title" value="<%= values.title || '' %>" required minlength="2" maxlength="80" placeholder="Portable satellite station"></label>
-        <label class="span-two">Description<textarea name="description" required minlength="20" maxlength="800" rows="4" placeholder="I’m building a portable 2m/70cm station to receive and eventually transmit through amateur satellites."><%= values.description || '' %></textarea></label>
-        <label class="span-two">Public GitHub repository<input type="url" name="repo_url" value="<%= values.repo_url || '' %>" required placeholder="https://github.com/you/project"><span class="field-help">It needs a README explaining setup/use and commits that show the build progressing.</span></label>
-        <label>Project track<select name="track"><option value="hardware" <%= values.track !== 'software' ? 'selected' : '' %>>Electronics hardware</option><option value="software" <%= values.track === 'software' ? 'selected' : '' %>>Software</option></select><span class="field-help">Choose the track that best fits your ham-radio project.</span></label>
-        <label>Project type<select name="project_type" required>
-          <option value="">Choose one</option>
-          <% [['antenna','Antenna or feedline'],['radio-electronics','Radio electronics'],['sdr','Software-defined radio'],['digital-mode','Digital mode'],['satellite','Satellite or space radio'],['propagation','Propagation or RF analysis'],['station-tooling','Station software or tooling'],['other','Other ham-radio build']].forEach(([value, label]) => { %>
-            <option value="<%= value %>" <%= values.project_type === value ? 'selected' : '' %>><%= label %></option>
-          <% }) %>
-        </select></label>
-        <label class="span-two">How is this a ham-radio project?<textarea name="radio_relevance" required minlength="40" maxlength="800" rows="3" placeholder="Explain the radio problem, band, signal, protocol, station workflow, or electronics your project works with."><%= values.radio_relevance || '' %></textarea><span class="field-help">Studying or completing a course by itself is not a project. You must make working electronics or software.</span></label>
-        <label>Tags<input name="tags" value="<%= values.tags || '' %>" placeholder="antenna, satellites, SDR"><span class="field-help">Comma separated.</span></label>
-        <label class="span-two">AI statement <span class="optional">optional</span><textarea name="ai_statement" maxlength="500" rows="2" placeholder="What did AI help with, if anything?"><%= values.ai_statement || '' %></textarea></label>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow"><%= editing ? 'PROJECT CHANNEL / EDIT' : 'NEW TRANSMISSION' %></span><h1><%= editing ? `Edit ${project.title}` : 'Create a project' %></h1></div><a class="button ghost headright" href="<%= editing ? `/app/projects/${project.id}` : '/app/projects' %>">Cancel</a></header>
+  <div class="appbody split">
+    <form method="post" action="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>" class="formpane project-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <% if (errors.length) { %><div class="form-errors" role="alert"><strong>CHECK TRANSMISSION DATA</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
+      <div class="notice">Projects must be directly related to amateur radio. Electronics, antennas, receivers, SDR experiments, digital modes, and radio software are all welcome.</div>
+      <div class="field"><label>PROJECT TITLE</label><input name="title" value="<%= values.title || '' %>" required minlength="2" maxlength="80" placeholder="e.g. Portable APRS tracker"></div>
+      <div class="field"><label>DESCRIPTION</label><textarea name="description" required minlength="20" maxlength="800" placeholder="What are you building?"><%= values.description || '' %></textarea></div>
+      <div class="field"><label>PUBLIC GITHUB REPOSITORY</label><input type="url" name="repo_url" value="<%= values.repo_url || '' %>" required placeholder="https://github.com/you/project"><small class="field-help">Include a README and commits that show the build progressing.</small></div>
+      <div class="formgrid">
+        <div class="field"><label>PROJECT TRACK</label><select name="track"><option value="hardware" <%= values.track !== 'software' ? 'selected' : '' %>>Electronics hardware</option><option value="software" <%= values.track === 'software' ? 'selected' : '' %>>Software</option></select></div>
+        <div class="field"><label>PROJECT TYPE</label><select name="project_type" required><option value="">Choose one</option><% [['antenna','Antenna or feedline'],['radio-electronics','Radio electronics'],['sdr','Software-defined radio'],['digital-mode','Digital mode'],['satellite','Satellite or space radio'],['propagation','Propagation or RF analysis'],['station-tooling','Station software or tooling'],['other','Other ham-radio build']].forEach(([value,label]) => { %><option value="<%= value %>" <%= values.project_type === value ? 'selected' : '' %>><%= label %></option><% }) %></select></div>
       </div>
-    </section>
-
-    <section class="panel form-section">
-      <div class="form-section-heading"><span>02</span><div><h2>Your location and radio path</h2><p>Rules for owning, importing, and transmitting with radios vary by country.</p></div></div>
-      <div class="form-grid">
-        <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %></option><% }) %></select></label>
-        <label>Licence goal<input name="license_goal" value="<%= values.license_goal || '' %>" placeholder="Foundation licence"></label>
-        <label>Callsign <span class="optional">when issued</span><input name="callsign" value="<%= values.callsign || '' %>" placeholder="VK7ABC"></label>
-      </div>
-    </section>
-
-    <section class="panel form-section">
-      <div class="form-section-heading"><span>03</span><div><h2>Coding activity</h2><p>Select the Hackatime projects used for this build.</p></div></div>
+      <div class="field"><label>RADIO RELEVANCE</label><textarea name="radio_relevance" required minlength="40" maxlength="800" placeholder="How does this work with amateur radio?"><%= values.radio_relevance || '' %></textarea></div>
+      <div class="formgrid"><div class="field"><label>COUNTRY OR TERRITORY</label><select name="country_code" required><option value="">Choose location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %></option><% }) %></select></div><div class="field"><label>LICENCE GOAL / OPTIONAL</label><input name="license_goal" value="<%= values.license_goal || '' %>" placeholder="Foundation licence"></div></div>
+      <div class="formgrid"><div class="field"><label>CALLSIGN / WHEN ISSUED</label><input name="callsign" value="<%= values.callsign || '' %>" placeholder="VK7ABC"></div><div class="field"><label>TAGS / COMMA SEPARATED</label><input name="tags" value="<%= values.tags || '' %>" placeholder="antenna, satellites"></div></div>
+      <div class="field"><label>AI STATEMENT / OPTIONAL</label><textarea name="ai_statement" maxlength="500" placeholder="What did AI help with, if anything?"><%= values.ai_statement || '' %></textarea></div>
       <% const selectedHackatime = Array.isArray(values.hackatime_projects) ? values.hackatime_projects : String(values.hackatime_projects || '').split(',').map((value) => value.trim()).filter(Boolean); %>
-      <% if (hackatime.connected) { %>
-        <% if (hackatime.error === 'stale') { %><p class="config-note">Hackatime could not be reached, so this is your most recently saved project list.</p><% } %>
-        <% if (hackatime.projects.length) { %>
-          <fieldset class="hackatime-picker">
-            <legend class="sr-only">Hackatime projects</legend>
-            <% hackatime.projects.forEach((hackatimeProject) => { %>
-              <label class="hackatime-option">
-                <input type="checkbox" name="hackatime_projects" value="<%= hackatimeProject.name %>" <%= selectedHackatime.includes(hackatimeProject.name) ? 'checked' : '' %>>
-                <span><strong><%= hackatimeProject.name %></strong><small><%= hackatimeProject.hours %> hours<% if (hackatimeProject.languages.length) { %> · <%= hackatimeProject.languages.slice(0, 3).join(', ') %><% } %></small></span>
-              </label>
-            <% }) %>
-            <% selectedHackatime.filter((name) => !hackatime.projects.some((item) => item.name === name)).forEach((name) => { %>
-              <label class="hackatime-option unavailable"><input type="checkbox" name="hackatime_projects" value="<%= name %>" checked><span><strong><%= name %></strong><small>No longer returned by Hackatime</small></span></label>
-            <% }) %>
-          </fieldset>
-          <div class="picker-footer"><span class="field-help">Choose every coding project used for this build. Hardware-only work can be recorded with work logs.</span><button class="text-link" type="submit" formmethod="post" formaction="/app/hackatime/refresh" name="return_to" value="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>">Refresh list</button></div>
-        <% } else { %>
-          <div class="integration-prompt"><div><strong>No coding projects found</strong><p>Record some coding time in Hackatime, then refresh this list. Hardware-only work can still use CQ work logs.</p></div><button class="button button-ghost" type="submit" formmethod="post" formaction="/app/hackatime/refresh" name="return_to" value="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>">Refresh</button></div>
-        <% } %>
-      <% } else if (hackatime.configured) { %>
-        <div class="integration-prompt"><div><strong>Connect Hackatime</strong><p>CQ will automatically load your coding projects so you can select the ones used for this build.</p></div><a class="button button-primary" href="/app/hackatime/connect?return_to=<%= encodeURIComponent(editing ? `/app/projects/${project.id}/edit` : '/app/projects/new') %>">Connect</a></div>
-      <% } else { %>
-        <div class="integration-prompt"><div><strong>Hackatime is not configured yet</strong><p>You can create the project now and link your coding activity once the organizer finishes setup.</p></div></div>
-      <% } %>
-    </section>
-
-    <section class="panel form-section">
-      <div class="form-section-heading"><span>04</span><div><h2>Show your project</h2><p>You can add these later, but you’ll need them when you’re ready to ship.</p></div></div>
-      <div class="form-grid">
-        <label class="span-two">Public thumbnail URL<input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://cdn.example.com/project.jpg"><span class="field-help">Use a public HTTP(S) image URL.</span></label>
-        <label class="span-two">Public demo, download, or video URL<input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://youtu.be/..."><span class="field-help">At submission, anyone must be able to experience the project with under two minutes of setup. A source-only release page is not enough.</span></label>
-        <label class="checkbox-field span-two"><input type="checkbox" name="is_update" value="1" <%= values.is_update ? 'checked' : '' %>> This is an update to an earlier ship</label>
-        <label class="span-two">Update note <span class="optional">only for updates</span><textarea name="update_message" maxlength="2000" rows="3" placeholder="What changed since the last review?"><%= values.update_message || '' %></textarea></label>
-        <fieldset class="span-two checkbox-group"><legend>YSWS eligibility confirmations</legend><label><input type="checkbox" name="original_work" value="1" <%= values.original_work ? 'checked' : '' %>> This is my original work, with anything reused clearly attributed</label><label><input type="checkbox" name="not_school_assignment" value="1" <%= values.not_school_assignment ? 'checked' : '' %>> This was not made as a school assignment</label><label><input type="checkbox" name="not_paid_hack_club_work" value="1" <%= values.not_paid_hack_club_work ? 'checked' : '' %>> This was not made as paid Hack Club work</label></fieldset>
+      <div class="field"><label>HACKATIME PROJECTS</label>
+        <% if (hackatime.connected && hackatime.projects.length) { %><fieldset><% hackatime.projects.forEach((item) => { %><label class="hackatime-option"><input type="checkbox" name="hackatime_projects" value="<%= item.name %>" <%= selectedHackatime.includes(item.name) ? 'checked' : '' %>><span><strong><%= item.name %></strong><small><%= item.hours %> hours · <%= item.languages.slice(0,3).join(', ') %></small></span></label><% }) %></fieldset><button class="text-link" type="submit" formmethod="post" formaction="/app/hackatime/refresh" name="return_to" value="<%= editing ? `/app/projects/${project.id}/edit` : '/app/projects/new' %>">Refresh list</button>
+        <% } else if (hackatime.configured && !hackatime.connected) { %><a class="button ghost" href="/app/hackatime/connect?return_to=<%= encodeURIComponent(editing ? `/app/projects/${project.id}/edit` : '/app/projects/new') %>">Connect Hackatime</a>
+        <% } else { %><span class="field-help"><%= hackatime.connected ? 'No coding projects found.' : 'Hackatime is not connected. You can continue now.' %></span><% } %>
       </div>
-    </section>
-    <div class="sticky-actions">
-      <a class="button button-ghost" href="<%= editing ? `/app/projects/${project.id}` : '/app/projects' %>">Cancel</a>
-      <button class="button button-primary" type="submit"><%= editing ? 'Save project' : 'Create project' %></button>
-    </div>
-  </form>
-</main>
+      <div class="field"><label>PUBLIC THUMBNAIL URL / ADD LATER</label><input type="url" name="thumbnail_url" value="<%= values.thumbnail_url || '' %>" placeholder="https://..."></div>
+      <div class="field"><label>PUBLIC DEMO, DOWNLOAD OR VIDEO URL / ADD LATER</label><input type="url" name="demo_url" value="<%= values.demo_url || '' %>" placeholder="https://..."></div>
+      <label class="checkbox-field"><input type="checkbox" name="is_update" value="1" <%= values.is_update ? 'checked' : '' %>> This is an update to an earlier ship</label>
+      <div class="field"><label>UPDATE NOTE / IF APPLICABLE</label><textarea name="update_message" maxlength="2000"><%= values.update_message || '' %></textarea></div>
+      <fieldset><legend>YSWS CONFIRMATIONS</legend><label class="checkbox-field"><input type="checkbox" name="original_work" value="1" <%= values.original_work ? 'checked' : '' %>> This is my original work, with reused work attributed</label><label class="checkbox-field"><input type="checkbox" name="not_school_assignment" value="1" <%= values.not_school_assignment ? 'checked' : '' %>> This was not made as a school assignment</label><label class="checkbox-field"><input type="checkbox" name="not_paid_hack_club_work" value="1" <%= values.not_paid_hack_club_work ? 'checked' : '' %>> This was not made as paid Hack Club work</label></fieldset>
+      <div class="sticky-actions"><a class="button ghost" href="<%= editing ? `/app/projects/${project.id}` : '/app/projects' %>">Cancel</a><button class="button" type="submit"><%= editing ? 'Save project' : 'Create project' %></button></div>
+    </form>
+    <aside class="summary"><span class="label">TRANSMISSION CHECK</span><dl><div><dt>PROJECT</dt><dd><%= editing ? project.id : 'NOT SET' %></dd></div><div><dt>LOGGING</dt><dd>ENABLED</dd></div><div><dt>EARN RATE</dt><dd>5 Hz/hr</dd></div><div><dt>REVIEW</dt><dd>LOCAL CQ</dd></div></dl><p class="field-help">You can add a thumbnail and public demo before shipping.</p></aside>
+  </div>
+</section>
 <%- include('../partials/footer') %>
