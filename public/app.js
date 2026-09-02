@@ -117,3 +117,48 @@ for (const form of document.querySelectorAll("form[data-devlog-form]")) {
   });
   renderPreview();
 }
+
+const canvas = document.querySelector('.scope canvas');
+if (canvas) {
+  const ctx = canvas.getContext('2d');
+  const palette = ['#c7a5a2', '#c1aa96', '#c3ba92', '#aebc9b', '#9db8ad', '#9eacb8', '#aaa4b9', '#b9a2af'];
+  let tick = 0;
+
+  function resize() {
+    canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function paint() {
+    tick += 0.018;
+    const w = canvas.width;
+    const h = canvas.height;
+    const d = window.devicePixelRatio || 1;
+    const bw = 7 * d;
+    const g = 3 * d;
+    const n = Math.ceil(w / (bw + g));
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < n; i++) {
+      const q = i / (n - 1);
+      const floor = 0.07 + (Math.sin(i * 0.73 + tick * 3) + Math.sin(i * 0.22 - tick)) * 0.01;
+      const signal = Math.exp(-Math.pow((q - 0.5) * 24, 2)) * 0.64 +
+                     Math.exp(-Math.pow((q - 0.28) * 43, 2)) * 0.22 +
+                     Math.exp(-Math.pow((q - 0.74) * 55, 2)) * 0.16;
+      const bh = Math.min(0.78, floor + signal) * h * 0.8;
+
+      ctx.fillStyle = palette[Math.min(7, Math.floor(q * 8))];
+      ctx.globalAlpha = 0.82;
+      ctx.fillRect(i * (bw + g), h - bh - 15 * d, bw, bh);
+    }
+
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(paint);
+  }
+
+  paint();
+}

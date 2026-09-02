@@ -1,23 +1,30 @@
 <%- include('partials/head') %>
-<section id="main" class="screen-page home-screen">
-  <div class="scope" aria-label="Radio spectrum tuned to the ISS repeater">
-    <div class="freq">145.990.000 <small>MHz / FM</small></div>
-    <div class="wave" aria-hidden="true"><svg viewBox="0 0 900 180" preserveAspectRatio="none"><path d="M0 90 L85 90 L104 87 L112 94 L122 82 L132 101 L142 69 L151 113 L162 51 L173 132 L184 25 L195 151 L206 43 L217 125 L229 61 L240 111 L250 73 L260 101 L272 84 L285 94 L338 90 L410 90 L425 87 L437 95 L451 76 L464 106 L478 54 L491 128 L504 31 L517 147 L530 42 L543 132 L556 62 L569 113 L583 77 L597 101 L612 85 L629 94 L690 90 L900 90"/></svg></div>
-    <div class="scale"><span>145.960</span><span>145.975</span><span>145.990</span><span>146.005</span><span>146.020</span></div>
-    <div class="rxlog"><span>MODE FM / FILTER 12.5K / SQL 018</span><span>SIGNAL SOURCE: CQ / HACK CLUB</span></div>
+<section class="page home active" data-page="home">
+  <div class="scope">
+    <canvas id="scopeCanvas"></canvas>
+    <div class="freq" id="frequency">145.990.000 <small>MHz / FM</small></div>
+    <div class="scale">
+      <span>145.960</span>
+      <span>145.975</span>
+      <span>145.990</span>
+      <span>146.005</span>
+      <span>146.020</span>
+    </div>
+    <div class="rxlog">
+      <span>MODE FM / FILTER 12.5K / SQL 018</span>
+      <span>SIGNAL SOURCE: CQ / HACK CLUB</span>
+    </div>
   </div>
+
   <div class="homecopy">
     <p class="eyebrow">CQ CQ CQ DE HACK CLUB</p>
     <h1>Build your way onto the air.</h1>
-    <p>Build amateur-radio hardware or software, log your progress, and earn real equipment. No previous radio experience needed.</p>
-    <div class="actions"><a class="button" href="/auth/login">Tune in</a><a class="button ghost" href="#how">Program info</a></div>
-    <p class="sponsor-credit">A HACK CLUB RADIO YSWS · SUPPORTED BY <strong>ARCADE W</strong></p>
-    <div class="mini-info" id="how">
-      <div><b>BUILD</b><span>Make something related to amateur radio.</span></div>
-      <div id="rewards"><b>5 HERTZ / HOUR</b><span>Ship projects and choose equipment.</span></div>
-      <div id="radio"><b>GET ON AIR</b><span>Radios, receivers, kits and licence support.</span></div>
+    <p>Build amateur-radio projects, log your work, and earn real equipment. No previous radio experience needed.</p>
+    <div class="actions">
+      <a href="/auth/login" class="button" data-go="station">TUNE IN</a>
+      <button class="button ghost" data-modal="about">PROGRAM INFO</button>
     </div>
-    <p class="sponsor-credit" id="safety">LISTEN FREELY · TRANSMIT ONLY WHEN LICENSED · FOLLOW YOUR LOCAL RULES</p>
   </div>
 </section>
+
 <%- include('partials/footer') %>

@@ -255,6 +255,21 @@ img {
   overflow: hidden
 }
 
+.page {
+  position: absolute;
+  inset: 0;
+  display: none;
+  min-height: 0
+}
+
+.page.active {
+  display: grid
+}
+
+.page.home {
+  grid-template-columns: 1.23fr .77fr
+}
+
 .screen-page {
   height: 100%;
   min-height: 0;
@@ -389,11 +404,15 @@ img {
 .scope {
   position: relative;
   border-right: 1px solid var(--line2);
-  overflow: hidden;
-
+  overflow: hidden
 }
 
-
+.scope canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%
+}
 
 .scope::after {
   content: "";
@@ -1320,6 +1339,14 @@ th {
 
 .role-picker input {
   width: auto
+}
+
+.page-home, .page.home {
+  display: grid;
+  grid-template-columns: 1.23fr 0.77fr;
+  position: absolute;
+  inset: 0;
+  height: 100%;
 }
 
 .page-heading, .dashboard-hero, .shop-hero, .project-hero {
