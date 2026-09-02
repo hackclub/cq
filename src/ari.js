@@ -181,7 +181,9 @@ export async function applyAriEvent(store, payload, deliveryId) {
 
     if (["review.approved", "review.changes", "review.rejected", "review.reverted", "review.requeued"].includes(event) && project) {
       const approvedMinutes = event === "review.approved" ? Math.max(0, Number(payload.review?.approved_minutes ?? 0)) : 0;
-      const desiredHertz = Math.round(((approvedMinutes * 5) / 60) * 100) / 100;
+      const desiredHertz = project.track !== "hardware"
+        ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
+        : 0;
       const ledger = await store.get("ledger", submission.id);
       const previousHertz = Math.max(0, Number(ledger?.delta) || 0);
       const user = await store.get("user", project.userId);

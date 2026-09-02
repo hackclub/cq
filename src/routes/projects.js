@@ -4,7 +4,7 @@ import { writeAudit } from "../audit.js";
 import { requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
-import { isHttpUrl, projectInput, validateProject } from "../validation.js";
+import { isHttpUrl, projectInput, validateFundingRequest, validateProject } from "../validation.js";
 
 async function ownedProject(store, projectId, userId) {
   const project = await store.get("project", projectId);
@@ -29,6 +29,11 @@ function formValues(project) {
     original_work: project.originalWork,
     not_school_assignment: project.notSchoolAssignment,
     not_paid_hack_club_work: project.notPaidHackClubWork,
+    estimated_hours: project.estimatedHours,
+    build_plan: project.buildPlan,
+    bom: project.bom,
+    design_url: project.designUrl,
+    test_plan: project.testPlan,
   };
 }
 
@@ -71,6 +76,11 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     originalWork: input.originalWork,
     notSchoolAssignment: input.notSchoolAssignment,
     notPaidHackClubWork: input.notPaidHackClubWork,
+    estimatedHours: input.estimatedHours,
+    buildPlan: input.buildPlan,
+    bom: input.bom,
+    designUrl: input.designUrl,
+    testPlan: input.testPlan,
     createdAt: existing.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
@@ -138,7 +148,7 @@ function submissionJournals(journals, submissions) {
 function readiness(project, journals, user, { hasPriorSubmission = false } = {}) {
   const input = projectInput(formValues(project));
   const journalMinutes = journals.reduce((sum, journal) => sum + journal.minutes, 0);
-  const errors = validateProject(input, { forSubmission: true, journalMinutes });
+  const errors = validateProject(input, { forSubmission: true, journalMinutes, journalCount: journals.length });
   if (journals.some((journal) => journalImages(journal).length === 0)) {
     errors.push("Add a public progress image to every devlog.");
   }
@@ -278,10 +288,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.get("/:id", async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
-    const [projectDetails, country, hackatime] = await Promise.all([
+    const [projectDetails, country, hackatime, fundingRequests] = await Promise.all([
       details(store, project.id),
       store.get("country", project.countryCode),
       hackatimeClient.projects(req.user.id, { force: true }),
+      store.list("funding_request"),
     ]);
     if (project.hackatimeProjects.length && !project.hackatimeBaseline) {
       project.hackatimeBaseline = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
@@ -306,6 +317,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       country,
       hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
+      fundingRequests: fundingRequests.filter((item) => item.projectId === project.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     });
   });
 
@@ -355,6 +367,13 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     }
     try {
       await store.withLock(`devlog:${project.id}`, async () => {
+        if (project.track === "hardware") {
+          const timestamp = nowIso();
+          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), minutes: 0, hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
+          await store.put("journal", journal.id, journal);
+          await store.put("project", project.id, { ...project, updatedAt: timestamp });
+          return;
+        }
         const [freshDetails, hackatime] = await Promise.all([
           details(store, project.id),
           hackatimeClient.projects(req.user.id, { force: true }),
@@ -434,6 +453,46 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     res.redirect("/app/projects");
   });
 
+  router.post("/:id/funding/submit", requireCsrf, async (req, res) => {
+    const project = await ownedProject(store, req.params.id, req.user.id);
+    if (!project) return res.sendStatus(404);
+    if (project.track !== "hardware") {
+      setFlash(res, "error", "Only electronics hardware projects use the funding request flow.");
+      return res.redirect(`/app/projects/${project.id}`);
+    }
+    if (["funding_submitted", "funding_approved", "funding_issued"].includes(project.status)) {
+      setFlash(res, "error", "This project already has a funding request in progress or issued.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const input = projectInput({ ...formValues(project), ...req.body, track: "hardware" });
+    const errors = validateFundingRequest(input);
+    if (errors.length) {
+      setFlash(res, "error", errors[0]);
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const timestamp = nowIso();
+    const request = {
+      id: randomId("fund_"), projectId: project.id, userId: req.user.id,
+      status: "submitted", estimatedHours: input.estimatedHours,
+      requestedHertz: Math.round(input.estimatedHours * 5 * 100) / 100,
+      buildPlan: input.buildPlan, bom: input.bom, designUrl: input.designUrl, testPlan: input.testPlan,
+      projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
+      reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
+      createdAt: timestamp, updatedAt: timestamp,
+    };
+    await store.withLock(`funding:${project.id}`, async () => {
+      await store.put("funding_request", request.id, request);
+      await store.put("project", project.id, { ...project, ...toProjectRecord(project.id, project.userId, input, project), status: "funding_submitted", updatedAt: timestamp });
+    });
+    await writeAudit(store, req.user, {
+      action: "funding.submitted", entityType: "funding_request", entityId: request.id,
+      summary: `Submitted a ${request.requestedHertz} hertz hardware funding request for ${project.title}.`, after: request,
+    });
+    await notifier.fundingSubmitted?.(req.user, project, request);
+    setFlash(res, "success", "Funding request sent! The CQ team will review your design and build plan.");
+    res.redirect(`/app/projects/${project.id}#funding`);
+  });
+
   router.post("/:id/submit", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
@@ -445,6 +504,10 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     if (project.status === "submitted") {
       setFlash(res, "error", "This project already has an open review.");
       return res.redirect(`/app/projects/${project.id}#submission`);
+    }
+    if (project.track === "hardware" && project.status !== "funding_issued") {
+      setFlash(res, "error", "Send your design and funding request first. You can ship the finished hardware project after funding is issued.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
     const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 });

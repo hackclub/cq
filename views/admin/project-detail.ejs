@@ -1,15 +1,13 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <%- include('nav') %>
-  <div class="project-hero">
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead">
     <div>
-      <div class="project-meta-line"><span class="status-pill status-<%= project.status %>"><%= statusLabel(project.status) %></span><span><%= project.track %></span><span><%= country?.name || project.countryCode %></span></div>
-      <p class="eyebrow">Admin · project record</p>
+      <span class="eyebrow">PROJECT / <%= project.id %> / <%= statusLabel(project.status) %></span>
       <h1><%= project.title %></h1>
-      <p><%= project.description %></p>
     </div>
-    <div class="button-row"><a class="button button-ghost" href="/admin/projects">All projects</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div>
-  </div>
+    <div class="headright"><a class="button button-ghost" href="/admin/projects">All projects</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div>
+  </header>
+  <div class="appbody admin-body"><%- include('nav') %>
 
   <div class="project-layout">
     <div class="project-main-column">
@@ -45,5 +43,6 @@
       <form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="<%= project.status === 'archived' ? 'building' : 'archived' %>"><button class="button button-ghost" type="submit"><%= project.status === 'archived' ? 'Restore project' : 'Archive project' %></button><small>Approval, changes, and denial decisions are made through the review queue.</small></form>
     </aside>
   </div>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

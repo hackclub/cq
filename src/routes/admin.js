@@ -60,9 +60,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
     const canReview = hasPermission(req.user, "projects.review");
     const canOrders = hasPermission(req.user, "orders.manage");
     const canShop = hasPermission(req.user, "shop.manage");
-    const [users, projects, orders, submissions, deliveries, products] = await Promise.all([
+    const [users, projects, orders, submissions, deliveries, products, fundingRequests] = await Promise.all([
       canUsers ? store.list("user") : [], canReview ? store.list("project") : [], canOrders ? store.list("order") : [],
       canReview ? store.list("submission") : [], canUsers ? store.list("delivery") : [], canShop ? store.list("product") : [],
+      canReview ? store.list("funding_request") : [],
     ]);
     res.render("admin/index", {
       title: "Admin dashboard",
@@ -70,6 +71,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
         users: users.length,
         activeProjects: projects.filter((item) => !["archived", "approved"].includes(item.status)).length,
         pendingReviews: submissions.filter((item) => !item.decision && !["withdrawn", "error"].includes(item.phase)).length,
+        pendingFunding: fundingRequests.filter((item) => ["submitted", "under_review"].includes(item.status)).length,
         openOrders: orders.filter((item) => !["fulfilled", "cancelled"].includes(item.status)).length,
       },
       recentProjects: sortNewest(projects).slice(0, 8),
@@ -78,6 +80,85 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
       lowStock: products.filter((item) => item.stock <= 10).sort((a, b) => a.stock - b.stock),
       reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });
+  });
+
+  router.get("/funding", requirePermission("projects.review"), async (req, res) => {
+    const [requests, projects, users] = await Promise.all([store.list("funding_request"), store.list("project"), store.list("user")]);
+    const rows = sortNewest(requests).map((request) => ({
+      ...request,
+      project: projects.find((project) => project.id === request.projectId),
+      maker: users.find((user) => user.id === request.userId),
+      reviewer: users.find((user) => user.id === request.reviewerId),
+    }));
+    res.render("admin/funding", { title: "Hardware funding", requests: rows });
+  });
+
+  router.get("/funding/:id", requirePermission("projects.review"), async (req, res) => {
+    const request = await store.get("funding_request", req.params.id);
+    if (!request) return res.sendStatus(404);
+    const [project, maker, actions] = await Promise.all([
+      store.get("project", request.projectId), store.get("user", request.userId), store.list("review_action"),
+    ]);
+    res.render("admin/funding-detail", { title: "Hardware funding review", request, project, maker, actions: sortNewest(actions.filter((item) => item.fundingRequestId === request.id)) });
+  });
+
+  router.post("/funding/:id/decision", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const request = await store.get("funding_request", req.params.id);
+    if (!request) return res.sendStatus(404);
+    if (!['submitted', 'under_review', 'changes_requested'].includes(request.status)) {
+      setFlash(res, "error", "This funding request already has a final decision.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : "";
+    const noteToMaker = String(req.body.note_to_maker || "").trim().slice(0, 3000);
+    const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    const designChecked = req.body.design_checked === "1";
+    const bomChecked = req.body.bom_checked === "1";
+    const planChecked = req.body.plan_checked === "1";
+    const requested = Math.max(0, Number(request.requestedHertz) || 0);
+    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_hertz) || 0) * 100) / 100));
+    if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
+      setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedHertz <= 0)) {
+      setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const before = structuredClone(request);
+    const project = await store.get("project", request.projectId);
+    const maker = await store.get("user", request.userId);
+    const timestamp = nowIso();
+    request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
+    request.reviewerId = req.user.id; request.reviewerName = req.user.name;
+    request.review = { decision, noteToMaker, internalNote, approvedHertz: decision === "approved" ? approvedHertz : 0, criteria: { designChecked, bomChecked, planChecked }, reviewedAt: timestamp };
+    request.updatedAt = timestamp;
+    await store.put("funding_request", request.id, request);
+    if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
+    await writeAudit(store, req.user, { action: `funding.${decision}`, entityType: "funding_request", entityId: request.id, summary: `${decision} hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { approvedHertz } });
+    if (maker && project) await notifier.fundingDecision?.(maker, project, request);
+    setFlash(res, "success", "Funding decision saved.");
+    res.redirect(`/admin/funding/${request.id}`);
+  });
+
+  router.post("/funding/:id/issue", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const request = await store.get("funding_request", req.params.id);
+    if (!request) return res.sendStatus(404);
+    if (request.status !== "approved") {
+      setFlash(res, "error", "Only an approved funding request can be marked issued.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const timestamp = nowIso(); const project = await store.get("project", request.projectId); const maker = await store.get("user", request.userId);
+    const before = structuredClone(request);
+    request.status = "issued"; request.issuedAt = timestamp; request.issuedById = req.user.id;
+    request.hcbGrantReference = String(req.body.hcb_grant_reference || "").trim().slice(0, 200); request.updatedAt = timestamp;
+    await store.put("funding_request", request.id, request);
+    if (project) await store.put("project", project.id, { ...project, status: "funding_issued", updatedAt: timestamp });
+    await writeAudit(store, req.user, { action: "funding.issued", entityType: "funding_request", entityId: request.id, summary: `Marked funding issued for ${project?.title || request.projectId}.`, before, after: request });
+    if (maker && project) await notifier.fundingIssued?.(maker, project, request);
+    setFlash(res, "success", "Funding marked issued. The maker can now build and ship the finished project.");
+    res.redirect(`/admin/funding/${request.id}`);
   });
 
   router.get("/users", requirePermission("users.manage"), async (req, res) => {
@@ -427,7 +508,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
       await store.put("project", project.id, project);
 
       const existingLedger = await store.get("ledger", submission.id);
-      const desiredHertz = decision === "approved" ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100 : 0;
+      // Hardware is funded before its build starts. A final hardware review confirms
+      // the finished project only; it must never turn logged build time into shop Hertz.
+      const desiredHertz = decision === "approved" && project.track !== "hardware"
+        ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
+        : 0;
       const previousHertz = Math.max(0, Number(existingLedger?.delta) || 0);
       const maker = await store.get("user", project.userId);
       if (maker && desiredHertz !== previousHertz) {

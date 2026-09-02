@@ -1,10 +1,7 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <%- include('nav') %>
-  <div class="project-hero">
-    <div><p class="eyebrow">Review · <%= submission.id %></p><h1><%= project.title %></h1><p><%= project.description %></p></div>
-    <div class="button-row"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div>
-  </div>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">REVIEW / <%= submission.id %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
+  <div class="appbody admin-body"><%- include('nav') %>
   <div class="review-workspace">
     <div class="project-main-column">
       <section class="panel">
@@ -60,5 +57,6 @@
       </form>
     </aside>
   </div>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

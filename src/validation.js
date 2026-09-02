@@ -41,10 +41,26 @@ export function projectInput(body = {}) {
     originalWork: body.original_work === "1" || body.original_work === true,
     notSchoolAssignment: body.not_school_assignment === "1" || body.not_school_assignment === true,
     notPaidHackClubWork: body.not_paid_hack_club_work === "1" || body.not_paid_hack_club_work === true,
+    estimatedHours: Math.min(500, Math.max(1, Number.parseFloat(body.estimated_hours || "0") || 0)),
+    buildPlan: text(body.build_plan, 2000),
+    bom: text(body.bom, 8000),
+    designUrl: text(body.design_url, 500),
+    testPlan: text(body.test_plan, 2000),
   };
 }
 
-export function validateProject(input, { forSubmission = false, journalMinutes = 0 } = {}) {
+export function validateFundingRequest(input) {
+  const errors = [];
+  if (input.track !== "hardware") errors.push("Only hardware projects can request build funding.");
+  if (!Number.isFinite(input.estimatedHours) || input.estimatedHours < 1) errors.push("Estimate at least one hour of build work.");
+  if (input.buildPlan.length < 40) errors.push("Add a build plan with at least 40 characters.");
+  if (input.bom.length < 20) errors.push("Add a bill of materials with parts, quantities, and supplier links.");
+  if (!isHttpUrl(input.designUrl)) errors.push("Add a public link to your schematic, CAD, PCB, or other design work.");
+  if (input.testPlan.length < 30) errors.push("Add a short plan for how you will test the finished build.");
+  return errors;
+}
+
+export function validateProject(input, { forSubmission = false, journalMinutes = 0, journalCount = 0 } = {}) {
   const errors = [];
   if (input.title.length < 2) errors.push("Give the project a name of at least 2 characters.");
   if (input.description.length < 20) errors.push("Describe the project in at least 20 characters.");
@@ -63,8 +79,11 @@ export function validateProject(input, { forSubmission = false, journalMinutes =
     if (!input.notSchoolAssignment) errors.push("Confirm this project was not made as a school assignment.");
     if (!input.notPaidHackClubWork) errors.push("Confirm this project was not made as paid Hack Club work.");
     if (input.isUpdate && input.updateMessage.length < 20) errors.push("Describe the meaningful new work in this update.");
-    if (input.hackatimeProjects.length === 0 && journalMinutes <= 0) {
+    if (input.track === "software" && input.hackatimeProjects.length === 0 && journalMinutes <= 0) {
       errors.push("Link a Hackatime project or add at least one timed work log.");
+    }
+    if (input.track === "hardware" && journalCount <= 0) {
+      errors.push("Add at least one devlog documenting your build.");
     }
   } else {
     if (input.thumbnailUrl && !isHttpUrl(input.thumbnailUrl)) errors.push("The thumbnail must be an HTTP or HTTPS URL.");

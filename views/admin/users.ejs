@@ -1,6 +1,7 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Users and roles</h1><p>Give organizers only the access they need. Airtable records remain readable to authorized base collaborators.</p></div></div>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / ACCESS CONTROL</span><h1>Users and roles</h1></div><div class="readout headright"><span>PARTICIPANTS</span><b><%= users.length %></b></div></header>
+  <div class="appbody admin-body">
   <%- include('nav') %>
   <section class="panel compact-panel panel-heading">
     <div><p class="eyebrow">Session control</p><h2>Sign everyone out</h2><p>Everyone, including you, will have to authenticate with Hack Club Auth again.</p></div>
@@ -38,5 +39,6 @@
       </tbody>
     </table>
   </div>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

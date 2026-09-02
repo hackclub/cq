@@ -97,7 +97,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     demo_url: "https://www.youtube.com/watch?v=radio-demo",
     thumbnail_url: "https://example.com/station.jpg",
     hackatime_projects: "iss-station",
-    track: "hardware",
+    track: "software",
     project_type: "satellite",
     radio_relevance: "This station receives and decodes amateur-radio satellite signals on the two metre and seventy centimetre bands.",
     country_code: "AU",

@@ -1,6 +1,7 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
-  <div class="page-heading"><div><p class="eyebrow">Admin</p><h1>Projects</h1><p>Program-wide build and submission state.</p></div></div>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / PROJECT BANK</span><h1>Projects</h1></div><div class="readout headright"><span>TOTAL</span><b><%= projects.length %></b></div></header>
+  <div class="appbody admin-body">
   <%- include('nav') %>
   <div class="panel table-wrap">
     <table>
@@ -18,5 +19,6 @@
       </tbody>
     </table>
   </div>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

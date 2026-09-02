@@ -1,13 +1,8 @@
 <%- include('../partials/head') %>
-<main id="main" class="app-main shell">
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / COUNTRY POLICIES</span><h1>Country policies</h1></div><div class="readout headright"><span>LOCATIONS</span><b><%= countries.length %></b></div></header>
+  <div class="appbody admin-body">
   <%- include('nav') %>
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow">Admin · fulfilment and radio rules</p>
-      <h1>Country policies</h1>
-      <p>Control the guidance participants see and how each destination is fulfilled. These notes are operational guidance, not legal advice.</p>
-    </div>
-  </div>
 
   <section class="panel form-section">
     <div class="panel-heading"><h2>Add a location</h2></div>
@@ -48,5 +43,6 @@
       </form>
     <% }) %>
   </div>
-</main>
+  </div>
+</section>
 <%- include('../partials/footer') %>

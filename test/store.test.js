@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AirtableEncryptedStore, LocalEncryptedStore, decryptRecord, encryptRecord } from "../src/store.js";
+import { AirtableEncryptedStore, LocalEncryptedStore, airtableEntityTables, decryptRecord, encryptRecord } from "../src/store.js";
 import { setupAirtable } from "../scripts/setup-airtable.js";
 
 const keyBase64 = Buffer.alloc(32, 7).toString("base64");
@@ -132,7 +132,7 @@ test("Airtable setup creates separate tables and safely migrates legacy cipherte
     airtableTableName: "CQ Data",
     airtableRequestIntervalMs: 0,
   }, fetchImpl);
-  assert.equal(result.created.length, 18);
+  assert.equal(result.created.length, Object.keys(airtableEntityTables).length);
   assert.equal(result.migrated, 1);
   const migratedBody = requests.find((request) => request.url.includes("CQ%20Users") && request.options.method === "POST").options.body;
   assert.match(migratedBody, /Legacy Maker/);
