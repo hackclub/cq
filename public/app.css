@@ -1427,9 +1427,6 @@ th {
 }
 
 .admin-screen th {
-  position: sticky;
-  top: 43px;
-  z-index: 5;
   padding: 11px 12px;
   background: #202322;
   font-size: 8px;
