@@ -179,12 +179,18 @@ function airtableSummary(type, value = {}) {
 }
 
 export function airtableRecordFields(type, id, value, updatedAt = new Date().toISOString()) {
-  return {
+  const fields = {
     ID: String(id),
     ...airtableSummary(type, value),
     Data: JSON.stringify(value, null, 2),
     "Updated At": updatedAt,
   };
+  // Submissions are also exported as a flat, automation-friendly row. Keep the
+  // canonical JSON in Data so older deployments and replay tooling continue to work.
+  if (type === "submission" && value.airtableFields && typeof value.airtableFields === "object") {
+    Object.assign(fields, value.airtableFields);
+  }
+  return fields;
 }
 
 function userStatus(value) {

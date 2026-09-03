@@ -25,6 +25,14 @@ const commonFields = [
   },
 ];
 
+const submissionFields = [
+  "Code URL", "Demo URL", "How did you hear about this", "What are we doing well",
+  "how can we improve", "First Name", "Last Name", "Email", "Project banner", "Description",
+  "GitHub Username", "Address line 1", "Address line 2", "City", "state/province",
+  "Country(2 letter code)", "Zip/Postal code", "Birthday", "Override Hours Spent",
+  "Override hours spent justification", "Claimed Hours", "Approved Hours", "Project Type", "Submission ID", "Review Status",
+].map((name) => ({ name, type: "singleLineText" }));
+
 function legacyValue(payload, encryptionKey) {
   if (!String(payload).startsWith("v1.")) return JSON.parse(payload);
   if (!encryptionKey) throw new Error("DATA_ENCRYPTION_KEY is required to migrate encrypted legacy rows.");
@@ -72,10 +80,22 @@ export async function setupAirtable(config, fetchImpl = fetch) {
   const created = [];
   for (const type of Object.keys(airtableEntityTables)) {
     const name = airtableTableName(config.airtableTablePrefix, type);
-    if (existingNames.has(name)) continue;
+    const existingTable = (metadata.tables || []).find((table) => table.name === name);
+    if (existingTable) {
+      if (type === "submission") {
+        const present = new Set((existingTable.fields || []).map((field) => field.name));
+        for (const field of submissionFields) {
+          if (present.has(field.name)) continue;
+          await request(`${metadataUrl}/${encodeURIComponent(existingTable.id)}/fields`, {
+            method: "POST", body: JSON.stringify(field),
+          });
+        }
+      }
+      continue;
+    }
     await request(metadataUrl, {
       method: "POST",
-      body: JSON.stringify({ name, fields: commonFields }),
+      body: JSON.stringify({ name, fields: type === "submission" ? [...commonFields, ...submissionFields] : commonFields }),
     });
     existingNames.add(name);
     created.push(name);

@@ -6,6 +6,20 @@ import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { isHttpUrl, projectInput, validateFundingRequest, validateProject } from "../validation.js";
 
+function githubUsername(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.toLowerCase() !== "github.com") return "";
+    return parsed.pathname.split("/").filter(Boolean)[0] || "";
+  } catch { return ""; }
+}
+
+function formatBirthday(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match) return `${Number(match[3])}/${Number(match[2])}/${match[1]}`;
+  return String(value || "").trim();
+}
+
 async function ownedProject(store, projectId, userId) {
   const project = await store.get("project", projectId);
   return project?.userId === userId ? project : null;
@@ -543,7 +557,32 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       lastError: null,
       createdAt: timestamp,
       updatedAt: timestamp,
+      airtableFields: {
+        "Code URL": project.repoUrl || "",
+        "Demo URL": project.demoUrl || "",
+        "First Name": req.user.firstName || "",
+        "Last Name": req.user.lastName || "",
+        Email: req.user.email || "",
+        "Project banner": project.thumbnailUrl || "",
+        Description: project.description || "",
+        "GitHub Username": githubUsername(project.repoUrl),
+        "Address line 1": req.user.addressLine1 || "",
+        "Address line 2": req.user.addressLine2 || "",
+        City: req.user.city || "",
+        "state/province": req.user.region || "",
+        "Country(2 letter code)": country?.code || project.countryCode || "",
+        "Zip/Postal code": req.user.postalCode || "",
+        Birthday: formatBirthday(req.user.birthday),
+        "Override Hours Spent": "",
+        "Override hours spent justification": "",
+        "Claimed Hours": (journalsForSubmission.reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0) / 60).toFixed(2),
+        "Approved Hours": "",
+        "Project Type": project.track || project.projectType || "",
+        "Submission ID": "",
+        "Review Status": "Submitted",
+      },
     };
+    submission.airtableFields["Submission ID"] = submission.id;
     await store.put("submission", submission.id, submission);
     if (!usingAri) {
       project.status = "submitted";
