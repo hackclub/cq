@@ -270,9 +270,9 @@ img {
 .internal-frequency-cell {
   position: relative;
   display: block;
-  background-color: rgb(202 214 204 / calc(.001 + var(--if-fill) * .003));
-  border-left: 1px solid rgb(202 214 204 / calc(.010 + var(--if-line) * .006));
-  border-top: 1px solid rgb(202 214 204 / calc(.010 + var(--if-line) * .006));
+  background-color: rgb(202 214 204 / calc(.002 + var(--if-fill) * .012));
+  border-left: 1px solid rgb(202 214 204 / calc(.014 + var(--if-line) * .020));
+  border-top: 1px solid rgb(202 214 204 / calc(.014 + var(--if-line) * .020));
 }
 
 .internal-frequency-cell::before {
@@ -282,7 +282,7 @@ img {
   left: -1px;
   width: 1px;
   height: 1px;
-  background: rgb(211 220 213 / calc(.012 + var(--if-dot) * .025));
+  background: rgb(211 220 213 / calc(.020 + var(--if-dot) * .040));
 }
 
 .display > .admin-screen { position: relative; z-index: 1; }
