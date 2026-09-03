@@ -97,6 +97,7 @@ if (bomInput && bomRows && bomAdd) {
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
 if (thumbnailUpload) {
   const input = thumbnailUpload.querySelector("[data-thumbnail-file]");
+  const choose = thumbnailUpload.querySelector("[data-thumbnail-choose]");
   const url = thumbnailUpload.querySelector("[data-thumbnail-url]");
   const status = thumbnailUpload.querySelector("[data-thumbnail-status]");
   const preview = thumbnailUpload.querySelector("[data-thumbnail-preview]");
@@ -111,6 +112,10 @@ if (thumbnailUpload) {
     remove.addEventListener("click", () => { url.value = ""; render(); });
     item.append(image, remove); preview.append(item);
   };
+  choose?.addEventListener("click", (event) => {
+    event.preventDefault();
+    input?.click();
+  });
   input?.addEventListener("change", async () => {
     const file = input.files?.[0];
     if (!file || !status || !url) return;
@@ -123,6 +128,35 @@ if (thumbnailUpload) {
       if (!response.ok) throw new Error(result.error || "Upload failed.");
       url.value = result.images[0].url; status.textContent = "Thumbnail uploaded."; render();
     } catch (error) { status.textContent = error.message || "Thumbnail upload failed."; }
+    finally { input.value = ""; }
+  });
+  render();
+}
+
+for (const uploader of document.querySelectorAll("[data-shop-image-upload]")) {
+  const input = uploader.querySelector("[data-shop-image-file]");
+  const url = uploader.querySelector("[data-shop-image-url]");
+  const status = uploader.querySelector("[data-shop-image-status]");
+  const preview = uploader.querySelector("[data-shop-image-preview]");
+  const csrf = uploader.closest("form")?.querySelector('input[name="_csrf"]')?.value || "";
+  const render = () => {
+    if (!preview || !url) return;
+    preview.replaceChildren();
+    if (!url.value) return;
+    const image = document.createElement("img"); image.src = url.value; image.alt = "Product image preview"; preview.append(image);
+  };
+  input?.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file || !status || !url) return;
+    if (!file.type.startsWith("image/") || file.size > 8 * 1024 * 1024) { status.textContent = "Choose an image under 8 MB."; return; }
+    status.textContent = "Uploading image…";
+    const body = new FormData(); body.append("image", file);
+    try {
+      const response = await fetch("/admin/uploads/images", { method: "POST", headers: { "x-csrf-token": csrf, Accept: "application/json" }, body });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Upload failed.");
+      url.value = result.image.url; status.textContent = "Image uploaded. Save the product to apply it."; render();
+    } catch (error) { status.textContent = error.message || "Image upload failed."; }
     finally { input.value = ""; }
   });
   render();

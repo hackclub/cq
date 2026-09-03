@@ -61,6 +61,16 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     fileFilter: (req, file, callback) => callback(null, ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype)),
   });
 
+  router.post("/uploads/images", requirePermission("shop.manage"), productImageUpload.single("image"), requireCsrf, async (req, res) => {
+    if (!req.file) return res.status(422).json({ error: "Choose a JPG, PNG, WebP, or GIF image." });
+    try {
+      const image = await uploadProductImage(cdnClient, req.file);
+      return res.json({ image });
+    } catch (error) {
+      return res.status(503).json({ error: error.message || "The image upload failed." });
+    }
+  });
+
   router.get("/", async (req, res) => {
     const canUsers = hasPermission(req.user, "users.manage");
     const canReview = hasPermission(req.user, "projects.review");
@@ -349,13 +359,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.render("admin/shop", { title: "Manage shop", products, imageUploadsConfigured: Boolean(cdnClient?.configured()) });
   });
 
-  router.post("/shop", requirePermission("shop.manage"), productImageUpload.single("image_file"), requireCsrf, async (req, res) => {
+  router.post("/shop", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const id = randomId("product_");
-    let image = "";
-    try { image = await uploadProductImage(cdnClient, req.file); } catch (error) {
-      setFlash(res, "error", error.message); return res.redirect("/admin/shop");
-    }
-    const product = productInput(req.body, id, { image });
+    const product = productInput(req.body, id);
     await store.put("product", id, product);
     await writeAudit(store, req.user, {
       action: "product.created", entityType: "product", entityId: product.id,
@@ -365,14 +371,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.redirect("/admin/shop");
   });
 
-  router.post("/shop/:id", requirePermission("shop.manage"), productImageUpload.single("image_file"), requireCsrf, async (req, res) => {
+  router.post("/shop/:id", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const existing = await store.get("product", req.params.id);
     if (!existing) return res.sendStatus(404);
-    let image = existing.image;
-    try { image = await uploadProductImage(cdnClient, req.file, existing.image); } catch (error) {
-      setFlash(res, "error", error.message); return res.redirect("/admin/shop");
-    }
-    const updated = { ...existing, ...productInput(req.body, existing.id, { image }) };
+    const updated = { ...existing, ...productInput(req.body, existing.id, { image: req.body.image || existing.image }) };
     await store.put("product", existing.id, updated);
     await writeAudit(store, req.user, {
       action: "product.updated", entityType: "product", entityId: updated.id,
@@ -631,7 +633,7 @@ function productInput(body, id, { image = "" } = {}) {
     description: String(body.description || "").trim().slice(0, 1000),
     price: Math.max(0, Number.parseInt(body.price || "0", 10) || 0),
     stock: Math.max(0, Number.parseInt(body.stock || "0", 10) || 0),
-    image: String(image || "").trim().slice(0, 500),
+    image: String(image || body.image || "").trim().slice(0, 500),
     category: String(body.category || "gear").trim().slice(0, 80),
     sortOrder: Number.parseInt(body.sort_order || "100", 10) || 100,
     active: body.active === "1",

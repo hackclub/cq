@@ -898,6 +898,10 @@ img {
 
 .shop-image-upload small { color: var(--dim); font-size: 7px; }
 
+.shop-image-preview:empty { display: none; }
+.shop-image-preview { margin-top: 4px; }
+.shop-image-preview img { display: block; width: 100%; max-width: 180px; height: 90px; object-fit: contain; background: #202322; border: 1px solid var(--line2); }
+
 .span-two {
   grid-column: 1/-1
 }
