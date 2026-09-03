@@ -73,6 +73,10 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
   }
 
   async function securityRecipients() {
+    // Routine organizer activity belongs in the operations log, not in a
+    // person's DMs. A direct recipient remains a fallback for installations
+    // that have not configured the operations channel yet.
+    if (config.slackAdminChannelId) return [config.slackAdminChannelId];
     if (config.slackSecurityUserId) return [config.slackSecurityUserId];
     const users = await store.list("user");
     return [...new Set(users
@@ -83,11 +87,12 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
 
   return {
     configured,
-    async securityAlert(actor, { method, path, status }) {
+    async securityAlert(actor, { method, path, status, description = null }) {
       const recipients = await securityRecipients();
       if (!recipients.length) return { skipped: true };
       const outcome = status >= 200 && status < 400 ? "completed" : "was rejected or failed";
-      const text = `🔐 *CQ security alert*\n${actor?.name || actor?.id || "Unknown organizer"} ${outcome} an organizer action.\n\`${method} ${path}\` · HTTP ${status}`;
+      const detail = description || `${method} ${path}`;
+      const text = `🔐 *CQ security alert*\n${actor?.name || actor?.id || "Unknown organizer"} ${outcome} an organizer action: ${detail}.\nHTTP ${status}`;
       const results = await Promise.all(recipients.map((channel) => deliver({
         userId: actor?.id || null, channel, kind: "security.organizer_action", text,
       })));

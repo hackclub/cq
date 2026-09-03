@@ -75,7 +75,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.once('finish', () => {
       const outcome = res.statusCode >= 200 && res.statusCode < 400 ? "completed" : `failed with HTTP ${res.statusCode}`;
       req.app.locals.logger.info(`${req.user.id} ${outcome} admin action: ${req.method} ${req.originalUrl}`);
-      notifier.securityAlert?.(req.user, { method: req.method, path: req.originalUrl, status: res.statusCode }).catch(() => {});
+      notifier.securityAlert?.(req.user, {
+        method: req.method, path: req.originalUrl, status: res.statusCode,
+        description: res.locals.securityAlertDescription || null,
+      }).catch(() => {});
     });
     next();
   });
@@ -297,6 +300,17 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       ...removedRoles.map((role) => `removed permission: ${role}`),
       ...(Number.isFinite(hertzDelta) && hertzDelta !== 0 ? [`adjusted hertz by ${hertzDelta}`] : []),
     ];
+    const roleLabels = userRoles(user)
+      .filter((role) => role !== "participant")
+      .map((role) => roleDefinitions[role]?.label || role);
+    if (addedRoles.length || removedRoles.length) {
+      const verb = addedRoles.includes("admin") ? "Upgraded" : removedRoles.includes("admin") ? "Downgraded" : "Changed roles for";
+      res.locals.securityAlertDescription = `${verb} user ${user.name} to: ${roleLabels.join(", ") || "Participant"}`;
+    } else if (Number.isFinite(hertzDelta) && hertzDelta !== 0) {
+      res.locals.securityAlertDescription = `Adjusted ${user.name}’s Hertz balance by ${hertzDelta}`;
+    } else {
+      res.locals.securityAlertDescription = `Saved user settings for ${user.name}`;
+    }
     req.app.locals.logger.info(`${req.user.id} changed permissions of ${user.id}${changes.length ? ` - ${changes.join("; ")}` : " - no effective change"}`);
     await writeAudit(store, req.user, {
       action: "user.updated", entityType: "user", entityId: user.id,

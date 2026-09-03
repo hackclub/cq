@@ -258,7 +258,7 @@ img {
 .internal-frequency-grid {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(var(--if-cols), minmax(0, 1fr));
   grid-template-rows: repeat(var(--if-rows), minmax(0, 1fr));
