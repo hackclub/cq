@@ -5,7 +5,7 @@
   <%- include('nav') %>
   <div class="panel table-wrap">
     <table>
-      <thead><tr><th>Project</th><th>Maker</th><th>Ari</th><th>Updated</th><th>Status</th></tr></thead>
+      <thead><tr><th>Project</th><th>Maker</th><th>Review</th><th>Updated</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         <% projects.forEach((item) => { %>
           <tr>
@@ -13,7 +13,8 @@
             <td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || '' %></small></td>
             <td><%= item.latestSubmission ? statusLabel(item.latestSubmission.phase) : 'Not submitted' %><small><%= item.latestSubmission?.ariId || '' %></small></td>
             <td><%= formatDate(item.updatedAt) %></td>
-            <td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span><% if (item.latestSubmission) { %><small><a href="/admin/reviews/<%= item.latestSubmission.id %>">Open review →</a></small><% } %></td>
+            <td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span></td>
+            <td><% if (item.latestSubmission) { %><a class="button button-small" href="/admin/reviews/<%= item.latestSubmission.id %>"><%= item.latestSubmission.phase === 'second_pass' ? 'Second pass' : 'Open review' %></a><% } else { %><span class="empty-inline">—</span><% } %></td>
           </tr>
         <% }) %>
       </tbody>

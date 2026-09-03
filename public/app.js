@@ -23,6 +23,40 @@ for (const form of document.querySelectorAll("form[data-confirm]")) {
   });
 }
 
+const toast = document.querySelector(".toast");
+if (toast) {
+  window.setTimeout(() => {
+    toast.classList.add("toast-leaving");
+    window.setTimeout(() => toast.remove(), 220);
+  }, toast.classList.contains("flash-error") ? 8500 : 4500);
+}
+
+for (const form of document.querySelectorAll("form[data-review-form]")) {
+  const key = `cq-review-draft:${form.dataset.reviewId}:${form.dataset.reviewStage}`;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+    if (saved && typeof saved === "object") {
+      for (const [name, value] of Object.entries(saved)) {
+        for (const field of form.querySelectorAll(`[name="${CSS.escape(name)}"]`)) {
+          if (field.type === "checkbox") field.checked = Boolean(value);
+          else if (field.type !== "hidden") field.value = String(value);
+        }
+      }
+    }
+  } catch { }
+  const saveDraft = () => {
+    const draft = {};
+    for (const field of form.querySelectorAll("input, textarea, select")) {
+      if (!field.name || field.type === "hidden" || field.type === "submit") continue;
+      draft[field.name] = field.type === "checkbox" ? field.checked : field.value;
+    }
+    try { sessionStorage.setItem(key, JSON.stringify(draft)); } catch { }
+  };
+  form.addEventListener("input", saveDraft);
+  form.addEventListener("change", saveDraft);
+  form.addEventListener("submit", saveDraft);
+}
+
 const userSearch = document.querySelector("[data-user-search]");
 if (userSearch) {
   const rows = [...document.querySelectorAll("[data-user-row]")];

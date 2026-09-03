@@ -3,10 +3,10 @@
   <header class="apphead"><div><span class="eyebrow">ORGANIZER / REVIEW QUEUE</span><h1>Project reviews</h1></div><div class="headright"><div class="readout"><span>SUBMISSIONS</span><b><%= submissions.length %></b></div><span class="tag"><%= reviewMode %> active</span></div></header>
   <div class="appbody admin-body">
   <%- include('nav') %>
-  <section class="panel table-wrap">
-    <table><thead><tr><th>Project</th><th>Maker</th><th>Claimed time</th><th>Reviewer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>
-      <% submissions.forEach((item) => { %><tr><td><strong><%= item.project?.title || item.projectId %></strong><small><%= item.devlogCount %> devlog<%= item.devlogCount === 1 ? '' : 's' %></small></td><td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || '' %></small></td><td><strong><%= Math.round((item.claimedMinutes / 60) * 100) / 100 %> hr</strong><small><%= item.claimedMinutes %> minutes</small></td><td><%= item.firstPass?.reviewer_name || item.reviewer?.name || 'Unclaimed' %></td><td><span class="status-pill status-<%= item.decision || item.phase %>"><%= item.decision ? statusLabel(item.decision) : statusLabel(item.phase) %></span></td><td><%= formatDateTime(item.updatedAt) %></td><td><a class="button button-small" href="/admin/reviews/<%= item.id %>"><%= item.decision ? 'Inspect' : item.phase === 'second_pass' ? 'Second pass' : 'Review' %></a></td></tr><% }) %>
-    </tbody></table>
+  <section class="panel review-queue-list">
+    <div class="panel-heading"><div><p class="eyebrow">Queue</p><h2>Submissions to review</h2></div><strong><%= submissions.length %> open</strong></div>
+    <% if (!submissions.length) { %><p class="empty-inline">Nothing is waiting for review right now.</p><% } %>
+    <div class="compact-list"><% submissions.forEach((item) => { %><article class="review-queue-item"><div><strong><%= item.project?.title || item.projectId %></strong><small><%= item.maker?.name || 'Unknown maker' %> · <%= Math.round((item.claimedMinutes / 60) * 100) / 100 %> hours claimed · <%= item.devlogCount %> devlog<%= item.devlogCount === 1 ? '' : 's' %></small><small>First pass: <%= item.firstPass?.reviewer_name || item.reviewer?.name || 'Unclaimed' %> · Updated <%= formatDateTime(item.updatedAt) %></small></div><div class="review-queue-actions"><span class="status-pill status-<%= item.decision || item.phase %>"><%= item.decision ? statusLabel(item.decision) : statusLabel(item.phase) %></span><a class="button button-small" href="/admin/reviews/<%= item.id %>"><%= item.decision ? 'View review' : item.phase === 'second_pass' ? 'Second pass' : 'Start review' %></a></div></article><% }) %></div>
   </section>
   <% if (hasPermission(user, 'users.manage')) { %><section class="panel table-wrap">
     <div class="panel-heading"><h2>Webhook deliveries</h2></div>

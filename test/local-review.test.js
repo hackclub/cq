@@ -60,7 +60,9 @@ test("projects ship into local review when Ari is not configured", async () => {
   const queue = await agent.get("/admin/reviews");
   assert.equal(queue.status, 200);
   assert.match(queue.text, /Local review active/);
-  assert.match(queue.text, /1\.5 hr/);
+  assert.match(queue.text, /Digital receiver/);
+  assert.match(queue.text, /Start review/);
+  assert.match(queue.text, /1\.5 hours claimed/);
   const review = await agent.get(`/admin/reviews/${submission.id}`);
   assert.equal(review.status, 200);
   assert.match(review.text, /GitHub activity/);
