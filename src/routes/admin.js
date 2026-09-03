@@ -59,6 +59,13 @@ function projectForReview(submission, currentProject) {
 export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
   const router = Router();
   router.use(requireOrganizer);
+  router.use((req, res, next) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    res.once('finish', () => {
+      notifier.securityAlert?.(req.user, { method: req.method, path: req.originalUrl, status: res.statusCode }).catch(() => {});
+    });
+    next();
+  });
   const productImageUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024, files: 1 },
@@ -167,7 +174,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "This funding request is not waiting for second pass.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    if (request.firstPass.reviewerId === req.user.id) {
+    if (request.firstPass.reviewerId === req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "A different organizer must complete second pass.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
@@ -524,7 +531,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     if (secondPass && !hasPermission(req.user, "reviews.second_pass")) {
       return res.status(403).render("error", { title: "Second pass required", message: "Your account cannot complete second-pass reviews." });
     }
-    if (secondPass && submission.firstPass.reviewer_id === req.user.id) {
+    if (secondPass && submission.firstPass.reviewer_id === req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "A different organizer must complete second pass.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }

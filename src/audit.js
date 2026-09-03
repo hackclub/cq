@@ -1,6 +1,7 @@
 import { nowIso, randomId } from "./utils.js";
 
 const secretKey = /(^|_)(access_?token|refresh_?token|secret|password|authorization|airtable_?pat|encryption_?key)($|_)/i;
+const privateKey = /^(csrf|email|phone|birth|address|postal|zip|shipping|slack|city|region)/i;
 
 function safeValue(value, depth = 0) {
   if (depth > 7) return "[truncated]";
@@ -8,7 +9,7 @@ function safeValue(value, depth = 0) {
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [
     key,
-    secretKey.test(key) ? "[redacted]" : safeValue(item, depth + 1),
+    (secretKey.test(key) || privateKey.test(key)) ? "[redacted]" : safeValue(item, depth + 1),
   ]));
 }
 

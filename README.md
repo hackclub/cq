@@ -69,7 +69,8 @@ npm test
    configure its outgoing webhook as `https://your-domain.example/ari/webhook`.
 5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
    then set `SLACK_BOT_TOKEN`. `SLACK_ADMIN_CHANNEL_ID` is optional and receives
-   organizer-facing purchase notices.
+   organizer-facing purchase notices. Set `SLACK_SECURITY_USER_ID` to your Slack
+   member ID to receive direct security alerts for every organizer-side mutation.
 6. Create a server API key in [Hack Club CDN](https://cdn.hackclub.com/api_keys)
    and set `HACKCLUB_CDN_API_KEY`. CQ uses it for permanent devlog image uploads;
    the key is never sent to participants' browsers.

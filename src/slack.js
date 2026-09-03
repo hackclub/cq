@@ -58,8 +58,27 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
     return deliver({ userId: user.id, channel: user.slackId, kind, text, entityId });
   }
 
+  async function securityRecipients() {
+    if (config.slackSecurityUserId) return [config.slackSecurityUserId];
+    const users = await store.list("user");
+    return [...new Set(users
+      .filter((user) => config.adminEmails.includes(String(user.email || "").toLowerCase()))
+      .map((user) => user.slackId)
+      .filter(Boolean))];
+  }
+
   return {
     configured,
+    async securityAlert(actor, { method, path, status }) {
+      const recipients = await securityRecipients();
+      if (!recipients.length) return { skipped: true };
+      const outcome = status >= 200 && status < 400 ? "completed" : "was rejected or failed";
+      const text = `🔐 *CQ security alert*\n${actor?.name || actor?.id || "Unknown organizer"} ${outcome} an organizer action.\n\`${method} ${path}\` · HTTP ${status}`;
+      const results = await Promise.all(recipients.map((channel) => deliver({
+        userId: actor?.id || null, channel, kind: "security.organizer_action", text,
+      })));
+      return { recipients: results.length, results };
+    },
     projectSubmitted(user, project) {
       return userMessage(
         user,

@@ -35,6 +35,7 @@ export function getConfig(overrides = {}) {
       .filter(Boolean),
     slackBotToken: overrides.slackBotToken ?? process.env.SLACK_BOT_TOKEN ?? "",
     slackAdminChannelId: overrides.slackAdminChannelId ?? process.env.SLACK_ADMIN_CHANNEL_ID ?? "",
+    slackSecurityUserId: overrides.slackSecurityUserId ?? process.env.SLACK_SECURITY_USER_ID ?? "",
     hackClubCdnApiKey: overrides.hackClubCdnApiKey ?? process.env.HACKCLUB_CDN_API_KEY ?? "",
     githubToken: overrides.githubToken ?? process.env.GITHUB_TOKEN ?? "",
     sessionCookieName: overrides.sessionCookieName ?? process.env.SESSION_COOKIE_NAME ?? "cq_session",
