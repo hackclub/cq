@@ -33,7 +33,7 @@
                 <input type="file" name="image_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple <%= imageUploadsConfigured ? '' : 'disabled' %>>
                 <span class="dropzone-icon" aria-hidden="true">↑</span><strong>Drop images here or choose files</strong><small>JPG, PNG, WebP or GIF · up to 8 MB each · 8 images maximum</small>
               </label>
-              <div class="upload-status" aria-live="polite"><%= imageUploadsConfigured ? 'At least one image is required.' : 'Organizer action needed: add HACKCLUB_CDN_API_KEY to enable uploads.' %></div>
+              <div class="upload-status" aria-live="polite"><%= imageUploadsConfigured ? 'At least one image is required.' : 'Organizer action needed: configure R2 uploads.' %></div>
               <div class="upload-preview"></div>
             </div>
             <div class="journal-submit"><span><%= project.track === 'software' ? 'The final time is calculated when you post, using a fresh Hackatime reading.' : 'Add photos and a clear note so reviewers can follow the build.' %></span><button class="button button-primary" type="submit" <%= imageUploadsConfigured ? '' : 'disabled' %>>Post update</button></div>

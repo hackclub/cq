@@ -72,7 +72,7 @@ npm test
    organizer-facing purchase notices. Set `SLACK_SECURITY_USER_ID` to your Slack
    member ID to receive direct security alerts for every organizer-side mutation.
 6. Create a server API key in [Hack Club CDN](https://cdn.hackclub.com/api_keys)
-   and set `HACKCLUB_CDN_API_KEY`. CQ uses it for permanent devlog image uploads;
+   and set the R2 upload environment variables. CQ uses the configured R2 bucket for permanent devlog image uploads;
    the key is never sent to participants' browsers.
 7. Set `ADMIN_EMAILS` to a comma-separated list of organizer Hack Club email
    addresses. Those accounts receive the admin role when they sign in.

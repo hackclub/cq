@@ -750,7 +750,7 @@ async function addReviewAction(store, submission, reviewer, action, details = {}
 
 async function uploadProductImage(cdnClient, file, fallback = "") {
   if (!file) return fallback;
-  if (!cdnClient?.configured()) throw new Error("Product image uploads are not configured. Add HACKCLUB_CDN_API_KEY first.");
+  if (!cdnClient?.configured()) throw new Error("Product image uploads are not configured. Add the R2 upload environment variables first.");
   const image = await cdnClient.upload(file);
   return image.url;
 }
