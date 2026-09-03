@@ -889,6 +889,15 @@ img {
 .funding-bom-table th, .funding-bom-table td { padding: 9px; border-bottom: 1px solid var(--line2); text-align: left; vertical-align: top; }
 .funding-bom-table th { color: var(--dim); font-weight: 400; letter-spacing: .07em; }
 
+.shop-image-upload {
+  display: grid;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.shop-image-upload small { color: var(--dim); font-size: 7px; }
+
 .span-two {
   grid-column: 1/-1
 }

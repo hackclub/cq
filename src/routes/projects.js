@@ -266,6 +266,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: "Start a radio project", errors: [], values: {}, editing: false,
+      imageUploadsConfigured: Boolean(cdnClient?.configured()),
       ...context,
     });
   });
@@ -277,6 +278,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: "Start a radio project", errors, values: req.body, editing: false,
+        imageUploadsConfigured: Boolean(cdnClient?.configured()),
         ...context,
       });
     }
@@ -333,6 +335,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: `Edit ${project.title}`, errors: [], values: formValues(project), editing: true, project,
+      imageUploadsConfigured: Boolean(cdnClient?.configured()),
       ...context,
     });
   });
@@ -350,6 +353,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: `Edit ${project.title}`, errors, values: req.body, editing: true, project,
+        imageUploadsConfigured: Boolean(cdnClient?.configured()),
         ...context,
       });
     }

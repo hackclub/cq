@@ -94,6 +94,40 @@ if (bomInput && bomRows && bomAdd) {
   renderBom(); syncBom();
 }
 
+const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
+if (thumbnailUpload) {
+  const input = thumbnailUpload.querySelector("[data-thumbnail-file]");
+  const url = thumbnailUpload.querySelector("[data-thumbnail-url]");
+  const status = thumbnailUpload.querySelector("[data-thumbnail-status]");
+  const preview = thumbnailUpload.querySelector("[data-thumbnail-preview]");
+  const csrf = thumbnailUpload.closest("form")?.querySelector('input[name="_csrf"]')?.value || "";
+  const render = () => {
+    if (!preview || !url) return;
+    preview.replaceChildren();
+    if (!url.value) return;
+    const item = document.createElement("div"); item.className = "upload-preview-item";
+    const image = document.createElement("img"); image.src = url.value; image.alt = "Project thumbnail";
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove";
+    remove.addEventListener("click", () => { url.value = ""; render(); });
+    item.append(image, remove); preview.append(item);
+  };
+  input?.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file || !status || !url) return;
+    if (!file.type.startsWith("image/") || file.size > 8 * 1024 * 1024) { status.textContent = "Choose an image under 8 MB."; return; }
+    status.textContent = "Uploading thumbnail…";
+    const body = new FormData(); body.append("images", file);
+    try {
+      const response = await fetch("/app/projects/uploads/images", { method: "POST", headers: { "x-csrf-token": csrf, Accept: "application/json" }, body });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Upload failed.");
+      url.value = result.images[0].url; status.textContent = "Thumbnail uploaded."; render();
+    } catch (error) { status.textContent = error.message || "Thumbnail upload failed."; }
+    finally { input.value = ""; }
+  });
+  render();
+}
+
 for (const form of document.querySelectorAll("form[data-devlog-form]")) {
   const fileInput = form.querySelector('input[type="file"][name="image_files"]');
   const urlInput = form.querySelector('input[type="hidden"][name="image_urls"]');

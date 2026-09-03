@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDefinitions, userRoles } from "../auth.js";
 import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
@@ -51,9 +52,14 @@ function projectForReview(submission, currentProject) {
   };
 }
 
-export function adminRoutes({ store, config, ariClient, githubClient, notifier }) {
+export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
   const router = Router();
   router.use(requireOrganizer);
+  const productImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, callback) => callback(null, ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype)),
+  });
 
   router.get("/", async (req, res) => {
     const canUsers = hasPermission(req.user, "users.manage");
@@ -340,12 +346,16 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
 
   router.get("/shop", requirePermission("shop.manage"), async (req, res) => {
     const products = (await store.list("product")).sort((a, b) => a.sortOrder - b.sortOrder);
-    res.render("admin/shop", { title: "Manage shop", products });
+    res.render("admin/shop", { title: "Manage shop", products, imageUploadsConfigured: Boolean(cdnClient?.configured()) });
   });
 
-  router.post("/shop", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
+  router.post("/shop", requirePermission("shop.manage"), productImageUpload.single("image_file"), requireCsrf, async (req, res) => {
     const id = randomId("product_");
-    const product = productInput(req.body, id);
+    let image = "";
+    try { image = await uploadProductImage(cdnClient, req.file); } catch (error) {
+      setFlash(res, "error", error.message); return res.redirect("/admin/shop");
+    }
+    const product = productInput(req.body, id, { image });
     await store.put("product", id, product);
     await writeAudit(store, req.user, {
       action: "product.created", entityType: "product", entityId: product.id,
@@ -355,10 +365,14 @@ export function adminRoutes({ store, config, ariClient, githubClient, notifier }
     res.redirect("/admin/shop");
   });
 
-  router.post("/shop/:id", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
+  router.post("/shop/:id", requirePermission("shop.manage"), productImageUpload.single("image_file"), requireCsrf, async (req, res) => {
     const existing = await store.get("product", req.params.id);
     if (!existing) return res.sendStatus(404);
-    const updated = { ...existing, ...productInput(req.body, existing.id) };
+    let image = existing.image;
+    try { image = await uploadProductImage(cdnClient, req.file, existing.image); } catch (error) {
+      setFlash(res, "error", error.message); return res.redirect("/admin/shop");
+    }
+    const updated = { ...existing, ...productInput(req.body, existing.id, { image }) };
     await store.put("product", existing.id, updated);
     await writeAudit(store, req.user, {
       action: "product.updated", entityType: "product", entityId: updated.id,
@@ -603,14 +617,21 @@ async function addReviewAction(store, submission, reviewer, action, details = {}
   return record;
 }
 
-function productInput(body, id) {
+async function uploadProductImage(cdnClient, file, fallback = "") {
+  if (!file) return fallback;
+  if (!cdnClient?.configured()) throw new Error("Product image uploads are not configured. Add HACKCLUB_CDN_API_KEY first.");
+  const image = await cdnClient.upload(file);
+  return image.url;
+}
+
+function productInput(body, id, { image = "" } = {}) {
   return {
     id,
     name: String(body.name || "").trim().slice(0, 120),
     description: String(body.description || "").trim().slice(0, 1000),
     price: Math.max(0, Number.parseInt(body.price || "0", 10) || 0),
     stock: Math.max(0, Number.parseInt(body.stock || "0", 10) || 0),
-    image: String(body.image || "").trim().slice(0, 500),
+    image: String(image || "").trim().slice(0, 500),
     category: String(body.category || "gear").trim().slice(0, 80),
     sortOrder: Number.parseInt(body.sort_order || "100", 10) || 100,
     active: body.active === "1",

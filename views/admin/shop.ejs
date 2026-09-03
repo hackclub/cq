@@ -5,13 +5,13 @@
   <%- include('nav') %>
   <section class="panel">
     <div class="panel-heading"><h2>Add product</h2></div>
-    <form method="post" action="/admin/shop" class="inventory-form">
+    <form method="post" action="/admin/shop" class="inventory-form" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input name="name" placeholder="Product name" required>
       <input name="category" placeholder="Category" required>
       <input type="number" name="price" min="0" placeholder="Hertz" required>
       <input type="number" name="stock" min="0" placeholder="Stock" required>
-      <input type="url" name="image" placeholder="Image URL">
+      <label class="shop-image-upload"><span>Product image</span><input type="file" name="image_file" accept="image/jpeg,image/png,image/webp,image/gif" <%= imageUploadsConfigured ? '' : 'disabled' %>><small><%= imageUploadsConfigured ? 'Choose a JPG, PNG, WebP, or GIF up to 8 MB.' : 'Image uploads need HACKCLUB_CDN_API_KEY.' %></small></label>
       <input type="number" name="sort_order" value="100" placeholder="Sort">
       <textarea name="description" placeholder="Description" required></textarea>
       <label class="checkbox-field"><input type="checkbox" name="active" value="1" checked> Active</label>
@@ -20,13 +20,13 @@
   </section>
   <div class="inventory-grid">
     <% products.forEach((item) => { %>
-      <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
+      <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <img src="<%= item.image %>" alt="">
         <label>Name<input name="name" value="<%= item.name %>" required></label>
         <label>Category<input name="category" value="<%= item.category %>" required></label>
         <div class="form-grid"><label>Price<input type="number" name="price" min="0" value="<%= item.price %>" required></label><label>Stock<input type="number" name="stock" min="0" value="<%= item.stock %>" required></label></div>
-        <label>Image URL<input type="url" name="image" value="<%= item.image %>"></label>
+        <label class="shop-image-upload">Replace product image<input type="file" name="image_file" accept="image/jpeg,image/png,image/webp,image/gif" <%= imageUploadsConfigured ? '' : 'disabled' %>><small><%= imageUploadsConfigured ? 'Leave empty to keep the current image.' : 'Image uploads need HACKCLUB_CDN_API_KEY.' %></small></label>
         <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
         <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
         <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
