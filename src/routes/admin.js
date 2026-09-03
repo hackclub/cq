@@ -62,6 +62,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   router.use((req, res, next) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
     res.once('finish', () => {
+      const outcome = res.statusCode >= 200 && res.statusCode < 400 ? "completed" : `failed with HTTP ${res.statusCode}`;
+      req.app.locals.logger.info(`${req.user.id} ${outcome} admin action: ${req.method} ${req.originalUrl}`);
       notifier.securityAlert?.(req.user, { method: req.method, path: req.originalUrl, status: res.statusCode }).catch(() => {});
     });
     next();
@@ -275,6 +277,16 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     user.role = roles.includes("admin") ? "admin" : "participant";
     user.updatedAt = nowIso();
     await store.put("user", user.id, user);
+    const beforeRoles = new Set(userRoles(before));
+    const afterRoles = new Set(userRoles(user));
+    const addedRoles = [...afterRoles].filter((role) => !beforeRoles.has(role));
+    const removedRoles = [...beforeRoles].filter((role) => !afterRoles.has(role));
+    const changes = [
+      ...addedRoles.map((role) => `added permission: ${role}`),
+      ...removedRoles.map((role) => `removed permission: ${role}`),
+      ...(Number.isFinite(hertzDelta) && hertzDelta !== 0 ? [`adjusted hertz by ${hertzDelta}`] : []),
+    ];
+    req.app.locals.logger.info(`${req.user.id} changed permissions of ${user.id}${changes.length ? ` - ${changes.join("; ")}` : " - no effective change"}`);
     await writeAudit(store, req.user, {
       action: "user.updated", entityType: "user", entityId: user.id,
       summary: `Updated roles or hertz for ${user.name}.`, before, after: user,

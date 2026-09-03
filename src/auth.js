@@ -240,20 +240,26 @@ export function requireAuth(req, res, next) {
 
 export function requireOrganizer(req, res, next) {
   if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}${req.forceReauth ? "&reauth=1" : ""}`);
-  if (!isOrganizer(req.user)) return res.status(403).render("error", {
+  if (!isOrganizer(req.user)) {
+    req.app?.locals?.logger?.info(`${req.user.id} attempted to open ${req.originalUrl} - 403 forbidden, missing permission: organizer.access`);
+    return res.status(403).render("error", {
     title: "Organizer frequency only",
     message: "Your account does not have organizer access.",
-  });
+    });
+  }
   next();
 }
 
 export function requirePermission(permission) {
   return (req, res, next) => {
     if (!req.user) return res.redirect(`/auth/login?return_to=${encodeURIComponent(req.originalUrl)}${req.forceReauth ? "&reauth=1" : ""}`);
-    if (!hasPermission(req.user, permission)) return res.status(403).render("error", {
+    if (!hasPermission(req.user, permission)) {
+      req.app?.locals?.logger?.info(`${req.user.id} attempted to open ${req.originalUrl} - 403 forbidden, missing permission: ${permission}`);
+      return res.status(403).render("error", {
       title: "Permission required",
       message: "Your organizer roles do not allow this action.",
-    });
+      });
+    }
     next();
   };
 }
@@ -267,6 +273,9 @@ export function requireCsrf(req, res, next) {
     supplied.length > 0 &&
     expected.length === supplied.length &&
     crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
-  if (!valid) return res.status(403).render("error", { title: "Request expired", message: "Refresh the page and try again." });
+  if (!valid) {
+    req.app?.locals?.logger?.info(`${req.user?.id || "anonymous"} attempted ${req.method} ${req.originalUrl} - 403 forbidden, invalid CSRF token`);
+    return res.status(403).render("error", { title: "Request expired", message: "Refresh the page and try again." });
+  }
   next();
 }

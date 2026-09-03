@@ -86,21 +86,6 @@ export async function createApp({
   ));
   app.use(express.static(path.join(config.projectRoot, "public"), { maxAge: config.isProduction ? "1d" : 0 }));
   app.use(sessionMiddleware(dataStore, config));
-  app.use((req, res, next) => {
-    const startedAt = process.hrtime.bigint();
-    res.once("finish", () => {
-      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
-      logger.info("http_request", {
-        method: req.method,
-        path: req.path,
-        status: res.statusCode,
-        durationMs: Math.round(durationMs * 10) / 10,
-        actorId: req.user?.id || null,
-        actorRole: req.user?.role || "anonymous",
-      });
-    });
-    next();
-  });
   app.use(async (req, res, next) => {
     try {
       res.locals.currentPath = req.path;

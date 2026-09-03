@@ -292,6 +292,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.get("/:id", async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    req.app.locals.logger.info(`${req.user.id} opened project ${project.id}`);
     const [projectDetails, country, hackatime, fundingRequests] = await Promise.all([
       details(store, project.id),
       store.get("country", project.countryCode),
