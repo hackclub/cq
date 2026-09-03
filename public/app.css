@@ -258,7 +258,7 @@ img {
 .internal-frequency-grid {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 0;
   display: grid;
   grid-template-columns: repeat(var(--if-cols), minmax(0, 1fr));
   grid-template-rows: repeat(var(--if-rows), minmax(0, 1fr));
@@ -270,9 +270,9 @@ img {
 .internal-frequency-cell {
   position: relative;
   display: block;
-  background-color: rgb(202 214 204 / calc(.003 + var(--if-fill) * .012));
-  border-left: 1px solid rgb(202 214 204 / calc(.026 + var(--if-line) * .016));
-  border-top: 1px solid rgb(202 214 204 / calc(.026 + var(--if-line) * .016));
+  background-color: rgb(202 214 204 / calc(.001 + var(--if-fill) * .003));
+  border-left: 1px solid rgb(202 214 204 / calc(.010 + var(--if-line) * .006));
+  border-top: 1px solid rgb(202 214 204 / calc(.010 + var(--if-line) * .006));
 }
 
 .internal-frequency-cell::before {
@@ -282,7 +282,7 @@ img {
   left: -1px;
   width: 1px;
   height: 1px;
-  background: rgb(211 220 213 / calc(.035 + var(--if-dot) * .08));
+  background: rgb(211 220 213 / calc(.012 + var(--if-dot) * .025));
 }
 
 .display > .admin-screen { position: relative; z-index: 1; }
@@ -310,7 +310,6 @@ img {
 .organizer-warning-panel .organizer-warning-note { border-top: 1px solid #343835; margin-top: 24px; padding-top: 17px; color: #858b86; font-size: 9px; }
 .organizer-warning-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 28px; }
 .organizer-warning-actions form { margin: 0; }
-.organizer-unverified .display > .admin-screen { visibility: hidden; }
 
 .page {
   position: absolute;
