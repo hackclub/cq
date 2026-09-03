@@ -1453,14 +1453,14 @@ th {
 /* Organizer workspace */
 .admin-body {
   min-width: 0;
-  background: rgb(23 26 25 / .84);
+  background: transparent;
 }
 
 .admin-body .admin-tabs {
   position: sticky;
   top: 0;
   z-index: 8;
-  background: #1c1f1e;
+  background: rgb(28 31 30 / .38);
 }
 
 .admin-body .admin-tabs a {
@@ -1485,7 +1485,7 @@ th {
 
 .admin-screen th {
   padding: 11px 12px;
-  background: #202322;
+  background: rgb(32 35 34 / .52);
   font-size: 8px;
   text-transform: uppercase;
 }
@@ -1526,7 +1526,7 @@ th {
 
 .compact-list>a:hover {
   color: white;
-  background: #202322;
+  background: rgb(32 35 34 / .32);
 }
 
 .compact-list>p {
@@ -1548,7 +1548,7 @@ th {
 
 .commit-list { display: grid; margin-top: 12px; border-top: 1px solid var(--line2); }
 .commit-list > a { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line2); color: inherit; text-decoration: none; }
-.commit-list > a:hover { background: #202322; color: white; }
+.commit-list > a:hover { background: rgb(32 35 34 / .32); color: white; }
 .commit-list code { align-self: start; color: var(--accent); white-space: nowrap; }
 .commit-list strong, .commit-list small { display: block; overflow-wrap: anywhere; }
 .commit-list small { margin-top: 3px; color: var(--dim); font-size: 8px; line-height: 1.4; }
@@ -1627,7 +1627,7 @@ th {
   width: 100%;
   height: 115px;
   object-fit: contain;
-  background: #202322;
+  background: rgb(32 35 34 / .42);
 }
 
 .inventory-card>label,
@@ -1641,7 +1641,7 @@ th {
 .order-admin-card address {
   padding: 10px;
   color: #aeb2ae;
-  background: #202322;
+  background: rgb(32 35 34 / .42);
   border: 1px solid var(--line2);
   font-style: normal;
   line-height: 1.65;
@@ -1673,7 +1673,7 @@ th {
   overflow: auto;
   padding: 12px;
   color: #c8cbc7;
-  background: #111413;
+  background: rgb(17 20 19 / .58);
   border: 1px solid var(--line2);
   font: 8px/1.55 var(--mono);
   white-space: pre-wrap;
