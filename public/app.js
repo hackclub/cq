@@ -23,6 +23,77 @@ for (const form of document.querySelectorAll("form[data-confirm]")) {
   });
 }
 
+const userSearch = document.querySelector("[data-user-search]");
+if (userSearch) {
+  const rows = [...document.querySelectorAll("[data-user-row]")];
+  const count = document.querySelector("[data-user-search-count]");
+  const empty = document.querySelector("[data-user-search-empty]");
+  const filterUsers = () => {
+    const query = userSearch.value.trim().toLowerCase();
+    let shown = 0;
+    rows.forEach((row) => {
+      const matches = !query || row.dataset.searchText.includes(query);
+      row.hidden = !matches;
+      if (matches) shown += 1;
+    });
+    if (count) count.textContent = `${shown} ${shown === 1 ? "person" : "people"}`;
+    if (empty) empty.hidden = shown !== 0;
+  };
+  userSearch.addEventListener("input", filterUsers);
+}
+
+const projectTrack = document.querySelector("[data-project-track]");
+const hardwareFields = document.querySelector("[data-hardware-fields]");
+if (projectTrack && hardwareFields) {
+  const syncTrack = () => {
+    const hardware = projectTrack.value === "hardware";
+    hardwareFields.hidden = !hardware;
+    hardwareFields.querySelectorAll("input, textarea, select, button").forEach((field) => {
+      field.disabled = !hardware;
+    });
+  };
+  projectTrack.addEventListener("change", syncTrack);
+  syncTrack();
+}
+
+const bomInput = document.querySelector("[data-bom-input]");
+const bomRows = document.querySelector("[data-bom-rows]");
+const bomAdd = document.querySelector("[data-bom-add]");
+if (bomInput && bomRows && bomAdd) {
+  let items = [];
+  try {
+    const parsed = JSON.parse(bomInput.value || "[]");
+    if (Array.isArray(parsed)) items = parsed;
+  } catch { items = []; }
+  const fields = ["name", "purpose", "quantity", "unitCost", "link", "distributor"];
+  const labels = ["Part name", "Why it is needed", "0", "0.00", "https://…", "Supplier"];
+  const renderBom = () => {
+    bomRows.replaceChildren();
+    items.forEach((item, index) => {
+      const row = document.createElement("tr");
+      fields.forEach((field, fieldIndex) => {
+        const cell = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = ["quantity", "unitCost"].includes(field) ? "number" : field === "link" ? "url" : "text";
+        if (input.type === "number") { input.min = "0"; input.step = field === "quantity" ? "1" : "0.01"; }
+        input.placeholder = labels[fieldIndex];
+        input.value = item[field] ?? "";
+        input.addEventListener("input", () => { items[index][field] = input.value; syncBom(); });
+        cell.append(input); row.append(cell);
+      });
+      const removeCell = document.createElement("td");
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.className = "text-button danger-text"; remove.textContent = "Remove";
+      remove.addEventListener("click", () => { items.splice(index, 1); renderBom(); syncBom(); });
+      removeCell.append(remove); row.append(removeCell); bomRows.append(row);
+    });
+  };
+  const syncBom = () => { bomInput.value = JSON.stringify(items); };
+  bomAdd.addEventListener("click", () => { items.push({ name: "", purpose: "", quantity: "", unitCost: "", link: "", distributor: "" }); renderBom(); syncBom(); });
+  if (!items.length) items.push({ name: "", purpose: "", quantity: "", unitCost: "", link: "", distributor: "" });
+  renderBom(); syncBom();
+}
+
 for (const form of document.querySelectorAll("form[data-devlog-form]")) {
   const fileInput = form.querySelector('input[type="file"][name="image_files"]');
   const urlInput = form.querySelector('input[type="hidden"][name="image_urls"]');

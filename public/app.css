@@ -475,7 +475,11 @@ img {
   left: 20px;
   bottom: 28px;
   font-size: 8px;
-  color: #8e938f
+  z-index: 2;
+  padding: 5px 7px;
+  color: #c7ccc7;
+  background: rgba(18, 21, 20, .78);
+  border: 1px solid rgba(199, 204, 199, .28)
 }
 
 .rxlog span {
@@ -515,6 +519,36 @@ img {
   font-size: 8px !important;
   color: #777c78 !important
 }
+
+.admin-users-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.admin-search {
+  display: grid;
+  gap: 5px;
+  min-width: min(100%, 360px);
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.admin-search input { min-width: 280px; }
+
+.admin-danger-zone { border-color: #83585b; }
+
+.user-role-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.user-search-empty { margin: 12px 0; }
 
 .mini-info {
   display: grid;
@@ -830,6 +864,31 @@ img {
   gap: 12px
 }
 
+.hardware-funding-fields[hidden] { display: none; }
+
+.bom-editor { overflow: auto; }
+
+.bom-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.bom-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  margin: 4px 0 8px;
+  font-size: 7px;
+}
+
+.bom-table th, .bom-table td { padding: 6px; border-bottom: 1px solid var(--line2); text-align: left; vertical-align: top; }
+.bom-table th { color: var(--dim); font-weight: 400; letter-spacing: .07em; }
+.bom-table input { min-width: 80px; padding: 7px; font-size: 8px; }
+.bom-table td:nth-child(1) input { min-width: 125px; }
+.bom-table td:nth-child(2) input { min-width: 160px; }
+.bom-table td:nth-child(5) input { min-width: 170px; }
+
+.funding-bom-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+.funding-bom-table th, .funding-bom-table td { padding: 9px; border-bottom: 1px solid var(--line2); text-align: left; vertical-align: top; }
+.funding-bom-table th { color: var(--dim); font-weight: 400; letter-spacing: .07em; }
+
 .span-two {
   grid-column: 1/-1
 }
@@ -995,8 +1054,19 @@ img {
 
 .devlog-composer summary {
   padding: 10px;
-  cursor: pointer
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px
 }
+
+.devlog-composer summary span,
+.devlog-composer summary small,
+.devlog-total strong,
+.devlog-total span { white-space: nowrap; }
+
+.devlog-total { display: flex; align-items: baseline; gap: 7px; }
 
 .journal-form {
   padding: 12px;

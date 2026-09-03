@@ -3,28 +3,31 @@
   <header class="apphead"><div><span class="eyebrow">ORGANIZER / ACCESS CONTROL</span><h1>Users and roles</h1></div><div class="readout headright"><span>PARTICIPANTS</span><b><%= users.length %></b></div></header>
   <div class="appbody admin-body">
   <%- include('nav') %>
-  <section class="panel compact-panel panel-heading">
+  <section class="panel compact-panel panel-heading admin-danger-zone">
     <div><p class="eyebrow">Session control</p><h2>Sign everyone out</h2><p>Everyone, including you, will have to authenticate with Hack Club Auth again.</p></div>
-    <form method="post" action="/admin/users/sessions/revoke-all">
+    <form method="post" action="/admin/users/sessions/revoke-all" data-confirm="Sign every CQ user out? This includes you and cannot be undone.">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="button button-danger" type="submit">Sign everyone out</button>
     </form>
   </section>
-  <div class="panel table-wrap">
+  <section class="admin-users-toolbar" aria-label="User tools">
+    <label class="admin-search"><span>Search people</span><input type="search" placeholder="Name, email, Slack ID, or role" data-user-search autocomplete="off"></label>
+    <strong data-user-search-count><%= users.length %> people</strong>
+  </section>
+  <div class="panel table-wrap user-table-panel">
     <table>
       <thead><tr><th>Participant</th><th>Verification</th><th>Hertz</th><th>Roles and adjustment</th><th>Sessions</th></tr></thead>
       <tbody>
         <% users.forEach((item) => { %>
-          <tr>
+          <tr data-user-row data-search-text="<%= [item.name, item.email, item.slackId, item.verificationStatus, ...item.roleKeys].filter(Boolean).join(' ').toLowerCase() %>">
             <td><strong><%= item.name %></strong><small><%= item.email %><br><%= item.slackId || 'No Slack ID' %></small></td>
             <td><%= statusLabel(item.verificationStatus) %><small><%= item.yswsEligible === true ? 'YSWS eligible' : item.yswsEligible === false ? 'Not eligible' : 'Eligibility unknown' %></small></td>
             <td><strong><%= item.hertz %></strong></td>
             <td>
               <form method="post" action="/admin/users/<%= item.id %>" class="user-role-form">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <div class="role-picker"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= item.roleKeys.includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %></div>
-                <label class="compact-input">Hertz adjustment<input type="number" name="hertz_delta" value="0" step="0.01"></label>
-                <button class="button button-small" type="submit">Save</button>
+                <div class="role-picker" aria-label="Roles for <%= item.name %>"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= item.roleKeys.includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %></div>
+                <div class="user-role-actions"><label class="compact-input">Hertz adjustment<input type="number" name="hertz_delta" value="0" step="0.01" aria-label="Hertz adjustment for <%= item.name %>"></label><button class="button button-small" type="submit">Save access</button></div>
               </form>
             </td>
             <td>
@@ -39,6 +42,7 @@
       </tbody>
     </table>
   </div>
+  <p class="empty-inline user-search-empty" data-user-search-empty hidden>No people match that search.</p>
   </div>
 </section>
 <%- include('../partials/footer') %>

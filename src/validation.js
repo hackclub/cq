@@ -5,6 +5,26 @@ function text(value, max = 2000) {
   return String(value ?? "").trim().slice(0, max);
 }
 
+function bomItems(value) {
+  try {
+    const parsed = JSON.parse(String(value || "[]"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 40).map((item) => ({
+      name: text(item?.name, 160), purpose: text(item?.purpose, 500),
+      quantity: Math.min(10_000, Math.max(0, Number.parseFloat(item?.quantity) || 0)),
+      unitCost: Math.min(100_000, Math.max(0, Number.parseFloat(item?.unitCost) || 0)),
+      link: text(item?.link, 500), distributor: text(item?.distributor, 120),
+    })).filter((item) => item.name || item.purpose || item.quantity || item.unitCost || item.link || item.distributor);
+  } catch {
+    return [];
+  }
+}
+
+function bomSummary(items, fallback) {
+  if (!items.length) return text(fallback, 8000);
+  return items.map((item) => `${item.name} — ${item.purpose} — qty ${item.quantity} — $${item.unitCost} each — ${item.distributor} — ${item.link}`).join("\n").slice(0, 8000);
+}
+
 export function isHttpUrl(value) {
   try {
     const url = new URL(value);
@@ -20,6 +40,7 @@ export function isGithubRepo(value) {
 
 export function projectInput(body = {}) {
   const allowedTypes = ["antenna", "radio-electronics", "sdr", "digital-mode", "satellite", "propagation", "station-tooling", "other"];
+  const parsedBomItems = bomItems(body.bom_items);
   return {
     title: text(body.title, 80),
     description: text(body.description, 800),
@@ -43,7 +64,8 @@ export function projectInput(body = {}) {
     notPaidHackClubWork: body.not_paid_hack_club_work === "1" || body.not_paid_hack_club_work === true,
     estimatedHours: Math.min(500, Math.max(1, Number.parseFloat(body.estimated_hours || "0") || 0)),
     buildPlan: text(body.build_plan, 2000),
-    bom: text(body.bom, 8000),
+    bom: bomSummary(parsedBomItems, body.bom),
+    bomItems: parsedBomItems,
     designUrl: text(body.design_url, 500),
     testPlan: text(body.test_plan, 2000),
   };
@@ -54,7 +76,9 @@ export function validateFundingRequest(input) {
   if (input.track !== "hardware") errors.push("Only hardware projects can request build funding.");
   if (!Number.isFinite(input.estimatedHours) || input.estimatedHours < 1) errors.push("Estimate at least one hour of build work.");
   if (input.buildPlan.length < 40) errors.push("Add a build plan with at least 40 characters.");
-  if (input.bom.length < 20) errors.push("Add a bill of materials with parts, quantities, and supplier links.");
+  if (input.bomItems?.length) {
+    if (!input.bomItems.some((item) => item.name && item.quantity > 0 && item.link && isHttpUrl(item.link))) errors.push("Add at least one BOM part with a quantity and supplier link.");
+  } else if (input.bom.length < 20) errors.push("Add a bill of materials with parts, quantities, and supplier links.");
   if (!isHttpUrl(input.designUrl)) errors.push("Add a public link to your schematic, CAD, PCB, or other design work.");
   if (input.testPlan.length < 30) errors.push("Add a short plan for how you will test the finished build.");
   return errors;
