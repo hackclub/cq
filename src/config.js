@@ -50,6 +50,7 @@ export function getConfig(overrides = {}) {
     githubToken: overrides.githubToken ?? process.env.GITHUB_TOKEN ?? "",
     sessionCookieName: overrides.sessionCookieName ?? process.env.SESSION_COOKIE_NAME ?? "cq_session",
     sessionDays: integer(overrides.sessionDays ?? process.env.SESSION_DAYS, 14),
+    organizerVerificationMinutes: integer(overrides.organizerVerificationMinutes ?? process.env.ORGANIZER_VERIFICATION_MINUTES, 10),
     hackClubClientId: overrides.hackClubClientId ?? process.env.HACKCLUB_CLIENT_ID ?? "",
     hackClubClientSecret: overrides.hackClubClientSecret ?? process.env.HACKCLUB_CLIENT_SECRET ?? "",
     hackClubRedirectUri:

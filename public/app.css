@@ -286,6 +286,7 @@ img {
 }
 
 .display > .admin-screen { position: relative; z-index: 1; }
+.organizer-unverified .display > .admin-screen { visibility: hidden; }
 
 .organizer-warning {
   position: absolute;

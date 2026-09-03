@@ -21,10 +21,12 @@ test("organizer pages require session acknowledgement before access", async () =
   const first = await agent.get("/admin");
   assert.equal(first.status, 200);
   assert.match(first.text, /Now entering an encrypted frequency/);
+  assert.match(first.text, /organizer-unverified/);
   assert.match(first.text, /internal-frequency-cell/);
   const verified = await agent.post("/admin/session/verify").type("form").send({ _csrf: csrf(first.text) });
   assert.equal(verified.status, 302);
   const second = await agent.get("/admin/projects");
   assert.doesNotMatch(second.text, /Now entering an encrypted frequency/);
+  assert.doesNotMatch(second.text, /organizer-unverified/);
   assert.match(second.text, /internal-frequency-cell/);
 });

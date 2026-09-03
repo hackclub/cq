@@ -91,7 +91,11 @@ export async function createApp({
     try {
       res.locals.currentPath = req.path;
       res.locals.flash = readFlash(req, res);
-      res.locals.organizerWarningRequired = Boolean(req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && !req.session?.organizerVerifiedAt);
+      const verifiedAt = new Date(req.session?.organizerVerifiedAt || 0).getTime();
+      const verificationWindow = Math.max(1, config.organizerVerificationMinutes) * 60_000;
+      res.locals.organizerWarningRequired = Boolean(
+        req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && (!Number.isFinite(verifiedAt) || verifiedAt + verificationWindow <= Date.now()),
+      );
       res.locals.internalFrequency = createInternalFrequency(config, req.user, req.session, req.path);
       res.locals.cartCount = req.user
         ? (await dataStore.list("cart")).filter((item) => item.userId === req.user.id).reduce((sum, item) => sum + item.quantity, 0)
