@@ -21,7 +21,7 @@
           </article>
         <% }) %>
         <div class="cart-total"><span>Total</span><strong><%= cart.total %> hertz</strong></div>
-        <p class="balance-note">Balance after order: <strong><%= user.hertz - cart.total %> hertz</strong></p>
+        <p class="balance-note">Balance after order: <strong><%= Number((Number(user.hertz) - Number(cart.total)).toFixed(2)) %> hertz</strong></p>
       </section>
       <form class="panel form-stack" method="post" action="/app/shop/checkout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">

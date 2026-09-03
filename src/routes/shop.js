@@ -138,7 +138,7 @@ export function shopRoutes({ store, notifier }) {
           product.stock -= item.quantity;
           await store.put("product", product.id, product);
         }
-        user.hertz -= freshCart.total;
+        user.hertz = Math.max(0, Math.round((Number(user.hertz) - freshCart.total) * 100) / 100);
         user.updatedAt = timestamp;
         await store.put("user", user.id, user);
         await store.put("order", id, order);
