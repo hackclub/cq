@@ -115,24 +115,24 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       );
     },
     fundingSubmitted(user, project, request) {
-      return userMessage(user, "funding.submitted", `🧰 Your hardware funding request for *${project.title}* (${request.requestedHertz} hertz) is in the CQ review queue.`, request.id);
+      return userMessage(user, "funding.submitted", `🧰 Your hardware funding request for *${project.title}* ($${Number(request.requestedHertz).toFixed(2)}) is in the CQ review queue.`, request.id);
     },
     fundingDecision(user, project, request) {
       const messages = {
-        approved: `✅ Funding for *${project.title}* was approved for ${request.review?.approvedHertz} hertz. We’ll message you when it has been issued.`,
+        approved: `✅ Funding for *${project.title}* was approved for $${Number(request.review?.approvedHertz || 0).toFixed(2)}. We’ll message you when it has been issued.`,
         changes_requested: `🛠️ Your funding request for *${project.title}* needs changes.${request.review?.noteToMaker ? `\n> ${request.review.noteToMaker}` : ""}`,
         rejected: `⛔ Funding for *${project.title}* was declined.${request.review?.noteToMaker ? `\n> ${request.review.noteToMaker}` : ""}`,
       };
       return userMessage(user, `funding.${request.status}`, messages[request.status] ?? `There is an update on funding for *${project.title}*.`, request.id);
     },
     fundingIssued(user, project, request) {
-      return userMessage(user, "funding.issued", `🎉 Funding for *${project.title}* has been issued (${request.review?.approvedHertz} hertz). You can now build, document your progress, and ship the finished project.`, request.id);
+      return userMessage(user, "funding.issued", `🎉 $${Number(request.review?.approvedHertz || 0).toFixed(2)} in funding for *${project.title}* has been issued. You can now build, document your progress, and ship the finished project.`, request.id);
     },
     projectDecision(user, project, event, review = {}) {
       const messages = {
         "review.approved": project.track === "software"
           ? `✅ *${project.title}* was approved! Open CQ to see the review and any hertz awarded for approved time.`
-          : `✅ *${project.title}* passed its final build review! Great work shipping it.`,
+          : `✅ *${project.title}* passed its final build review! Great work shipping it — approved build time has been added to your Hertz balance.`,
         "review.changes": `🛠️ *${project.title}* was returned for changes.${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
         "review.rejected": `⛔ Oh no! Unfortunately, *${project.title}* was denied. ${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
         "review.reverted": `↩️ The decision on *${project.title}* was reverted. Any reward from that decision has been removed while it is reconsidered.`,

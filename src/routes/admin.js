@@ -653,9 +653,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       await store.put("project", project.id, project);
 
       const existingLedger = await store.get("ledger", submission.id);
-      // Hardware is funded before its build starts. A final hardware review confirms
-      // the finished project only; it must never turn logged build time into shop Hertz.
-      const desiredHertz = decision === "approved" && project.track !== "hardware"
+      // Hardware funding is a separate pre-build grant. Final review still rewards
+      // the documented assembly and build time as spendable Hertz.
+      const desiredHertz = decision === "approved"
         ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
         : 0;
       const previousHertz = Math.max(0, Number(existingLedger?.delta) || 0);

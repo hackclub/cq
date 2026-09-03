@@ -493,7 +493,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     });
     await writeAudit(store, req.user, {
       action: "funding.submitted", entityType: "funding_request", entityId: request.id,
-      summary: `Submitted a ${request.requestedHertz} hertz hardware funding request for ${project.title}.`, after: request,
+      summary: `Submitted a $${request.requestedHertz} hardware funding request for ${project.title}.`, after: request,
     });
     await notifier.fundingSubmitted?.(req.user, project, request);
     setFlash(res, "success", "Funding request sent! The CQ team will review your design and build plan.");
