@@ -87,7 +87,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         users: users.length,
         activeProjects: projects.filter((item) => !["archived", "approved"].includes(item.status)).length,
         pendingReviews: submissions.filter((item) => !item.decision && !["withdrawn", "error"].includes(item.phase)).length,
-        pendingFunding: fundingRequests.filter((item) => ["submitted", "under_review"].includes(item.status)).length,
+        pendingFunding: fundingRequests.filter((item) => ["submitted", "under_review", "second_pass"].includes(item.status)).length,
         openOrders: orders.filter((item) => !["fulfilled", "cancelled"].includes(item.status)).length,
       },
       recentProjects: sortNewest(projects).slice(0, 8),
@@ -145,16 +145,51 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const project = await store.get("project", request.projectId);
     const maker = await store.get("user", request.userId);
     const timestamp = nowIso();
-    request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
+    request.status = "second_pass";
     request.reviewerId = req.user.id; request.reviewerName = req.user.name;
-    request.review = { decision, noteToMaker, internalNote, approvedHertz: decision === "approved" ? approvedHertz : 0, criteria: { designChecked, bomChecked, planChecked }, reviewedAt: timestamp };
+    request.firstPass = { decision, noteToMaker, internalNote, approvedHertz: decision === "approved" ? approvedHertz : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
     request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedHertz });
+    await writeAudit(store, req.user, { action: "funding.first_pass", entityType: "funding_request", entityId: request.id, summary: `Completed first pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
+    setFlash(res, "success", "First pass saved. A second-pass reviewer must confirm it before the maker is notified.");
+    res.redirect(`/admin/funding/${request.id}`);
+  });
+
+  router.post("/funding/:id/second-pass", requirePermission("reviews.second_pass"), requireCsrf, async (req, res) => {
+    const request = await store.get("funding_request", req.params.id);
+    if (!request) return res.sendStatus(404);
+    if (request.status !== "second_pass" || !request.firstPass) {
+      setFlash(res, "error", "This funding request is not waiting for second pass.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (request.firstPass.reviewerId === req.user.id) {
+      setFlash(res, "error", "A different organizer must complete second pass.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : request.firstPass.decision;
+    const noteToMaker = String(req.body.note_to_maker || request.firstPass.noteToMaker || "").trim().slice(0, 3000);
+    const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    if (["changes", "rejected"].includes(decision) && noteToMaker.length < 5) {
+      setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    if (decision === "approved" && approvedHertz <= 0) {
+      setFlash(res, "error", "Enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const before = structuredClone(request); const timestamp = nowIso();
+    const [project, maker] = await Promise.all([store.get("project", request.projectId), store.get("user", request.userId)]);
+    request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
+    request.review = { decision, noteToMaker, internalNote, approvedHertz, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
+    request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
+    await store.put("funding_request", request.id, request);
     if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
-    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
-    await writeAudit(store, req.user, { action: `funding.${decision}`, entityType: "funding_request", entityId: request.id, summary: `${decision} hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { approvedHertz } });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
+    await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
     if (maker && project) await notifier.fundingDecision?.(maker, project, request);
-    setFlash(res, "success", "Funding decision saved.");
+    setFlash(res, "success", "Second pass confirmed and the participant was notified.");
     res.redirect(`/admin/funding/${request.id}`);
   });
 
@@ -277,6 +312,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
+    if (previousStatus === "rejected" && project.status === "building") {
+      project.isUpdate = true;
+      project.updateMessage = project.updateMessage || "Reopened after review feedback.";
+    }
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
     await writeAudit(store, req.user, {
@@ -285,7 +324,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     });
     if (previousStatus !== project.status) {
       const user = await store.get("user", project.userId);
-      const event = { submitted: "review.requeued" }[project.status];
+      const event = { submitted: "review.requeued", building: previousStatus === "rejected" ? "review.reopened" : null }[project.status];
       if (user && event) await notifier.projectDecision(user, project, event);
     }
     setFlash(res, "success", `${project.title} updated.`);
@@ -465,23 +504,44 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const submission = await store.get("submission", req.params.id);
     if (!submission) return res.sendStatus(404);
     const submissionBefore = structuredClone(submission);
-    if (submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
+    const secondPass = req.body.second_pass === "1";
+    if (submission.decision) {
+      setFlash(res, "error", "This review already has a final decision. Reopen the project before it can be shipped again.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (secondPass && (submission.phase !== "second_pass" || !submission.firstPass)) {
+      setFlash(res, "error", "This review is not waiting for second pass.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (!secondPass && submission.phase === "second_pass") {
+      setFlash(res, "error", "This review is waiting for second pass.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (secondPass && !hasPermission(req.user, "reviews.second_pass")) {
+      return res.status(403).render("error", { title: "Second pass required", message: "Your account cannot complete second-pass reviews." });
+    }
+    if (secondPass && submission.firstPass.reviewer_id === req.user.id) {
+      setFlash(res, "error", "A different organizer must complete second pass.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (!secondPass && submission.assignedReviewerId && submission.assignedReviewerId !== req.user.id && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", "This submission is claimed by another reviewer.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
     const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : "";
-    const noteToMaker = String(req.body.note_to_maker || "").trim().slice(0, 3000);
+    const prior = secondPass ? submission.firstPass : submission.review || {};
+    const noteToMaker = String(req.body.note_to_maker || prior.note_to_maker || "").trim().slice(0, 3000);
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
-    const technicalNote = String(req.body.technical_note || "").trim().slice(0, 3000);
-    const timeNote = String(req.body.time_note || "").trim().slice(0, 2000);
+    const technicalNote = String(req.body.technical_note || prior.technical_note || "").trim().slice(0, 3000);
+    const timeNote = String(req.body.time_note || prior.time_note || "").trim().slice(0, 2000);
     const criteria = {
-      radioRelated: req.body.radio_related === "1",
-      shipped: req.body.shipped === "1",
-      publicSource: req.body.public_source === "1",
-      reproducible: req.body.reproducible === "1",
-      evidenceSufficient: req.body.evidence_sufficient === "1",
-      eligibleWork: req.body.eligible_work === "1",
-      distinctHours: req.body.distinct_hours === "1",
+      radioRelated: req.body.radio_related === "1" || Boolean(prior.criteria?.radioRelated),
+      shipped: req.body.shipped === "1" || Boolean(prior.criteria?.shipped),
+      publicSource: req.body.public_source === "1" || Boolean(prior.criteria?.publicSource),
+      reproducible: req.body.reproducible === "1" || Boolean(prior.criteria?.reproducible),
+      evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
+      eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
+      distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
@@ -496,6 +556,23 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (!secondPass) {
+      const timestamp = nowIso();
+      submission.phase = "second_pass";
+      submission.firstPass = {
+        decision, approved_minutes: decision === "approved" ? requestedMinutes : 0,
+        approved_hours: Math.round(((decision === "approved" ? requestedMinutes : 0) / 60) * 100) / 100,
+        note_to_maker: noteToMaker, internal_note: internalNote, technical_note: technicalNote, time_note: timeNote, criteria,
+        reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp,
+      };
+      submission.assignedReviewerId = req.user.id;
+      submission.updatedAt = timestamp;
+      await store.put("submission", submission.id, submission);
+      await addReviewAction(store, submission, req.user, "first_pass", { decision, noteToMaker, internalNote, technicalNote, timeNote, criteria, approvedMinutes: submission.firstPass.approved_minutes });
+      await writeAudit(store, req.user, { action: "review.first_pass", entityType: "submission", entityId: submission.id, summary: `Completed first pass for ${submission.id}.`, before: submissionBefore, after: submission, metadata: { projectId: submission.projectId, decision } });
+      setFlash(res, "success", "First pass saved. A different second-pass reviewer must confirm the decision.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
     await store.withLock(`review:${submission.id}`, async () => {
@@ -515,6 +592,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         note_to_maker: noteToMaker, internal_note: internalNote,
         technical_note: technicalNote, time_note: timeNote, criteria,
         reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp,
+        first_pass: submission.firstPass,
+        second_pass: { reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp, internal_note: internalNote },
       };
       submission.assignedReviewerId = req.user.id;
       submission.updatedAt = timestamp;
@@ -542,18 +621,18 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
           delta: desiredHertz, reason: `CQ review by ${req.user.name}`, createdAt: existingLedger?.createdAt || timestamp, updatedAt: timestamp,
         });
       } else if (existingLedger) await store.delete("ledger", submission.id);
-      await addReviewAction(store, submission, req.user, decision, {
+      await addReviewAction(store, submission, req.user, `second_pass_${decision}`, {
         noteToMaker, internalNote, technicalNote, timeNote, criteria, approvedMinutes,
       });
       await writeAudit(store, req.user, {
-        action: `review.${decision}`, entityType: "submission", entityId: submission.id,
-        summary: `Saved a ${decision} decision for ${project.title}.`,
+        action: `review.second_pass.${decision}`, entityType: "submission", entityId: submission.id,
+        summary: `Completed second pass with a ${decision} decision for ${project.title}.`,
         before: submissionBefore, after: submission,
         metadata: { projectId: project.id, approvedMinutes, previousHertz, awardedHertz: desiredHertz },
       });
       if (maker) await notifier.projectDecision(maker, project, submission.event, submission.review);
     });
-    setFlash(res, "success", "Review decision saved and the participant was notified.");
+    setFlash(res, "success", "Second pass saved and the participant was notified.");
     res.redirect(`/admin/reviews/${submission.id}`);
   });
 

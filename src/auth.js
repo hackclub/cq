@@ -14,6 +14,11 @@ export const roleDefinitions = {
     description: "Review projects, inspect submissions, and update project decisions.",
     permissions: ["projects.review", "reviews.read"],
   },
+  second_pass_reviewer: {
+    label: "Second-pass reviewer",
+    description: "Double-check first-pass project and hardware-funding reviews before they become final.",
+    permissions: ["projects.review", "reviews.read", "reviews.second_pass"],
+  },
   shop_editor: {
     label: "Shop editor",
     description: "Add products and manage shop pricing, stock, and availability.",

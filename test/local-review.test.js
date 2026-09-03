@@ -106,6 +106,14 @@ test("hardware funding is approved and issued before a final ship can enter revi
   assert.equal(fundingReview.status, 200);
   const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_hertz: "55", note_to_maker: "Looks buildable." });
   assert.equal(approve.status, 302);
+  assert.equal((await store.get("funding_request", funding.id)).status, "second_pass");
+  const secondAgent = request.agent(app);
+  await secondAgent.post("/auth/dev-login").type("form").send({ name: "Second pass", email: "second-pass@example.com", return_to: "/admin" });
+  const secondUser = (await store.list("user")).find((item) => item.email === "second-pass@example.com");
+  await store.put("user", secondUser.id, { ...secondUser, roles: ["participant", "second_pass_reviewer"], role: "participant" });
+  const secondFundingReview = await secondAgent.get(`/admin/funding/${funding.id}`);
+  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_hertz: "55", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
+  assert.equal(secondApprove.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "approved");
   assert.equal((await store.get("user", user.id)).hertz, initialHertz);
   const approvedPage = await agent.get(`/admin/funding/${funding.id}`);

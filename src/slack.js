@@ -99,6 +99,7 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
         "review.rejected": `⛔ Oh no! Unfortunately, *${project.title}* was denied. ${review.note_to_maker ? `\n> ${review.note_to_maker}` : ""}`,
         "review.reverted": `↩️ The decision on *${project.title}* was reverted. Any reward from that decision has been removed while it is reconsidered.`,
         "review.requeued": `🔁 *${project.title}* is back in the review queue for a fresh look.`,
+        "review.reopened": `🔁 *${project.title}* has been reopened so you can continue working and ship it again when ready.`,
         "review.fraud": `🛡️ An additional integrity check finished for *${project.title}*. The CQ organizers will follow up if anything is needed.`,
       };
       return userMessage(user, event, messages[event] ?? `There is an update on *${project.title}*.`, project.id);

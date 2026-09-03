@@ -207,8 +207,22 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     internal_note: "All checks passed.",
   });
   assert.equal(decision.status, 302);
-  assert.equal((await store.get("project", projectPath.split("/").pop())).status, "approved");
+  assert.equal((await store.get("project", projectPath.split("/").pop())).status, "submitted");
   assert.equal((await store.list("review_action")).length, 2);
+  const secondAgent = request.agent(app);
+  await secondAgent.post("/auth/dev-login").type("form").send({ name: "HQ Check", email: "hq-check@hackclub.com", return_to: "/admin" });
+  const secondUser = (await store.list("user")).find((item) => item.email === "hq-check@hackclub.com");
+  await store.put("user", secondUser.id, { ...secondUser, roles: ["participant", "second_pass_reviewer"], role: "participant" });
+  const secondReview = await secondAgent.get(`/admin/reviews/${submissions[0].id}`);
+  assert.match(secondReview.text, /Double-check review/);
+  const secondDecision = await secondAgent.post(`/admin/reviews/${submissions[0].id}/decision`).type("form").send({
+    _csrf: csrf(secondReview.text), second_pass: "1", decision: "approved", approved_minutes: 60,
+    radio_related: "1", shipped: "1", public_source: "1", reproducible: "1", evidence_sufficient: "1", eligible_work: "1", distinct_hours: "1",
+    technical_note: "Confirmed the antenna build, measurements, repository, and functional radio outcome.", time_note: "Approved the evidenced first hour.", note_to_maker: "Strong documented build.", internal_note: "Second pass confirmed.",
+  });
+  assert.equal(secondDecision.status, 302);
+  assert.equal((await store.get("project", projectPath.split("/").pop())).status, "approved");
+  assert.equal((await store.list("review_action")).length, 3);
   // The form caps approval at the 45 minutes actually evidenced in devlogs.
   assert.equal((await store.list("user"))[0].hertz, 203.75);
 
