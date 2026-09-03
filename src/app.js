@@ -20,6 +20,7 @@ import { seedStore } from "./seed.js";
 import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
 import { formatDate, formatDateTime, jsonArray, readFlash, statusLabel } from "./utils.js";
+import { createInternalFrequency } from "./internal-frequency.js";
 
 const consoleLogger = {
   info: (...args) => console.info(...args),
@@ -90,6 +91,8 @@ export async function createApp({
     try {
       res.locals.currentPath = req.path;
       res.locals.flash = readFlash(req, res);
+      res.locals.organizerWarningRequired = Boolean(req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && !req.session?.organizerVerifiedAt);
+      res.locals.internalFrequency = createInternalFrequency(config, req.user, req.session, req.path);
       res.locals.cartCount = req.user
         ? (await dataStore.list("cart")).filter((item) => item.userId === req.user.id).reduce((sum, item) => sum + item.quantity, 0)
         : 0;

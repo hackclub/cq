@@ -255,6 +255,63 @@ img {
   overflow: hidden
 }
 
+.internal-frequency-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--if-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--if-rows), minmax(0, 1fr));
+  pointer-events: none;
+  overflow: hidden;
+  background: #171a19;
+}
+
+.internal-frequency-cell {
+  position: relative;
+  display: block;
+  background-color: rgb(202 214 204 / calc(.003 + var(--if-fill) * .012));
+  border-left: 1px solid rgb(202 214 204 / calc(.026 + var(--if-line) * .016));
+  border-top: 1px solid rgb(202 214 204 / calc(.026 + var(--if-line) * .016));
+}
+
+.internal-frequency-cell::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 1px;
+  height: 1px;
+  background: rgb(211 220 213 / calc(.035 + var(--if-dot) * .08));
+}
+
+.display > .admin-screen { position: relative; z-index: 1; }
+
+.organizer-warning {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(8 10 9 / .68);
+}
+
+.organizer-warning-panel {
+  width: min(700px, 100%);
+  border: 1px solid #3a3f3c;
+  background: #111312;
+  box-shadow: 0 20px 60px #000b;
+  padding: clamp(24px, 5vw, 54px);
+}
+
+.organizer-warning-panel h1 { margin: 13px 0 18px; font-size: clamp(24px, 4vw, 42px); font-weight: 400; letter-spacing: -.055em; }
+.organizer-warning-panel p { max-width: 590px; color: #afb3af; font-size: 13px; line-height: 1.7; }
+.organizer-warning-panel .organizer-warning-note { border-top: 1px solid #343835; margin-top: 24px; padding-top: 17px; color: #858b86; font-size: 9px; }
+.organizer-warning-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 28px; }
+.organizer-warning-actions form { margin: 0; }
+.organizer-unverified .display > .admin-screen { visibility: hidden; }
+
 .page {
   position: absolute;
   inset: 0;
@@ -1396,7 +1453,7 @@ th {
 /* Organizer workspace */
 .admin-body {
   min-width: 0;
-  background: #171a19;
+  background: rgb(23 26 25 / .84);
 }
 
 .admin-body .admin-tabs {

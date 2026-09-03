@@ -79,6 +79,7 @@ npm test
 8. Set `BASE_URL`, `NODE_ENV=production`, and all remaining values documented in
    `.env.example`.
 
+
 Hackatime compares redirect URIs exactly. For the production domain in this
 repository, register this URI as its own line in **My OAuth Apps**:
 
@@ -125,6 +126,7 @@ container health. On a platform with a Dockerfile builder:
 - leave the root directory empty;
 - leave install, build, output, and start overrides empty;
 - use `Dockerfile` as the Dockerfile path if the platform asks for one.
+
 
 The container starts the Express server itself, so a static output directory or
 dashboard start command must not be configured. Set the environment variables

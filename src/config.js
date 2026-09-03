@@ -12,6 +12,12 @@ function integer(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function keyValue(directValue, base64Value) {
+  if (directValue) return String(directValue).replace(/\\n/g, "\n");
+  if (!base64Value) return "";
+  try { return Buffer.from(String(base64Value), "base64").toString("utf8"); } catch { return ""; }
+}
+
 export function getConfig(overrides = {}) {
   const nodeEnv = overrides.nodeEnv ?? process.env.NODE_ENV ?? "development";
   const baseUrl = (overrides.baseUrl ?? process.env.BASE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
@@ -36,6 +42,10 @@ export function getConfig(overrides = {}) {
     slackBotToken: overrides.slackBotToken ?? process.env.SLACK_BOT_TOKEN ?? "",
     slackAdminChannelId: overrides.slackAdminChannelId ?? process.env.SLACK_ADMIN_CHANNEL_ID ?? "",
     slackSecurityUserId: overrides.slackSecurityUserId ?? process.env.SLACK_SECURITY_USER_ID ?? "",
+    internalFrequencyKey: keyValue(
+      overrides.internalFrequencyKey ?? process.env.INTERNAL_FREQUENCY_KEY ?? "",
+      overrides.internalFrequencyKeyB64 ?? process.env.INTERNAL_FREQUENCY_KEY_B64 ?? "",
+    ),
     hackClubCdnApiKey: overrides.hackClubCdnApiKey ?? process.env.HACKCLUB_CDN_API_KEY ?? "",
     githubToken: overrides.githubToken ?? process.env.GITHUB_TOKEN ?? "",
     sessionCookieName: overrides.sessionCookieName ?? process.env.SESSION_COOKIE_NAME ?? "cq_session",

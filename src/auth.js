@@ -222,6 +222,7 @@ export function sessionMiddleware(store, config) {
           : null;
       req.forceReauth = Boolean(session?.revokedAt);
       req.user = user;
+      req.session = session;
       req.csrfToken = user ? session.csrfToken : null;
       res.locals.user = user;
       res.locals.userRoles = userRoles(user || {});

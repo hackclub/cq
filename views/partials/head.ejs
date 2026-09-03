@@ -11,7 +11,7 @@
   <title><%= title %> · CQ</title>
   <link rel="stylesheet" href="/app.css">
 </head>
-<body class="<%= typeof bodyClass === 'string' ? bodyClass : '' %>">
+<body class="<%= [typeof bodyClass === 'string' ? bodyClass : '', organizerWarningRequired ? 'organizer-unverified' : ''].filter(Boolean).join(' ') %>">
   <a class="skip-link" href="#main">Skip to content</a>
   <% const channel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' ? ['005.000', 'MEM 02 / STATION'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
   <div class="desk">
@@ -25,4 +25,23 @@
         <% if (user) { %><form method="post" action="/auth/logout" class="top-logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit">SIGN OUT</button></form><% } %>
       </header>
       <div class="display">
+        <% if (internalFrequency) { %>
+          <div class="internal-frequency-grid" aria-hidden="true" style="--if-cols:<%= internalFrequency.columns %>;--if-rows:<%= internalFrequency.rows %>">
+            <% internalFrequency.cells.forEach((cell) => { %><i class="internal-frequency-cell" style="--if-fill:<%= cell.fill %>;--if-line:<%= cell.line %>;--if-dot:<%= cell.dot %>"></i><% }) %>
+          </div>
+        <% } %>
         <% if (flash) { %><div class="toast show flash-<%= flash.type %>" role="status"><%= flash.message %></div><% } %>
+        <% if (organizerWarningRequired) { %>
+          <section class="organizer-warning" role="dialog" aria-modal="true" aria-labelledby="organizer-warning-title">
+            <div class="organizer-warning-panel">
+              <p class="eyebrow">CQ / SECURE CHANNEL</p>
+              <h1 id="organizer-warning-title">Now entering an encrypted frequency</h1>
+              <p>You’re about to enter CQ’s internal organizer frequency. If you are screen sharing or recording, please stop before continuing. This area and its contents are confidential and covered by NDA.</p>
+              <p class="organizer-warning-note">This frequency carries access-control markers to help investigate unauthorized disclosure.</p>
+              <div class="organizer-warning-actions">
+                <a class="button button-ghost" href="/app">Exit internal</a>
+                <form method="post" action="/admin/session/verify"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-primary" type="submit">Verify session</button></form>
+              </div>
+            </div>
+          </section>
+        <% } %>

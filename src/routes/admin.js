@@ -59,6 +59,17 @@ function projectForReview(submission, currentProject) {
 export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
   const router = Router();
   router.use(requireOrganizer);
+  router.post("/session/verify", requireCsrf, async (req, res) => {
+    if (!req.session) return res.sendStatus(401);
+    const verifiedAt = nowIso();
+    await store.put("session", req.session.id, { ...req.session, organizerVerifiedAt: verifiedAt });
+    req.app.locals.logger.info(`${req.user.id} acknowledged the organizer confidentiality notice`);
+    await writeAudit(store, req.user, {
+      action: "organizer.session_verified", entityType: "session", entityId: req.session.id,
+      summary: "Acknowledged the organizer confidentiality notice.", metadata: { verifiedAt },
+    });
+    res.redirect("/admin");
+  });
   router.use((req, res, next) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
     res.once('finish', () => {
