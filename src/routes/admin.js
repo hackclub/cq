@@ -34,6 +34,10 @@ function journalsForReview(submission, journals) {
   return projectJournals.filter((item) => !submission.createdAt || String(item.createdAt || "") <= submission.createdAt);
 }
 
+function reviewMinutes(journals) {
+  return Math.round(journals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0));
+}
+
 function projectForReview(submission, currentProject) {
   if (submission.projectSnapshot) return structuredClone(submission.projectSnapshot);
   const payload = submission.payload || {};
@@ -436,7 +440,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         maker: users.find((user) => user.id === project?.userId),
         reviewer: users.find((user) => user.id === submission.assignedReviewerId),
         devlogCount: submissionJournals.length,
-        claimedMinutes: submissionJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0),
+        claimedMinutes: reviewMinutes(submissionJournals),
       };
     });
     res.render("admin/reviews", {
@@ -465,7 +469,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
       reviewers,
       github,
-      loggedMinutes: reviewJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0),
+      loggedMinutes: reviewMinutes(reviewJournals),
     });
   });
 
@@ -552,7 +556,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
-    const precheckMinutes = precheckJournals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0);
+    const precheckMinutes = reviewMinutes(precheckJournals);
     const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
@@ -578,7 +582,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     await store.withLock(`review:${submission.id}`, async () => {
       const project = await store.get("project", submission.projectId);
       const journals = journalsForReview(submission, await store.list("journal"));
-      const loggedMinutes = journals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0);
+      const loggedMinutes = reviewMinutes(journals);
       const approvedMinutes = decision === "approved"
         ? Math.min(loggedMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)))
         : 0;
