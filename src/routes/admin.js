@@ -475,7 +475,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const [submissions, projects, deliveries, users, journals] = await Promise.all([
       store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),
     ]);
-    const rows = sortNewest(submissions).map((submission) => {
+    const rows = sortNewest(submissions)
+      .filter((submission) => !submission.decision && !["withdrawn", "error"].includes(submission.phase))
+      .map((submission) => {
       const currentProject = projects.find((item) => item.id === submission.projectId);
       const project = currentProject ? projectForReview(submission, currentProject) : null;
       const submissionJournals = journalsForReview(submission, journals);
@@ -486,7 +488,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         devlogCount: submissionJournals.length,
         claimedMinutes: reviewMinutes(submissionJournals),
       };
-    });
+      });
     res.render("admin/reviews", {
       title: "Project review queue",
       submissions: rows,

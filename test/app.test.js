@@ -223,6 +223,8 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(secondDecision.status, 302);
   assert.equal((await store.get("project", projectPath.split("/").pop())).status, "approved");
   assert.equal((await store.list("review_action")).length, 3);
+  const completedQueue = await secondAgent.get("/admin/reviews");
+  assert.match(completedQueue.text, /Nothing is waiting for review right now/);
   // The form caps approval at the 45 minutes actually evidenced in devlogs.
   assert.equal((await store.list("user"))[0].hertz, 203.75);
 
