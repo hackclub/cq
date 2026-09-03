@@ -16,6 +16,7 @@ test("Slack bot uses its environment token and records notification delivery", a
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
+    if (url.endsWith("conversations.open")) return new Response(JSON.stringify({ ok: true, channel: { id: "D123456" } }), { status: 200 });
     return new Response(JSON.stringify({ ok: true, ts: "123.456" }), { status: 200 });
   };
   const notifier = createSlackNotifier(config, store, fetchImpl);
@@ -23,9 +24,9 @@ test("Slack bot uses its environment token and records notification delivery", a
     { id: "user_1", slackId: "U123456", name: "Maker", email: "maker@example.com" },
     { id: "order_1", total: 20 },
   );
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].options.headers.Authorization, "Bearer xoxb-test-token");
-  assert.match(calls[0].options.body, /20 hertz/);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].options.headers.Authorization, "Bearer xoxb-test-token");
+  assert.match(calls[1].options.body, /20 hertz/);
   const notices = await store.list("notification");
   assert.equal(notices[0].status, "sent");
   assert.equal(notices[0].slackTimestamp, "123.456");
@@ -40,10 +41,11 @@ test("security alerts are direct messages to the configured security recipient",
   const calls = [];
   const notifier = createSlackNotifier(config, store, async (url, options) => {
     calls.push({ url, options });
+    if (url.endsWith("conversations.open")) return new Response(JSON.stringify({ ok: true, channel: { id: "DSECURITY" } }), { status: 200 });
     return new Response(JSON.stringify({ ok: true, ts: "123.456" }), { status: 200 });
   });
   await notifier.securityAlert({ id: "admin_1", name: "Admin" }, { method: "POST", path: "/admin/users/user_1", status: 302 });
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.match(calls[0].options.body, /USECURITY/);
-  assert.match(calls[0].options.body, /security alert/i);
+  assert.match(calls[1].options.body, /security alert/i);
 });

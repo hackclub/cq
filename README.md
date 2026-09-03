@@ -67,7 +67,7 @@ npm test
 4. Ari is optional. With no Ari credentials, shipped projects enter CQ's local
    review queue. If Ari is enabled later, add its program and signing secrets and
    configure its outgoing webhook as `https://your-domain.example/ari/webhook`.
-5. Create a Slack app with `chat:write`, install it to the Hack Club workspace,
+5. Create a Slack app with `chat:write` and `im:write`, install it to the Hack Club workspace,
    then set `SLACK_BOT_TOKEN`. `SLACK_ADMIN_CHANNEL_ID` is optional and receives
    organizer-facing purchase notices. Set `SLACK_SECURITY_USER_ID` to your Slack
    member ID to receive direct security alerts for every organizer-side mutation.

@@ -3,25 +3,37 @@ import { nowIso, randomId, publicUrl } from "./utils.js";
 export function createSlackNotifier(config, store, fetchImpl = fetch) {
   const configured = () => Boolean(config.slackBotToken);
 
-  async function post(channel, text) {
-    if (!configured() || !channel) return { skipped: true };
-    const response = await fetchImpl("https://slack.com/api/chat.postMessage", {
+  async function slackRequest(method, body) {
+    const response = await fetchImpl(`https://slack.com/api/${method}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.slackBotToken}`,
         "Content-Type": "application/json; charset=utf-8",
       },
-      body: JSON.stringify({
-        channel,
-        text,
-        unfurl_links: false,
-        unfurl_media: false,
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(10_000),
     });
-    const body = await response.json();
-    if (!response.ok || !body.ok) throw new Error(body.error || `Slack returned ${response.status}.`);
-    return body;
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || `Slack returned ${response.status}.`);
+    return result;
+  }
+
+  async function directMessageChannel(channel) {
+    if (!String(channel).startsWith("U")) return channel;
+    const result = await slackRequest("conversations.open", { users: channel });
+    if (!result.channel?.id) throw new Error("Slack did not return a direct-message channel.");
+    return result.channel.id;
+  }
+
+  async function post(channel, text) {
+    if (!configured() || !channel) return { skipped: true };
+    const directChannel = await directMessageChannel(channel);
+    return slackRequest("chat.postMessage", {
+      channel: directChannel,
+      text,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
   }
 
   async function deliver({ userId = null, channel, kind, text, entityId = null }) {
@@ -41,9 +53,11 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       const result = await post(channel, text);
       notification.status = result.skipped ? "skipped" : "sent";
       notification.slackTimestamp = result.ts ?? null;
+      if (!result.skipped) console.info("slack_notification", { kind, entityId, status: notification.status });
     } catch (error) {
       notification.status = "failed";
       notification.error = error.message;
+      console.error("slack_notification", { kind, entityId, status: "failed", error: error.message });
     }
     notification.updatedAt = nowIso();
     try {
