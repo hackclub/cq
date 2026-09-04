@@ -161,7 +161,9 @@ if (thumbnailUpload) {
       const response = await fetch("/app/projects/uploads/images", { method: "POST", headers: { "x-csrf-token": csrf, Accept: "application/json" }, body });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Upload failed.");
-      url.value = result.images[0].url; status.textContent = "Thumbnail uploaded."; render();
+      const uploadedUrl = result.images?.[0]?.url || result.images?.[0];
+      if (!safeImageUrl(uploadedUrl)) throw new Error("Upload returned no usable image URL.");
+      url.value = uploadedUrl; status.textContent = "Thumbnail uploaded."; render();
     } catch (error) { status.textContent = error.message || "Thumbnail upload failed."; }
     finally { input.value = ""; }
   });
@@ -190,7 +192,9 @@ for (const uploader of document.querySelectorAll("[data-shop-image-upload]")) {
       const response = await fetch("/admin/uploads/images", { method: "POST", headers: { "x-csrf-token": csrf, Accept: "application/json" }, body });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Upload failed.");
-      url.value = result.image.url; status.textContent = "Image uploaded. Save the product to apply it."; render();
+      const uploadedUrl = result.image?.url || result.image;
+      if (!safeImageUrl(uploadedUrl)) throw new Error("Upload returned no usable image URL.");
+      url.value = uploadedUrl; status.textContent = "Image uploaded. Save the product to apply it."; render();
     } catch (error) { status.textContent = error.message || "Image upload failed."; }
     finally { input.value = ""; }
   });
@@ -256,7 +260,9 @@ for (const form of document.querySelectorAll("form[data-devlog-form]")) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Upload failed.");
-      urlInput.value = [...existing, ...result.images.map((image) => image.url)].slice(0, 8).join("\n");
+      const uploadedUrls = (result.images || []).map((image) => image?.url || image).filter(safeImageUrl);
+      if (!uploadedUrls.length) throw new Error("Upload returned no usable image URL.");
+      urlInput.value = [...existing, ...uploadedUrls].slice(0, 8).join("\n");
       status.textContent = `${result.images.length} image${result.images.length === 1 ? "" : "s"} uploaded.`;
       renderPreview();
     } catch (error) {
