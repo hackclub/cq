@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { writeAudit } from "../audit.js";
-import { requireAuth, requireCsrf } from "../auth.js";
+import { hasPermission, requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { isHttpUrl, projectInput, validateFundingRequest, validateProject } from "../validation.js";
@@ -523,6 +523,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.post("/:id/submit", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    const programSettings = await store.get("setting", "program");
+    if (programSettings?.submissionsClosed && !hasPermission(req.user, "users.manage")) {
+      setFlash(res, "error", programSettings.submissionsMessage || "Project submissions are temporarily closed.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
     const projectDetails = await details(store, project.id);
     if (project.status === "rejected") {
       setFlash(res, "error", "A denied project cannot be resubmitted unless an organizer reopens it.");

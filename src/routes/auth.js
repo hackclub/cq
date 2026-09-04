@@ -53,6 +53,8 @@ export function authRoutes({ store, config }) {
       const user = await upsertUser(store, config, profile);
       await createSession(store, config, res, user.id);
       setFlash(res, "success", `Welcome to CQ, ${user.name}.`);
+      const programSettings = await store.get("setting", "program");
+      if (programSettings?.loginNotice) setFlash(res, "success", programSettings.loginNotice);
       res.redirect(safeReturnTo(oauthState.return_to));
     } catch (error) {
       req.app.locals.logger.error("Hack Club Auth callback failed", error);

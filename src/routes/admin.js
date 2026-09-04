@@ -132,12 +132,14 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
 
   router.get("/settings", requirePermission("users.manage"), async (req, res) => {
     const launchGate = await store.get("setting", "launch_gate") || { enabled: false, message: "Coming soon", until: "" };
-    res.render("admin/settings", { title: "Organizer settings", launchGate });
+    const program = await store.get("setting", "program") || {};
+    res.render("admin/settings", { title: "Organizer settings", launchGate, program });
   });
 
   router.post("/settings", requirePermission("users.manage"), requireCsrf, async (req, res) => {
     const launchGate = { id: "launch_gate", enabled: req.body.launch_gate === "on", message: String(req.body.message || "Coming soon").trim().slice(0, 120), until: String(req.body.until || "").trim().slice(0, 80), updatedAt: nowIso() };
     await store.put("setting", "launch_gate", launchGate);
+    await store.put("setting", "program", { id: "program", loginNotice: String(req.body.login_notice || "").trim().slice(0, 500), shopClosed: req.body.shop_closed === "on", shopMessage: String(req.body.shop_message || "").trim().slice(0, 200), submissionsClosed: req.body.submissions_closed === "on", submissionsMessage: String(req.body.submissions_message || "").trim().slice(0, 200), updatedAt: nowIso() });
     await writeAudit(store, req.user, { action: "settings.launch_gate", entityType: "setting", entityId: "launch_gate", summary: `${launchGate.enabled ? "Enabled" : "Disabled"} the homepage launch gate.`, after: launchGate });
     setFlash(res, "success", "Homepage launch setting saved.");
     res.redirect("/admin/settings");
