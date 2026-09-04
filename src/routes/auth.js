@@ -15,14 +15,14 @@ import { nowIso, randomId, safeReturnTo, setFlash } from "../utils.js";
 export function authRoutes({ store, config }) {
   const router = Router();
   const attempts = new Map();
-  const limit = (req, res, next) => {
+  const rateLimit = (req, res, next) => {
     const key = `${req.ip}:${req.path}`; const now = Date.now();
     const recent = (attempts.get(key) || []).filter((time) => now - time < 60_000);
     if (recent.length >= 30) return res.status(429).send("Too many authentication attempts. Try again shortly.");
     recent.push(now); attempts.set(key, recent); return next();
   };
 
-  router.get("/login", limit, async (req, res) => {
+  router.get("/login", rateLimit, async (req, res) => {
     const returnTo = safeReturnTo(req.query.return_to, "/app/profile");
     const forceReauth = req.forceReauth || req.query.reauth === "1";
     if (req.user && !forceReauth) return res.redirect(returnTo);
@@ -34,7 +34,7 @@ export function authRoutes({ store, config }) {
     });
   });
 
-  router.get("/callback", limit, async (req, res) => {
+  router.get("/callback", rateLimit, async (req, res) => {
     if (req.query.error) {
       return res.status(400).render("error", {
         title: "Sign in cancelled",
@@ -68,7 +68,7 @@ export function authRoutes({ store, config }) {
     res.redirect("/");
   });
 
-  router.post("/dev-login", limit, async (req, res) => {
+  router.post("/dev-login", rateLimit, async (req, res) => {
     if (!config.devAuthBypass) return res.sendStatus(404);
     const timestamp = nowIso();
     const email = String(req.body.email || "radio-maker@example.com").trim().toLowerCase();
