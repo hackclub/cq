@@ -1,3 +1,27 @@
 <%- include('../partials/head') %>
-<section id="main" class="screen-page app-screen admin-screen"><header class="apphead"><div><p class="eyebrow">ORGANIZER / SETTINGS</p><h1>Settings</h1></div></header><%- include('nav') %>
-<section class="panel form-stack"><h2>Homepage launch gate</h2><form method="post" action="/admin/settings"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label><input type="checkbox" name="launch_gate" <%= launchGate.enabled ? 'checked' : '' %>> Show coming-soon mode</label><label>Message<input name="message" value="<%= launchGate.message %>"></label><label>Launch date/time<input name="until" value="<%= launchGate.until %>"></label><hr><h2>Program controls</h2><label>Notice after login<textarea name="login_notice"><%= program.loginNotice || '' %></textarea></label><label><input type="checkbox" name="shop_closed" <%= program.shopClosed ? 'checked' : '' %>> Close shop</label><label>Shop message<input name="shop_message" value="<%= program.shopMessage || '' %>"></label><label><input type="checkbox" name="submissions_closed" <%= program.submissionsClosed ? 'checked' : '' %>> Close submissions</label><label>Submissions message<input name="submissions_message" value="<%= program.submissionsMessage || '' %>"></label><button class="button button-primary" type="submit">Save settings</button></form></section></section><%- include('../partials/footer') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead">
+    <div><p class="eyebrow">ORGANIZER / SETTINGS</p><h1>Settings</h1></div>
+  </header>
+  <div class="appbody admin-body">
+    <%- include('nav') %>
+    <section class="panel form-stack settings-panel">
+      <form method="post" action="/admin/settings">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <h2>Homepage launch gate</h2>
+        <label class="checkbox-field"><input type="checkbox" name="launch_gate" <%= launchGate.enabled ? 'checked' : '' %>> <span>Show coming-soon mode</span></label>
+        <label>Message<input name="message" value="<%= launchGate.message %>"></label>
+        <label>Launch date/time<input name="until" value="<%= launchGate.until %>"></label>
+        <hr>
+        <h2>Program controls</h2>
+        <label>Notice after login<textarea name="login_notice"><%= program.loginNotice || '' %></textarea></label>
+        <label class="checkbox-field"><input type="checkbox" name="shop_closed" <%= program.shopClosed ? 'checked' : '' %>> <span>Close shop</span></label>
+        <label>Shop message<input name="shop_message" value="<%= program.shopMessage || '' %>"></label>
+        <label class="checkbox-field"><input type="checkbox" name="submissions_closed" <%= program.submissionsClosed ? 'checked' : '' %>> <span>Close submissions</span></label>
+        <label>Submissions message<input name="submissions_message" value="<%= program.submissionsMessage || '' %>"></label>
+        <button class="button button-primary" type="submit">Save settings</button>
+      </form>
+    </section>
+  </div>
+</section>
+<%- include('../partials/footer') %>
