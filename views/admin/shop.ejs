@@ -22,11 +22,11 @@
     <% products.forEach((item) => { %>
       <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <img src="<%= item.image %>" alt="">
+        <img src="<%= item.image || '/assets/radio_img.png' %>" alt="">
         <label>Name<input name="name" value="<%= item.name %>" required></label>
         <label>Category<input name="category" value="<%= item.category %>" required></label>
         <div class="form-grid"><label>Price<input type="number" name="price" min="0" value="<%= item.price %>" required></label><label>Stock<input type="number" name="stock" min="0" value="<%= item.stock %>" required></label></div>
-        <div class="shop-image-upload" data-shop-image-upload><span>Replace product image</span><input type="hidden" name="image" value="<%= item.image %>" data-shop-image-url><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-shop-image-file <%= imageUploadsConfigured ? '' : 'disabled' %>><small data-shop-image-status><%= imageUploadsConfigured ? 'Choose a new image, or leave this empty to keep the current one.' : 'Image uploads need R2 configuration.' %></small><div class="shop-image-preview" data-shop-image-preview></div></div>
+        <div class="shop-image-upload" data-shop-image-upload><span>Replace product image</span><input type="hidden" name="image" value="<%= item.image || '/assets/radio_img.png' %>" data-shop-image-url><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-shop-image-file <%= imageUploadsConfigured ? '' : 'disabled' %>><small data-shop-image-status><%= imageUploadsConfigured ? 'Choose a new image, or leave this empty to keep the current one.' : 'Image uploads need R2 configuration.' %></small><div class="shop-image-preview" data-shop-image-preview></div></div>
         <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
         <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
         <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
