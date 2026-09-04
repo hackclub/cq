@@ -9,10 +9,10 @@ services:
       replicas: 2
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "0.15"
           memory: 1G
         reservations:
-          cpus: "0.1"
+          cpus: "0.05"
           memory: 256M
     ports:
       - "3000:3000"
