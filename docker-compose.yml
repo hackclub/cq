@@ -9,7 +9,7 @@ services:
       replicas: ${CQ_REPLICAS:-1}
       resources:
         limits:
-          cpus: "0.3"
+          cpus: "0.1"
           memory: 512M
         reservations:
           cpus: "0.05"
