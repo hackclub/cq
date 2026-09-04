@@ -38,6 +38,15 @@ export function isGithubRepo(value) {
   return Boolean(parseGitHubRepository(value));
 }
 
+export function isPublicGitRepo(value) {
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) return false;
+    const parts = url.pathname.split('/').filter(Boolean);
+    return parts.length >= 2 && !/[<>"'`\s]/.test(url.toString());
+  } catch { return false; }
+}
+
 export function projectInput(body = {}) {
   const allowedTypes = ["antenna", "radio-electronics", "sdr", "digital-mode", "satellite", "propagation", "station-tooling", "other"];
   const parsedBomItems = bomItems(body.bom_items);
@@ -88,7 +97,9 @@ export function validateProject(input, { forSubmission = false, journalMinutes =
   const errors = [];
   if (input.title.length < 2) errors.push("Give the project a name of at least 2 characters.");
   if (input.description.length < 20) errors.push("Describe the project in at least 20 characters.");
-  if (!isGithubRepo(input.repoUrl)) errors.push("Add a public GitHub repository URL.");
+  if (!(input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl))) {
+    errors.push(input.track === "hardware" ? "Add a public Git repository URL (GitHub, GitLab, Codeberg, or another provider)." : "Add a public GitHub repository URL.");
+  }
   if (!input.projectType) errors.push("Choose the kind of ham-radio project you are making.");
   if (input.radioRelevance.length < 40) {
     errors.push("Explain in at least 40 characters how the project directly relates to ham radio.");

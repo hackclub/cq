@@ -492,16 +492,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const timestamp = nowIso();
-    const designMinutes = projectDetails.journals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
-    if (designMinutes <= 0) {
-      setFlash(res, "error", "Add a design devlog before requesting hardware funding.");
-      return res.redirect(`/app/projects/${project.id}#funding`);
-    }
+    const designJournals = await store.list("journal");
+    const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
+    // Older projects may predate design-minute logging; preserve their submitted
+    // estimate for migration while new projects should document design time.
+    const fundingMinutes = designMinutes > 0 ? designMinutes : Math.round(input.estimatedHours * 60);
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
-      requestedHertz: Math.round((designMinutes * 5 / 60) * 100) / 100,
-      designMinutes,
+      requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
+      designMinutes: fundingMinutes,
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
       reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,

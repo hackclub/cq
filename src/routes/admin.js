@@ -12,6 +12,11 @@ function sessionIsActive(session) {
   return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
 }
 
+async function recordProgramFunding(store, id, entry) {
+  const existing = await store.get("program_funding", id);
+  await store.put("program_funding", id, { id, ...existing, ...entry, updatedAt: nowIso() });
+}
+
 async function revokeSessions(store, sessions, actor) {
   const revokedAt = nowIso();
   for (const session of sessions.filter(sessionIsActive)) {
@@ -225,6 +230,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     request.review = { decision, noteToMaker, internalNote, approvedHertz, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
     request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
+    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedHertz, availableUsd: -approvedHertz, status: "allocated", issued: false });
     if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
     await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
     await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
@@ -671,6 +677,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const desiredHertz = decision === "approved"
         ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
         : 0;
+      if (decision === "approved") await recordProgramFunding(store, `hours_${submission.id}`, {
+        type: "approved_hours", sourceId: submission.id, projectId: project.id,
+        approvedMinutes, generatedUsd: desiredHertz, allocatedUsd: 0,
+        availableUsd: desiredHertz, status: "available", createdAt: timestamp,
+      });
       const previousHertz = Math.max(0, Number(existingLedger?.delta) || 0);
       const maker = await store.get("user", project.userId);
       if (maker && desiredHertz !== previousHertz) {

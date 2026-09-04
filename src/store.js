@@ -144,6 +144,7 @@ export const airtableEntityTables = Object.freeze({
   hackatime_token: "Hackatime Tokens",
   hackatime_cache: "Hackatime Cache",
   setting: "Settings",
+  program_funding: "Program Funding",
 });
 
 export function airtableTableName(prefix, type) {
