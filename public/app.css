@@ -1003,6 +1003,13 @@ img {
   width: auto
 }
 
+.hackatime-picker {
+  border: 1px solid var(--line2);
+  padding: 10px;
+}
+.hackatime-picker summary { cursor: pointer; color: var(--ink); }
+.hackatime-picker fieldset { max-height: 240px; overflow-y: auto; margin-top: 10px; }
+
 .checkbox-group, fieldset {
   border: 1px solid var(--line2);
   padding: 12px;

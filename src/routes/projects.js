@@ -496,9 +496,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const timestamp = nowIso();
     const designJournals = await store.list("journal");
     const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
-    // Older projects may predate design-minute logging; preserve their submitted
-    // estimate for migration while new projects should document design time.
-    const fundingMinutes = designMinutes > 0 ? designMinutes : Math.round(input.estimatedHours * 60);
+    if (designMinutes < 1) {
+      setFlash(res, "error", "Log at least one hour of design work in a devlog before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const fundingMinutes = Math.round(designMinutes);
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
