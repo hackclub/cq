@@ -10,10 +10,10 @@ services:
       resources:
         limits:
           cpus: "0.1"
-          memory: 1G
+          memory: 512M
         reservations:
           cpus: "0.05"
-          memory: 256M
+          memory: 128M
     ports:
       - "3000:3000"
     environment:
