@@ -243,6 +243,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   });
 
   router.post("/funding/:id/issue", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const grantIssuers = new Set((config.grantIssuerEmails.length ? config.grantIssuerEmails : config.adminEmails));
+    if (!grantIssuers.has(String(req.user.email || "").toLowerCase())) {
+      setFlash(res, "error", "Only an authorised grant issuer can issue hardware funding.");
+      return res.redirect(`/admin/funding/${req.params.id}`);
+    }
     const request = await store.get("funding_request", req.params.id);
     if (!request) return res.sendStatus(404);
     if (request.status !== "approved") {

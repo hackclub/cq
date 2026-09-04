@@ -48,6 +48,7 @@ function formValues(project) {
     bom: project.bom,
     bom_items: project.bomItems?.length ? JSON.stringify(project.bomItems) : "",
     design_url: project.designUrl,
+    firmware_url: project.firmwareUrl,
     test_plan: project.testPlan,
   };
 }
@@ -96,6 +97,7 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     bom: input.bom,
     bomItems: input.bomItems,
     designUrl: input.designUrl,
+    firmwareUrl: input.firmwareUrl,
     testPlan: input.testPlan,
     createdAt: existing.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -506,7 +508,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       status: "submitted", estimatedHours: input.estimatedHours,
       requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
       designMinutes: fundingMinutes,
-      buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, testPlan: input.testPlan,
+      buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
       reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
       createdAt: timestamp, updatedAt: timestamp,

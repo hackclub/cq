@@ -76,6 +76,7 @@ export function projectInput(body = {}) {
     bom: bomSummary(parsedBomItems, body.bom),
     bomItems: parsedBomItems,
     designUrl: text(body.design_url, 500),
+    firmwareUrl: text(body.firmware_url, 500),
     testPlan: text(body.test_plan, 2000),
   };
 }
