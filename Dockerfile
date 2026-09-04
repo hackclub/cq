@@ -2,11 +2,7 @@ FROM node:20-alpine AS dependencies
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-# Keep npm's download cache in BuildKit between deployments. The AWS SDK makes
-# a cold install relatively large, and Orchard can otherwise mark the builder
-# unhealthy while npm is still downloading packages.
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --no-audit --no-fund --prefer-offline
+RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:20-alpine AS runtime
 
