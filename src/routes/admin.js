@@ -99,6 +99,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const image = await uploadProductImage(cdnClient, req.file);
       return res.json({ image });
     } catch (error) {
+      req.app.locals.logger.error("Shop image upload failed", { name: error.name, code: error.Code || error.code, message: error.message, bucketConfigured: Boolean(cdnClient?.configured?.()) });
       return res.status(503).json({ error: error.message || "The image upload failed." });
     }
   });

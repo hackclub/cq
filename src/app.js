@@ -42,6 +42,7 @@ export async function createApp({
   const hackatime = hackatimeClient ?? createHackatimeClient(config, dataStore);
   const github = githubClient ?? createGitHubClient(config);
   const cdn = cdnClient ?? createCdnClient(config);
+  if (!cdn.configured()) logger.error("R2 image uploads are not configured; shop and project image uploads will return 503.");
   const notifier = slackNotifier ?? createSlackNotifier(config, dataStore);
   const app = express();
 
