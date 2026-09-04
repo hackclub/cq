@@ -20,7 +20,7 @@
     <p class="eyebrow">CQ CQ CQ DE HACK CLUB</p>
     <h1>Build your way onto the air.</h1>
     <p>Build amateur-radio projects, log your work, and earn real equipment. No previous radio experience needed.</p>
-    <% if (launchGate) { %><div class="launch-gate"><strong><%= launchGate.message || 'Coming soon' %></strong><% if (launchGate.until) { %><span>Launches <%= launchGate.until %></span><% } %></div><% } else { %><div class="actions">
+    <% if (launchGate) { %><div class="launch-gate"><strong><%= launchGate.message || 'Coming soon' %></strong><% if (launchGate.until) { %><span class="launch-date">Launches <%= launchGate.until %></span><% } %></div><% } else { %><div class="actions">
       <a href="/auth/login" class="button" data-go="station">TUNE IN</a>
       <button class="button ghost" data-modal="about">PROGRAM INFO</button>
     </div><% } %>

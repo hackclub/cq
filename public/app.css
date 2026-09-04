@@ -583,6 +583,11 @@ img {
   display: block;
 }
 
+.launch-gate .launch-date {
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
 .launch-gate span {
   color: #a2a7a3;
 }
