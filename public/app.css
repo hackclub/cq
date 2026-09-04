@@ -571,6 +571,22 @@ img {
   margin-top: 18px
 }
 
+.launch-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.launch-gate strong,
+.launch-gate span {
+  display: block;
+}
+
+.launch-gate span {
+  color: #a2a7a3;
+}
+
 .sponsor-credit {
   margin-top: 13px !important;
   font-size: 8px !important;
