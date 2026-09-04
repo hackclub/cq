@@ -83,7 +83,6 @@ export function projectInput(body = {}) {
 export function validateFundingRequest(input) {
   const errors = [];
   if (input.track !== "hardware") errors.push("Only hardware projects can request build funding.");
-  if (!Number.isFinite(input.estimatedHours) || input.estimatedHours < 1) errors.push("Estimate at least one hour of build work.");
   if (input.buildPlan.length < 40) errors.push("Add a build plan with at least 40 characters.");
   if (input.bomItems?.length) {
     if (!input.bomItems.some((item) => item.name && item.quantity > 0 && item.link && isHttpUrl(item.link))) errors.push("Add at least one BOM part with a quantity and supplier link.");
