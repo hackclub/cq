@@ -12,6 +12,11 @@ function sessionIsActive(session) {
   return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
 }
 
+async function recordProgramFunding(store, id, entry) {
+  const existing = await store.get("program_funding", id);
+  await store.put("program_funding", id, { id, ...existing, ...entry, updatedAt: nowIso() });
+}
+
 async function revokeSessions(store, sessions, actor) {
   const revokedAt = nowIso();
   for (const session of sessions.filter(sessionIsActive)) {
@@ -94,6 +99,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const image = await uploadProductImage(cdnClient, req.file);
       return res.json({ image });
     } catch (error) {
+      req.app.locals.logger.error("Shop image upload failed", { name: error.name, code: error.Code || error.code, message: error.message, bucketConfigured: Boolean(cdnClient?.configured?.()) });
       return res.status(503).json({ error: error.message || "The image upload failed." });
     }
   });
@@ -123,6 +129,21 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       lowStock: products.filter((item) => item.stock <= 10).sort((a, b) => a.stock - b.stock),
       reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });
+  });
+
+  router.get("/settings", requirePermission("users.manage"), async (req, res) => {
+    const launchGate = await store.get("setting", "launch_gate") || { enabled: false, message: "Coming soon", until: "" };
+    const program = await store.get("setting", "program") || {};
+    res.render("admin/settings", { title: "Organizer settings", launchGate, program });
+  });
+
+  router.post("/settings", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const launchGate = { id: "launch_gate", enabled: req.body.launch_gate === "on", message: String(req.body.message || "Coming soon").trim().slice(0, 120), until: String(req.body.until || "").trim().slice(0, 80), updatedAt: nowIso() };
+    await store.put("setting", "launch_gate", launchGate);
+    await store.put("setting", "program", { id: "program", loginNotice: String(req.body.login_notice || "").trim().slice(0, 500), shopClosed: req.body.shop_closed === "on", shopMessage: String(req.body.shop_message || "").trim().slice(0, 200), submissionsClosed: req.body.submissions_closed === "on", submissionsMessage: String(req.body.submissions_message || "").trim().slice(0, 200), updatedAt: nowIso() });
+    await writeAudit(store, req.user, { action: "settings.launch_gate", entityType: "setting", entityId: "launch_gate", summary: `${launchGate.enabled ? "Enabled" : "Disabled"} the homepage launch gate.`, after: launchGate });
+    setFlash(res, "success", "Homepage launch setting saved.");
+    res.redirect("/admin/settings");
   });
 
   router.get("/funding", requirePermission("projects.review"), async (req, res) => {
@@ -212,6 +233,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     request.review = { decision, noteToMaker, internalNote, approvedHertz, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
     request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
+    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedHertz, availableUsd: -approvedHertz, status: "allocated", issued: false });
     if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
     await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
     await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
@@ -221,6 +243,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   });
 
   router.post("/funding/:id/issue", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const grantIssuers = new Set((config.grantIssuerEmails.length ? config.grantIssuerEmails : config.adminEmails));
+    if (!grantIssuers.has(String(req.user.email || "").toLowerCase())) {
+      setFlash(res, "error", "Only an authorised grant issuer can issue hardware funding.");
+      return res.redirect(`/admin/funding/${req.params.id}`);
+    }
     const request = await store.get("funding_request", req.params.id);
     if (!request) return res.sendStatus(404);
     if (request.status !== "approved") {
@@ -658,6 +685,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const desiredHertz = decision === "approved"
         ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
         : 0;
+      if (decision === "approved") await recordProgramFunding(store, `hours_${submission.id}`, {
+        type: "approved_hours", sourceId: submission.id, projectId: project.id,
+        approvedMinutes, generatedUsd: desiredHertz, allocatedUsd: 0,
+        availableUsd: desiredHertz, status: "available", createdAt: timestamp,
+      });
       const previousHertz = Math.max(0, Number(existingLedger?.delta) || 0);
       const maker = await store.get("user", project.userId);
       if (maker && desiredHertz !== previousHertz) {

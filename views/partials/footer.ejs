@@ -15,7 +15,7 @@
           <a href="/#rewards"><b>F3</b>REWARDS</a>
           <a href="/#radio"><b>F4</b>RADIO</a>
           <a href="/#safety"><b>F5</b>SAFETY</a>
-          <a href="/auth/login"><b>F6</b>SIGN IN</a>
+          <% if (typeof launchGate === 'undefined' || !launchGate || !launchGate.enabled) { %><a href="/auth/login"><b>F6</b>SIGN IN</a><% } else { %><a href="/#how"><b>F6</b>INFO</a><% } %>
         <% } %>
       </nav>
       <footer class="status" aria-hidden="true">

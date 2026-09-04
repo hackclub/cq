@@ -26,6 +26,14 @@ async function activeCountries(store) {
 export function shopRoutes({ store, notifier }) {
   const router = Router();
   router.use(requireAuth);
+  router.use(async (req, res, next) => {
+    const settings = await store.get("setting", "program");
+    if (settings?.shopClosed && !req.path.startsWith("/orders")) {
+      setFlash(res, "error", settings.shopMessage || "The CQ shop is temporarily closed.");
+      return res.redirect("/app");
+    }
+    next();
+  });
 
   router.get("/", async (req, res) => {
     const products = (await store.list("product")).filter((product) => product.active).sort((a, b) => a.sortOrder - b.sortOrder);

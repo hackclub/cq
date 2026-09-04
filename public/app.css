@@ -571,6 +571,27 @@ img {
   margin-top: 18px
 }
 
+.launch-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.launch-gate strong,
+.launch-gate span {
+  display: block;
+}
+
+.launch-gate .launch-date {
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+.launch-gate span {
+  color: #a2a7a3;
+}
+
 .sponsor-credit {
   margin-top: 13px !important;
   font-size: 8px !important;
@@ -771,9 +792,12 @@ img {
 }
 
 .product-img img {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
+  object-position: center;
   filter: saturate(.65)
 }
 
@@ -978,6 +1002,13 @@ img {
 .checkbox-field input, .checkbox-group input, .hackatime-option input {
   width: auto
 }
+
+.hackatime-picker {
+  border: 1px solid var(--line2);
+  padding: 10px;
+}
+.hackatime-picker summary { cursor: pointer; color: var(--ink); }
+.hackatime-picker fieldset { max-height: 240px; overflow-y: auto; margin-top: 10px; }
 
 .checkbox-group, fieldset {
   border: 1px solid var(--line2);

@@ -39,6 +39,10 @@ export function getConfig(overrides = {}) {
       .split(",")
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
+    grantIssuerEmails: String(overrides.grantIssuerEmails ?? process.env.GRANT_ISSUER_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
     slackBotToken: overrides.slackBotToken ?? process.env.SLACK_BOT_TOKEN ?? "",
     slackAdminChannelId: overrides.slackAdminChannelId ?? process.env.SLACK_ADMIN_CHANNEL_ID ?? "",
     slackSecurityUserId: overrides.slackSecurityUserId ?? process.env.SLACK_SECURITY_USER_ID ?? "",

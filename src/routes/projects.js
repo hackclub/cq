@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { writeAudit } from "../audit.js";
-import { requireAuth, requireCsrf } from "../auth.js";
+import { hasPermission, requireAuth, requireCsrf } from "../auth.js";
 import { buildAriPayload } from "../ari.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { isHttpUrl, projectInput, validateFundingRequest, validateProject } from "../validation.js";
@@ -48,6 +48,7 @@ function formValues(project) {
     bom: project.bom,
     bom_items: project.bomItems?.length ? JSON.stringify(project.bomItems) : "",
     design_url: project.designUrl,
+    firmware_url: project.firmwareUrl,
     test_plan: project.testPlan,
   };
 }
@@ -96,6 +97,7 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     bom: input.bom,
     bomItems: input.bomItems,
     designUrl: input.designUrl,
+    firmwareUrl: input.firmwareUrl,
     testPlan: input.testPlan,
     createdAt: existing.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -266,14 +268,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       store.list("project"),
       store.list("journal"),
     ]);
-    const projects = allProjects
-      .filter((project) => project.userId === req.user.id && project.status !== "archived")
+    const scope = ["active", "all", "archived"].includes(req.query.view) ? req.query.view : "active";
+    const mine = allProjects.filter((project) => project.userId === req.user.id);
+    const projects = mine
+      .filter((project) => scope === "all" || (scope === "archived" ? project.status === "archived" : project.status !== "archived"))
       .map((project) => ({
         ...project,
         journalMinutes: journals.filter((item) => item.projectId === project.id).reduce((sum, item) => sum + item.minutes, 0),
       }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    res.render("projects/index", { title: "Your projects", projects });
+    res.render("projects/index", { title: "Your projects", projects, scope, counts: { active: mine.filter((p) => p.status !== "archived").length, all: mine.length, archived: mine.filter((p) => p.status === "archived").length } });
   });
 
   router.get("/new", async (req, res) => {
@@ -492,11 +496,19 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const timestamp = nowIso();
+    const designJournals = await store.list("journal");
+    const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
+    if (designMinutes < 1) {
+      setFlash(res, "error", "Log design work in a devlog before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const fundingMinutes = Math.round(designMinutes);
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
-      requestedHertz: Math.round(input.estimatedHours * 5 * 100) / 100,
-      buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, testPlan: input.testPlan,
+      requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
+      designMinutes: fundingMinutes,
+      buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
       reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
       createdAt: timestamp, updatedAt: timestamp,
@@ -517,6 +529,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.post("/:id/submit", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    const programSettings = await store.get("setting", "program");
+    if (programSettings?.submissionsClosed && !hasPermission(req.user, "users.manage")) {
+      setFlash(res, "error", programSettings.submissionsMessage || "Project submissions are temporarily closed.");
+      return res.redirect(`/app/projects/${project.id}#submission`);
+    }
     const projectDetails = await details(store, project.id);
     if (project.status === "rejected") {
       setFlash(res, "error", "A denied project cannot be resubmitted unless an organizer reopens it.");

@@ -10,7 +10,7 @@
       <section class="panel cart-list">
         <% cart.items.forEach((item) => { %>
           <article>
-            <img src="<%= item.image %>" alt="">
+            <img src="<%= item.image || '/assets/radio_img.png' %>" alt="">
             <div><strong><%= item.name %></strong><span><%= item.price %> hertz each</span></div>
             <form method="post" action="/app/shop/cart/<%= item.id %>/update">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
