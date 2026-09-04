@@ -1,0 +1,46 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">FULFILMENT BUFFER</span><h1>Your cart</h1></div><a class="button ghost headright" href="/app/shop">← Shop</a></header>
+  <div class="appbody">
+  <% if (errors.length) { %><div class="form-errors" role="alert"><strong>Checkout needs attention:</strong><ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div><% } %>
+  <% if (!cart.items.length) { %>
+    <div class="panel empty-state"><img src="/assets/radio_img.png" alt=""><h2>Your cart is quiet.</h2><p>Approved hours turn into hertz you can spend on real radio gear.</p><a class="button button-primary" href="/app/shop">Browse the shop</a></div>
+  <% } else { %>
+    <div class="checkout-layout">
+      <section class="panel cart-list">
+        <% cart.items.forEach((item) => { %>
+          <article>
+            <img src="<%= item.image %>" alt="">
+            <div><strong><%= item.name %></strong><span><%= item.price %> hertz each</span></div>
+            <form method="post" action="/app/shop/cart/<%= item.id %>/update">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <label><span class="sr-only">Quantity</span><input type="number" name="quantity" min="0" max="10" value="<%= item.quantity %>"></label>
+              <button class="text-button" type="submit">Update</button>
+            </form>
+            <strong><%= item.lineTotal %> hertz</strong>
+          </article>
+        <% }) %>
+        <div class="cart-total"><span>Total</span><strong><%= cart.total %> hertz</strong></div>
+        <p class="balance-note">Balance after order: <strong><%= Number((Number(user.hertz) - Number(cart.total)).toFixed(2)) %> hertz</strong></p>
+      </section>
+      <form class="panel form-stack" method="post" action="/app/shop/checkout">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div><p class="eyebrow">Shipping</p><h2>Where should it go?</h2><p class="field-help">Use the address where you can receive your order.</p></div>
+        <label>Full name<input name="shipping_name" value="<%= values.shipping_name || '' %>" required></label>
+        <label>Address line 1<input name="address_line_1" value="<%= values.address_line_1 || '' %>" required></label>
+        <label>Address line 2 <span class="optional">optional</span><input name="address_line_2" value="<%= values.address_line_2 || '' %>"></label>
+        <div class="form-grid">
+          <label>City<input name="city" value="<%= values.city || '' %>" required></label>
+          <label>State / region<input name="region" value="<%= values.region || '' %>" required></label>
+          <label>Postal code<input name="postal_code" value="<%= values.postal_code || '' %>" required></label>
+          <label>Country or territory<select name="country_code" required><option value="">Choose your location</option><% countries.forEach((country) => { %><option value="<%= country.code %>" <%= values.country_code === country.code ? 'selected' : '' %>><%= country.name %> · <%= statusLabel(country.fulfilmentMode) %></option><% }) %></select></label>
+        </div>
+        <p class="field-help">Radio availability, ownership and import requirements vary. Transmitting radios also require CQ's readiness check before fulfilment. The organizer will review your location and contact you if the item, grant, or shipping route needs a manual check.</p>
+        <label>Notes <span class="optional">optional</span><textarea name="notes" rows="2"><%= values.notes || '' %></textarea></label>
+        <button class="button button-primary" type="submit" <%= cart.total > user.hertz ? 'disabled' : '' %>>Place order · <%= cart.total %> Hz</button>
+      </form>
+    </div>
+  <% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

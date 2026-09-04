@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / PROJECT BANK</span><h1>Projects</h1></div><div class="readout headright"><span>TOTAL</span><b><%= projects.length %></b></div></header>
+  <div class="appbody admin-body">
+  <%- include('nav') %>
+  <div class="panel table-wrap">
+    <table>
+      <thead><tr><th>Project</th><th>Maker</th><th>Review</th><th>Updated</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% projects.forEach((item) => { %>
+          <tr>
+            <td><a href="/admin/projects/<%= item.id %>"><strong><%= item.title %></strong></a><small><%= item.description %> · <a href="<%= item.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></small></td>
+            <td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || '' %></small></td>
+            <td><%= item.latestSubmission ? statusLabel(item.latestSubmission.phase) : 'Not submitted' %><small><%= item.latestSubmission?.ariId || '' %></small></td>
+            <td><%= formatDate(item.updatedAt) %></td>
+            <td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span></td>
+            <td><% if (item.latestSubmission) { %><a class="button button-small" href="/admin/reviews/<%= item.latestSubmission.id %>"><%= item.latestSubmission.phase === 'second_pass' ? 'Second pass' : 'Open review' %></a><% } else { %><span class="empty-inline">—</span><% } %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

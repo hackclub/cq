@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <% const reviewData = submission.firstPass || submission.review || {}; const awaitingSecondPass = submission.phase === 'second_pass' && !submission.decision; const canSecondPass = hasPermission(user, 'reviews.second_pass'); %>
+  <header class="apphead"><div><span class="eyebrow">REVIEW / <%= submission.id %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
+  <div class="appbody admin-body"><%- include('nav') %>
+  <div class="review-workspace">
+    <div class="project-main-column">
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Submission</p><h2>What to verify</h2></div><span class="status-pill status-<%= submission.decision || submission.phase %>"><%= statusLabel(submission.decision || submission.phase) %></span></div>
+        <dl class="admin-detail-list">
+          <div><dt>Maker</dt><dd><%= maker?.name || 'Unknown' %> · <%= maker?.email || '' %></dd></div>
+          <div><dt>Type</dt><dd><%= statusLabel(project.track) %> · <%= statusLabel(project.projectType) %></dd></div>
+          <div><dt>Radio relevance</dt><dd><%= project.radioRelevance %></dd></div>
+          <div><dt>Hackatime projects</dt><dd><%= project.hackatimeProjects.join(', ') || 'None linked' %></dd></div>
+          <div><dt>Country</dt><dd><%= country?.name || project.countryCode %></dd></div>
+          <div><dt>Logged time</dt><dd><strong><%= Math.round((loggedMinutes / 60) * 100) / 100 %> hours</strong> (<%= loggedMinutes %> minutes)</dd></div>
+          <div><dt>AI statement</dt><dd><%= project.aiStatement || 'None supplied' %></dd></div>
+        </dl>
+      </section>
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Repository evidence</p><h2>GitHub activity</h2></div><strong><%= github.available ? `${github.commits.length} recent commits` : 'Unavailable' %></strong></div>
+        <% if (!github.available) { %>
+          <div class="readiness-list"><strong>GitHub could not be checked automatically.</strong><p><%= github.error %></p><p>Open the repository manually before making a decision.</p></div>
+        <% } else { %>
+          <dl class="admin-detail-list repository-summary">
+            <div><dt>Repository</dt><dd><strong><%= github.slug %></strong><%= github.description ? ` · ${github.description}` : '' %></dd></div>
+            <div><dt>Default branch</dt><dd><code><%= github.defaultBranch %></code></dd></div>
+            <div><dt>Last push</dt><dd><%= formatDateTime(github.pushedAt) %></dd></div>
+            <div><dt>Licence</dt><dd><%= github.license %></dd></div>
+            <div><dt>Flags</dt><dd><%= github.fork ? 'Fork' : 'Original repository' %><%= github.archived ? ' · Archived' : '' %></dd></div>
+          </dl>
+          <div class="commit-list">
+            <% github.commits.forEach((commit) => { %><a href="<%= commit.url %>" target="_blank" rel="noreferrer"><code><%= commit.sha %></code><span><strong><%= commit.message %></strong><small><%= commit.author %> · <%= formatDateTime(commit.date) %><%= commit.verified ? ' · verified' : '' %></small></span></a><% }) %>
+          </div>
+          <% if (!github.commits.length) { %><p class="empty-inline">No commits were returned for the default branch.</p><% } %>
+        <% } %>
+      </section>
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Devlog</h2></div><strong><%= journals.length %> updates</strong></div>
+        <% if (!journals.length) { %><p class="empty-inline">No devlogs were attached.</p><% } %>
+        <div class="journal-list"><% journals.forEach((journal) => { const images = journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : []); %><article><header><h3><%= journal.title || 'Project update' %></h3><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((url) => { %><a class="journal-image" href="<%= url %>" target="_blank" rel="noreferrer"><img src="<%= url %>" alt="Progress evidence" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div></article><% }) %></div>
+      </section>
+      <% if (actions.length) { %><section class="panel"><div class="panel-heading"><h2>Audit trail</h2></div><div class="compact-list"><% actions.forEach((action) => { %><div><span><strong><%= action.reviewerName %> · <%= statusLabel(action.action) %></strong><small><%= action.internalNote || action.noteToMaker || '' %></small></span><time><%= formatDateTime(action.createdAt) %></time></div><% }) %></div></section><% } %>
+    </div>
+    <aside class="project-sidebar">
+      <section class="panel compact-panel"><p class="eyebrow">Assignment</p><strong><%= reviewers.find((item) => item.id === submission.assignedReviewerId)?.name || 'Unclaimed' %></strong><form method="post" action="/admin/reviews/<%= submission.id %>/claim"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="<%= submission.assignedReviewerId === user.id ? 'release' : 'claim' %>"><button class="button button-ghost" type="submit"><%= submission.assignedReviewerId === user.id ? 'Release' : submission.assignedReviewerId ? 'Take over' : 'Claim review' %></button></form></section>
+      <% if (!submission.decision && (!awaitingSecondPass || canSecondPass)) { %><form method="post" action="/admin/reviews/<%= submission.id %>/decision" class="panel form-stack review-decision-form" data-review-form data-review-id="<%= submission.id %>" data-review-stage="<%= awaitingSecondPass ? 'second' : 'first' %>">
+        <div><p class="eyebrow"><%= awaitingSecondPass ? 'Second pass' : 'First pass' %></p><h2><%= awaitingSecondPass ? 'Double-check review' : 'Complete review' %></h2><p><a href="https://hackclub.gitbook.io/ysws-project-submission-guidelines/BLBRN8LIfoCZhFV6oMNR" target="_blank" rel="noreferrer">Open the current YSWS review policy ↗</a></p></div>
+        <fieldset class="review-checklist"><legend>YSWS approval checks</legend><label><input type="checkbox" name="radio_related" value="1" <%= reviewData.criteria?.radioRelated ? 'checked' : '' %>> Genuinely related to amateur radio</label><label><input type="checkbox" name="shipped" value="1" <%= reviewData.criteria?.shipped ? 'checked' : '' %>> Working MVP with a public demo/download/video requiring under two minutes of setup</label><label><input type="checkbox" name="public_source" value="1" <%= reviewData.criteria?.publicSource ? 'checked' : '' %>> Public source, useful README, and incremental commits</label><label><input type="checkbox" name="reproducible" value="1" <%= reviewData.criteria?.reproducible ? 'checked' : '' %>> Reproducible; hardware includes applicable BOM, schematic/wiring, editable CAD, and firmware</label><label><input type="checkbox" name="evidence_sufficient" value="1" <%= reviewData.criteria?.evidenceSufficient ? 'checked' : '' %>> Screenshot, repository, Hackatime, and devlogs match the claimed work</label><label><input type="checkbox" name="eligible_work" value="1" <%= reviewData.criteria?.eligibleWork ? 'checked' : '' %>> Original/attributed work; not a school assignment or paid Hack Club work</label><label><input type="checkbox" name="distinct_hours" value="1" <%= reviewData.criteria?.distinctHours ? 'checked' : '' %>> Hours are genuine and not previously rewarded; when uncertain, reduced to supported time</label></fieldset>
+        <label>Technical review notes<textarea name="technical_note" rows="5" maxlength="3000"><%= reviewData.technical_note || '' %></textarea><small>Required for approval. Record the concrete features and evidence you checked.</small></label>
+        <label>Approved minutes<input type="number" name="approved_minutes" min="0" max="<%= loggedMinutes %>" step="1" value="<%= reviewData.approved_minutes ?? loggedMinutes %>"><small>Cannot exceed the <%= loggedMinutes %> whole minutes evidenced in devlogs.</small></label>
+        <label>Time adjustment reason<textarea name="time_note" rows="3" maxlength="2000"><%= reviewData.time_note || '' %></textarea><small>Explain any reduction from the evidenced Hackatime total.</small></label>
+        <label>Message to participant<textarea name="note_to_maker" rows="5" maxlength="3000"><%= reviewData.note_to_maker || '' %></textarea><small>Required when returning for changes or denying.</small></label>
+        <label>Private reviewer notes<textarea name="internal_note" rows="4" maxlength="3000"><%= reviewData.internal_note || '' %></textarea><small>Only organizers can see this.</small></label>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% if (awaitingSecondPass) { %><input type="hidden" name="second_pass" value="1"><% } %><div class="review-decision-actions"><p><%= awaitingSecondPass ? 'Confirm the final outcome after checking the first-pass work.' : 'Choose an outcome to send this complete assessment to second pass.' %></p><div><button class="button button-primary" type="submit" name="decision" value="approved"><%= awaitingSecondPass ? 'Confirm approval' : 'Approve' %></button><button class="button button-ghost" type="submit" name="decision" value="changes">Request changes</button><button class="button button-danger" type="submit" name="decision" value="rejected">Deny</button></div></div>
+      </form><% } else if (awaitingSecondPass) { %><section class="panel compact-panel"><p class="eyebrow">Second pass</p><strong>Awaiting an admin or second-pass reviewer</strong><p>First pass was completed by <%= submission.firstPass?.reviewer_name || 'a reviewer' %>. A different person must confirm the decision.</p></section><% } %>
+    </aside>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

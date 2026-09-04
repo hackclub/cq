@@ -1,0 +1,9 @@
+<%- include('partials/head') %>
+<main id="main" class="error-main shell">
+  <div class="error-signal" aria-hidden="true">··· — — — ···</div>
+  <p class="eyebrow">CQ / NO CONTACT</p>
+  <h1><%= title %></h1>
+  <p><%= message %></p>
+  <a class="button button-primary" href="<%= user ? '/app' : '/' %>">Return to CQ</a>
+</main>
+<%- include('partials/footer') %>

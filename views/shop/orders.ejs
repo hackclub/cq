@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">FULFILMENT LOG</span><h1><%= order ? `Order ${order.id}` : 'Your orders' %></h1></div><a class="button ghost headright" href="/app/shop">← Shop</a></header>
+  <div class="appbody">
+  <% if (order) { %>
+    <section class="panel order-detail">
+      <div class="order-status-line"><span class="status-pill status-<%= order.status %>"><%= statusLabel(order.status) %></span><span><%= formatDateTime(order.createdAt) %></span><strong><%= order.total %> hertz</strong></div>
+      <div class="order-items"><% items.forEach((item) => { %><div><span><%= item.quantity %> × <%= item.name %></span><strong><%= item.unitPrice * item.quantity %> hertz</strong></div><% }) %></div>
+      <% if (order.trackingUrl) { %><a class="button button-primary" href="<%= order.trackingUrl %>" target="_blank" rel="noreferrer">Track shipment ↗</a><% } %>
+      <div class="shipping-summary"><strong>Ships to</strong><p><%= order.shipping.shippingName %><br><%= order.shipping.addressLine1 %><% if (order.shipping.addressLine2) { %><br><%= order.shipping.addressLine2 %><% } %><br><%= order.shipping.city %>, <%= order.shipping.region %> <%= order.shipping.postalCode %><br><%= order.shipping.country %></p></div>
+      <% if (order.shipping.countryPolicy) { %><div class="config-note"><strong>Fulfilment:</strong> <%= order.shipping.countryPolicy.fulfilmentNote %></div><% } %>
+    </section>
+  <% } else if (!orders.length) { %>
+    <div class="panel empty-state"><h2>No orders yet.</h2><p>When your work is approved, use your hertz here.</p><a class="button button-primary" href="/app/shop">Browse the shop</a></div>
+  <% } else { %>
+    <div class="panel table-wrap"><table><thead><tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th></tr></thead><tbody><% orders.forEach((item) => { %><tr><td><a href="/app/shop/orders/<%= item.id %>"><%= item.id %></a></td><td><%= formatDate(item.createdAt) %></td><td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span></td><td><%= item.total %> hertz</td></tr><% }) %></tbody></table></div>
+  <% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<main id="main" class="auth-main shell">
+  <section class="auth-card">
+    <p class="eyebrow">Organizer setup</p>
+    <h1>Hack Club sign-in is almost connected.</h1>
+    <p>Add the Hack Club Auth client ID, client secret, and callback URL to the server environment, then restart CQ.</p>
+    <code><%= config.baseUrl %>/auth/callback</code>
+    <% if (devAuthBypass) { %>
+      <hr>
+      <h2>Local preview</h2>
+      <form method="post" action="/auth/dev-login" class="form-stack">
+        <input type="hidden" name="return_to" value="<%= returnTo %>">
+        <label>Name<input name="name" value="Radio Maker" required></label>
+        <label>Email<input type="email" name="email" value="radio-maker@example.com" required></label>
+        <button class="button button-primary" type="submit">Enter local preview</button>
+      </form>
+    <% } %>
+  </section>
+</main>
+<%- include('../partials/footer') %>

@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
+    <div><span class="eyebrow">YOUR STATION</span><h1>Good to hear you, <%= user.name.split(' ')[0] %>.</h1></div>
+    <div class="headright"><div class="readout"><span>HERTZ BALANCE</span><b><%= Number(user.hertz).toFixed(3) %></b></div><a class="button" href="/app/projects/new">+ New project</a></div>
+  </header>
+  <div class="appbody">
+    <div class="stats">
+      <div class="stat"><label>PROJECTS ON AIR</label><strong><%= String(stats.projectCount || 0).padStart(3, '0') %></strong></div>
+      <div class="stat"><label>APPROVED</label><strong><%= String(stats.approvedCount || 0).padStart(3, '0') %></strong></div>
+      <div class="stat"><label>HERTZ BALANCE</label><strong><%= Number(user.hertz).toFixed(3) %></strong></div>
+      <div class="stat"><label>EARN RATE</label><strong>5 Hz/hr</strong></div>
+    </div>
+    <div class="sectionlabel">ACTIVE SIGNALS / RECENT PROJECTS</div>
+    <% if (!projects.length) { %><div class="empty-screen"><div><h2>NO PROJECT SIGNALS</h2><p>Start an antenna, radio circuit, SDR experiment, digital mode, or ham-radio software tool.</p><a class="button" href="/app/projects/new">Create project</a></div></div><% } else { %>
+      <div class="rows"><% projects.forEach((project) => { %><a class="row" href="/app/projects/<%= project.id %>"><i class="sig"></i><div><b><%= project.title %></b><br><span><%= project.description %></span></div><span><%= Math.round(project.journalMinutes / 6) / 10 %> h logged</span><em class="tag"><%= statusLabel(project.status) %></em><b class="arrow">›</b></a><% }) %></div>
+    <% } %>
+    <% if (latestOrder) { %><div class="sectionlabel">LATEST ORDER</div><div class="rows"><a class="row" href="/app/shop/orders/<%= latestOrder.id %>"><i class="sig"></i><b><%= latestOrder.id %></b><span><%= formatDate(latestOrder.createdAt) %> / <%= latestOrder.total %> HZ</span><em class="tag"><%= statusLabel(latestOrder.status) %></em><b class="arrow">›</b></a></div><% } %>
+  </div>
+</section>
+<%- include('partials/footer') %>

@@ -1,0 +1,39 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / INVENTORY</span><h1>Shop inventory</h1></div><div class="readout headright"><span>PRODUCTS</span><b><%= products.length %></b></div></header>
+  <div class="appbody admin-body">
+  <%- include('nav') %>
+  <section class="panel">
+    <div class="panel-heading"><h2>Add product</h2></div>
+    <form method="post" action="/admin/shop" class="inventory-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input name="name" placeholder="Product name" required>
+      <input name="category" placeholder="Category" required>
+      <input type="number" name="price" min="0" placeholder="Hertz" required>
+      <input type="number" name="stock" min="0" placeholder="Stock" required>
+      <div class="shop-image-upload" data-shop-image-upload><span>Product image</span><input type="hidden" name="image" value="" data-shop-image-url><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-shop-image-file <%= imageUploadsConfigured ? '' : 'disabled' %>><small data-shop-image-status><%= imageUploadsConfigured ? 'Choose a JPG, PNG, WebP, or GIF up to 8 MB.' : 'Image uploads need R2 configuration.' %></small><div class="shop-image-preview" data-shop-image-preview></div></div>
+      <input type="number" name="sort_order" value="100" placeholder="Sort">
+      <textarea name="description" placeholder="Description" required></textarea>
+      <label class="checkbox-field"><input type="checkbox" name="active" value="1" checked> Active</label>
+      <button class="button button-primary" type="submit">Add product</button>
+    </form>
+  </section>
+  <div class="inventory-grid">
+    <% products.forEach((item) => { %>
+      <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <img src="<%= item.image %>" alt="">
+        <label>Name<input name="name" value="<%= item.name %>" required></label>
+        <label>Category<input name="category" value="<%= item.category %>" required></label>
+        <div class="form-grid"><label>Price<input type="number" name="price" min="0" value="<%= item.price %>" required></label><label>Stock<input type="number" name="stock" min="0" value="<%= item.stock %>" required></label></div>
+        <div class="shop-image-upload" data-shop-image-upload><span>Replace product image</span><input type="hidden" name="image" value="<%= item.image %>" data-shop-image-url><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-shop-image-file <%= imageUploadsConfigured ? '' : 'disabled' %>><small data-shop-image-status><%= imageUploadsConfigured ? 'Choose a new image, or leave this empty to keep the current one.' : 'Image uploads need R2 configuration.' %></small><div class="shop-image-preview" data-shop-image-preview></div></div>
+        <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
+        <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
+        <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
+        <button class="button button-primary" type="submit">Save product</button>
+      </form>
+    <% }) %>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

@@ -1,0 +1,11 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">MEMORY BANK / PROJECTS</span><h1>Active signals</h1></div><div class="headright"><a class="button" href="/app/projects/new">+ New project</a></div></header>
+  <div class="appbody">
+    <div class="shoptools"><span class="filter active">ALL / <%= String(projects.length).padStart(2, '0') %></span></div>
+    <% if (!projects.length) { %><div class="empty-screen"><div><h2>NO PROJECTS STORED</h2><p>Build a listening setup, antenna, APRS tracker, RF circuit, SDR experiment, or ham-radio software tool.</p><a class="button" href="/app/projects/new">Create project</a></div></div><% } else { %>
+      <div class="rows"><% projects.forEach((project) => { %><a class="row" href="/app/projects/<%= project.id %>"><i class="sig"></i><div><b><%= project.title %></b><br><span><%= project.description %></span></div><span><%= Math.round(project.journalMinutes / 6) / 10 %> h logged / <%= project.track %></span><em class="tag"><%= statusLabel(project.status) %></em><b class="arrow">›</b></a><% }) %></div>
+    <% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

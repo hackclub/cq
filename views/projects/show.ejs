@@ -1,0 +1,123 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
+    <div>
+      <span class="eyebrow">PROJECT / <%= project.id %> / <%= statusLabel(project.status) %></span>
+      <h1><%= project.title %></h1>
+    </div>
+    <div class="headright">
+      <a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a>
+      <% if (!projectLocked) { %><a class="button button-primary" href="/app/projects/<%= project.id %>/edit">Edit project</a><% } else { %><span class="status-pill status-submitted">Shipped version locked</span><% } %>
+    </div>
+  </header>
+
+  <div class="appbody"><div class="project-layout">
+    <div class="project-main-column">
+      <% if (project.track === 'hardware') { const funding = fundingRequests[0]; %><section class="panel submission-panel" id="funding">
+        <div class="panel-heading"><div><p class="eyebrow">Before the build</p><h2>Hardware funding</h2><p>Send your design, parts list, and build estimate for review before buying parts.</p></div><span class="review-mark">5 Hz/hr</span></div>
+        <% if (funding) { %><div class="submission-status"><div><small>REQUEST</small><strong><%= statusLabel(funding.status) %></strong><span>$<%= Number(funding.requestedHertz).toFixed(2) %> funding · <%= funding.estimatedHours %> estimated hours</span></div><div><small>UPDATED</small><strong><%= formatDate(funding.updatedAt) %></strong><span><%= funding.review?.noteToMaker || funding.review?.note_to_maker || 'The CQ team will update you here.' %></span></div></div><% if (funding.status === 'issued') { %><div class="ready-banner"><span>✓</span><div><strong>Funding issued — build time</strong><p>Document your progress, then ship the finished hardware project for its final review and Hertz rewards.</p></div></div><% } %><% } else { %><div class="readiness-list"><strong>Prepare your request in Edit project:</strong><ul><li>Estimated build hours</li><li>Build plan and test plan</li><li>Bill of materials with supplier links</li><li>Public schematic, CAD, PCB, or design link</li></ul></div><div class="button-row"><a class="button button-ghost" href="/app/projects/<%= project.id %>/edit">Edit funding plan</a><form method="post" action="/app/projects/<%= project.id %>/funding/submit" data-confirm="Send this design and funding request for review?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-primary" type="submit">Send funding request</button></form></div><% } %>
+      </section><% } %>
+      <section class="panel" id="work-log">
+        <div class="panel-heading devlog-heading"><div><p class="eyebrow">Build story</p><h2>Devlog</h2><p>Post concrete progress as you make it. Every entry needs visual evidence.</p></div><div class="devlog-total"><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %></strong><span>hours logged</span></div></div>
+        <details class="devlog-composer" <%= !journals.length ? 'open' : '' %>>
+          <summary><span><b>＋</b><strong>Add a progress update</strong></span><small>Markdown<%= project.track === 'software' ? ', Hackatime and images' : ' and images' %></small></summary>
+          <form method="post" action="/app/projects/<%= project.id %>/journals" class="journal-form" data-devlog-form data-activity-ready="<%= project.track === 'hardware' || hackatimeActivity.ready ? 'true' : 'false' %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="journal-title">Update title<input name="title" minlength="3" maxlength="120" required placeholder="Tuned the antenna for 2 m"></label>
+            <% if (project.track === 'software') { %><div class="hackatime-earned <%= hackatimeActivity.ready ? 'ready' : '' %>"><span aria-hidden="true">◷</span><div><strong><%= hackatimeActivity.ready ? `${hackatimeActivity.minutes} new minute${hackatimeActivity.minutes === 1 ? '' : 's'} ready to log` : 'Waiting for new Hackatime activity' %></strong><p><%= hackatimeActivity.ready ? `Counted from ${project.hackatimeProjects.join(', ')} since the last devlog.` : hackatimeActivity.reason %></p></div></div><% } else { %><div class="hackatime-earned ready"><span aria-hidden="true">⌁</span><div><strong>Document the build as it progresses</strong><p>Hardware devlogs are visual build notes; they do not add or spend Hertz.</p></div></div><% } %>
+            <label class="journal-text">What changed? <span class="optional">Markdown supported</span><textarea name="text" rows="8" minlength="5" maxlength="2000" required placeholder="## What I changed&#10;&#10;Explain what you built, tested, learned, or fixed. You can use **bold**, lists, links, and code."></textarea></label>
+            <div class="journal-image-field">
+              <span class="field-label">Progress images</span>
+              <input type="hidden" name="image_urls" value="">
+              <label class="image-dropzone <%= imageUploadsConfigured ? '' : 'disabled' %>">
+                <input type="file" name="image_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple <%= imageUploadsConfigured ? '' : 'disabled' %>>
+                <span class="dropzone-icon" aria-hidden="true">↑</span><strong>Drop images here or choose files</strong><small>JPG, PNG, WebP or GIF · up to 8 MB each · 8 images maximum</small>
+              </label>
+              <div class="upload-status" aria-live="polite"><%= imageUploadsConfigured ? 'At least one image is required.' : 'Organizer action needed: configure R2 uploads.' %></div>
+              <div class="upload-preview"></div>
+            </div>
+            <div class="journal-submit"><span><%= project.track === 'software' ? 'The final time is calculated when you post, using a fresh Hackatime reading.' : 'Add photos and a clear note so reviewers can follow the build.' %></span><button class="button button-primary" type="submit" <%= imageUploadsConfigured ? '' : 'disabled' %>>Post update</button></div>
+          </form>
+        </details>
+        <% if (!journals.length) { %>
+          <div class="devlog-empty"><span aria-hidden="true">↳</span><div><strong>Your build story starts here.</strong><p>Post the first thing you made, tested, or changed—not study notes on their own.</p></div></div>
+        <% } else { %>
+          <div class="journal-list">
+            <% journals.forEach((journal, index) => { %>
+              <article id="devlog-<%= journal.id %>">
+                <div class="devlog-marker"><span></span></div>
+                <header><div><span class="devlog-entry-number">UPDATE <%= String(journals.length - index).padStart(2, '0') %></span><h3><%= journal.title || 'Project update' %></h3></div><div class="devlog-meta"><time datetime="<%= journal.entryDate %>"><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header>
+                <div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div>
+                <% if (journal.imageUrls.length) { %><div class="devlog-gallery <%= journal.imageUrls.length === 1 ? 'single' : '' %>"><% journal.imageUrls.forEach((imageUrl, imageIndex) => { %><a class="journal-image" href="<%= imageUrl %>" target="_blank" rel="noreferrer"><img src="<%= imageUrl %>" alt="Evidence <%= imageIndex + 1 %> for <%= journal.title || 'project update' %>" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div><% } else { %><div class="missing-journal-image">This older devlog needs a progress image before submission.</div><% } %>
+                <% if (!lockedJournalIds.includes(journal.id)) { %><details class="journal-edit"><summary>Manage update</summary><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/edit" class="form-grid" data-devlog-form><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label class="span-two">Title<input name="title" minlength="3" maxlength="120" value="<%= journal.title || 'Project update' %>" required></label><label class="span-two">What changed? <span class="optional">Markdown supported</span><textarea name="text" rows="7" minlength="5" maxlength="2000" required><%= journal.text %></textarea></label><div class="span-two journal-image-field"><span class="field-label">Progress images</span><input type="hidden" name="image_urls" value="<%= journal.imageUrls.join('\n') %>"><label class="image-dropzone <%= imageUploadsConfigured ? '' : 'disabled' %>"><input type="file" name="image_files" accept="image/jpeg,image/png,image/webp,image/gif" multiple <%= imageUploadsConfigured ? '' : 'disabled' %>><span class="dropzone-icon" aria-hidden="true">↑</span><strong>Drop more images or choose files</strong><small>Existing images can be removed from the preview below.</small></label><div class="upload-status" aria-live="polite"></div><div class="upload-preview"></div></div><div class="button-row span-two"><button class="button button-primary" type="submit">Save update</button></div></form><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/delete" data-confirm="Remove this devlog?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="text-button danger-text" type="submit">Remove this update</button></form></details><% } else { %><small class="submitted-evidence-note">Included in a shipped version</small><% } %>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="panel submission-panel" id="submission">
+        <div class="panel-heading"><div><p class="eyebrow">Final hop</p><h2>Project review</h2></div><span class="review-mark">REVIEW</span></div>
+        <% if (readiness.errors.length) { %>
+          <div class="readiness-list"><strong>Before you can ship:</strong><ul><% readiness.errors.forEach((error) => { %><li><%= error %></li><% }) %></ul></div>
+        <% } else { %>
+          <div class="ready-banner"><span>✓</span><div><strong>Ready to ship</strong><p>Your project has everything it needs to ship.</p></div></div>
+        <% } %>
+        <% if (submissions.length) { const latest = submissions[0]; %>
+          <div class="submission-status">
+            <div><small>LATEST SUBMISSION</small><strong><%= statusLabel(latest.phase) %></strong><span><%= latest.ariId || 'CQ review queue' %></span></div>
+            <div><small>DECISION</small><strong><%= latest.decision ? statusLabel(latest.decision) : 'Pending' %></strong><span><%= formatDateTime(latest.updatedAt) %></span></div>
+          </div>
+          <% if (latest.lastError) { %><p class="inline-error"><%= latest.lastError %></p><% } %>
+          <% if (latest.review) { const review = latest.review; %>
+            <% if (review.note_to_maker) { %><blockquote><strong>Reviewer note</strong><p><%= review.note_to_maker %></p></blockquote><% } %>
+            <% if (review.approved_hours !== undefined) { %><p class="approval-total"><strong><%= review.approved_hours %> approved hours</strong><%= project.track === 'software' ? ' · rewarded at 5 hertz per approved hour' : ' · final hardware build review complete' %></p><% } %>
+          <% } %>
+        <% } %>
+        <div class="button-row">
+          <form method="post" action="/app/projects/<%= project.id %>/submit" data-confirm="Submit this project for review?">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="button button-primary" type="submit" <%= readiness.errors.length || (project.track === 'hardware' && project.status !== 'funding_issued') ? 'disabled' : '' %>><%= submissions.length ? 'Ship project update' : 'Ship project' %></button>
+          </form>
+          <% if (submissions.length) { %>
+            <% if (ariConfigured && submissions[0].ariId) { %><form method="post" action="/app/projects/<%= project.id %>/status"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-ghost" type="submit">Refresh status</button></form><% } %>
+            <% if (['processing', 'review', 'under_review', 'second_pass'].includes(submissions[0].phase) && !submissions[0].decision) { %>
+              <form method="post" action="/app/projects/<%= project.id %>/withdraw" data-confirm="Withdraw this open review submission?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Withdraw</button></form>
+            <% } %>
+          <% } %>
+        </div>
+      </section>
+    </div>
+
+    <aside class="project-sidebar">
+      <section class="panel compact-panel">
+        <p class="eyebrow">Station details</p>
+        <dl>
+          <div><dt>Country</dt><dd><%= country?.name || project.countryCode || 'Not set' %></dd></div>
+          <div><dt>Project type</dt><dd><%= statusLabel(project.projectType) %></dd></div>
+          <div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div>
+          <div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div>
+          <div><dt>Hackatime</dt><dd><%= project.hackatimeProjects.join(', ') || 'Using work logs' %></dd></div>
+        </dl>
+      </section>
+      <% if (country) { %>
+        <section class="panel compact-panel safety-mini">
+          <strong>Your local radio guidance</strong>
+          <p><%= country.transmissionRule %></p>
+          <p><%= country.ownershipRule %></p>
+          <p><strong>Fulfilment:</strong> <%= country.fulfilmentNote %></p>
+          <% if (country.sourceUrl) { %><a href="<%= country.sourceUrl %>" target="_blank" rel="noreferrer">Read the official source ↗</a><% } %>
+          <small>Guidance only; check current local rules before buying, importing, or transmitting.</small>
+        </section>
+      <% } %>
+      <section class="panel compact-panel safety-mini">
+        <strong>Transmit safely</strong><p>Do not transmit until you have the authorisation and callsign required where you live.</p>
+      </section>
+      <form method="post" action="/app/projects/<%= project.id %>/archive" data-confirm="Archive this project? You can keep its data, but it will leave your active list.">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button class="text-button danger-text" type="submit">Archive project</button>
+      </form>
+    </aside>
+  </div></div>
+</section>
+<%- include('../partials/footer') %>

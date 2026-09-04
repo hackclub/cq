@@ -1,0 +1,27 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / FULFILMENT</span><h1>Orders</h1></div><div class="readout headright"><span>ORDERS</span><b><%= orders.length %></b></div></header>
+  <div class="appbody admin-body">
+  <%- include('nav') %>
+  <div class="order-admin-grid">
+    <% orders.forEach((item) => { %>
+      <article class="panel order-admin-card">
+        <div class="panel-heading"><div><small><%= item.id %></small><h2><%= item.maker?.name || item.shipping.shippingName %></h2><p><%= item.maker?.email || '' %></p></div><strong><%= item.total %> hertz</strong></div>
+        <div class="order-items"><% item.items.forEach((product) => { %><div><span><%= product.quantity %> × <%= product.name %></span><strong><%= product.unitPrice * product.quantity %> hertz</strong></div><% }) %></div>
+        <address><%= item.shipping.shippingName %><br><%= item.shipping.addressLine1 %><% if (item.shipping.addressLine2) { %><br><%= item.shipping.addressLine2 %><% } %><br><%= item.shipping.city %>, <%= item.shipping.region %> <%= item.shipping.postalCode %><br><%= item.shipping.country %></address>
+        <% if (item.refundedAt) { %><div class="config-note"><strong>Refunded:</strong> <%= formatDateTime(item.refundedAt) %>. Stock and hertz were restored.</div><% } %>
+        <% if (item.fulfilledAt) { %><div class="config-note"><strong>Fulfilled:</strong> by <%= item.fulfilledByName || 'an organizer' %> on <%= formatDateTime(item.fulfilledAt) %>.</div><% } %>
+        <% if (item.shipping.countryPolicy) { %><div class="config-note"><strong><%= statusLabel(item.shipping.countryPolicy.fulfilmentMode) %>:</strong> <%= item.shipping.countryPolicy.fulfilmentNote %></div><% } %>
+        <form method="post" action="/admin/orders/<%= item.id %>" class="form-stack">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label>Status<select name="status" <%= item.status === 'cancelled' ? 'disabled' : '' %>><% ['received','packing','shipped','fulfilled','cancelled'].forEach((status) => { %><option value="<%= status %>" <%= item.status === status ? 'selected' : '' %>><%= statusLabel(status) %></option><% }) %></select><% if (item.status === 'cancelled') { %><input type="hidden" name="status" value="cancelled"><% } %></label>
+          <label>Tracking URL<input type="url" name="tracking_url" value="<%= item.trackingUrl || '' %>"></label>
+          <label>Admin note<textarea name="admin_note" rows="2"><%= item.adminNote || '' %></textarea></label>
+          <button class="button button-primary" type="submit">Update order</button>
+        </form>
+      </article>
+    <% }) %>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

@@ -1,0 +1,40 @@
+<%- include('partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead"><div><span class="eyebrow">OPERATOR SETTINGS</span><h1>Station profile</h1></div><div class="headright"><div class="readout"><span>VERIFICATION</span><b><%= statusLabel(values.verificationStatus) %></b></div></div></header>
+  <div class="appbody profile-layout">
+  <section class="formpane form-stack">
+    <div><p class="eyebrow">Managed by Hack Club Auth</p><h2>Your details</h2><p>Update these details in Hack Club Auth, then refresh them here. CQ does not maintain a separate editable profile.</p></div>
+    <label>Display name<input value="<%= values.name %>" readonly aria-readonly="true"></label>
+    <div class="form-grid"><label>First name<input value="<%= values.firstName || '' %>" readonly aria-readonly="true"></label><label>Last name<input value="<%= values.lastName || '' %>" readonly aria-readonly="true"></label></div>
+    <div class="form-grid"><label>Birthday<input type="date" value="<%= values.birthday || '' %>" readonly aria-readonly="true"></label><label>Phone number<input value="<%= values.phoneNumber || '' %>" readonly aria-readonly="true"></label></div>
+    <label>Hack Club email<input value="<%= values.email %>" readonly aria-readonly="true"></label>
+    <label>Slack user ID<input value="<%= values.slackId || '' %>" readonly aria-readonly="true"></label>
+    <fieldset class="form-stack"><legend>Submission and fulfilment address</legend><label>Address line 1<input value="<%= values.addressLine1 || '' %>" readonly aria-readonly="true"></label><label>Address line 2<input value="<%= values.addressLine2 || '' %>" readonly aria-readonly="true"></label><div class="form-grid"><label>City<input value="<%= values.city || '' %>" readonly aria-readonly="true"></label><label>State / province / region<input value="<%= values.region || '' %>" readonly aria-readonly="true"></label><label>ZIP / postal code<input value="<%= values.postalCode || '' %>" readonly aria-readonly="true"></label><label>Country<input value="<%= values.addressCountry || '' %>" readonly aria-readonly="true"></label></div></fieldset>
+    <div class="profile-readout"><span>Verification <strong><%= statusLabel(values.verificationStatus) %></strong></span><span>YSWS eligible <strong><%= values.yswsEligible === true ? 'Yes' : values.yswsEligible === false ? 'No' : 'Not reported' %></strong></span></div>
+    <div class="button-row"><a class="button button-primary" href="https://auth.hackclub.com/">Update in Hack Club Auth ↗</a><a class="button button-ghost" href="/auth/login?return_to=%2Fapp%2Fprofile&amp;reauth=1">Refresh details</a></div>
+  </section>
+  <aside class="summary integration-card">
+    <div>
+      <p class="eyebrow">Coding activity</p>
+      <h2>Hackatime</h2>
+      <% if (hackatime.connected) { %>
+        <p>Your account is connected. CQ can load your coding projects when you create or edit a project.</p>
+        <% if (hackatime.account?.username) { %><p class="integration-account">Connected as <strong><%= hackatime.account.username %></strong></p><% } %>
+      <% } else if (hackatime.configured) { %>
+        <p>Connect Hackatime to automatically find your coding projects and select the ones that belong to each CQ build.</p>
+      <% } else { %>
+        <p>The organizer still needs to configure the Hackatime connection.</p>
+      <% } %>
+    </div>
+    <div class="integration-actions">
+      <% if (hackatime.connected) { %>
+        <form method="post" action="/app/hackatime/refresh"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="return_to" value="/app/profile"><button class="button button-ghost" type="submit">Refresh projects</button></form>
+        <form method="post" action="/app/hackatime/disconnect"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Disconnect</button></form>
+      <% } else if (hackatime.configured) { %>
+        <a class="button button-primary" href="/app/hackatime/connect?return_to=%2Fapp%2Fprofile">Connect Hackatime</a>
+      <% } %>
+    </div>
+  </aside>
+  </div>
+</section>
+<%- include('partials/footer') %>

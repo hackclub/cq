@@ -1,0 +1,16 @@
+.git
+.github
+.DS_Store
+.vscode
+node_modules
+.env
+.env.*
+!.env.example
+data
+coverage
+test
+npm-debug.log*
+Dockerfile*
+README.md
+docs
+railpack.json

@@ -1,0 +1,19 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / REVIEW QUEUE</span><h1>Project reviews</h1></div><div class="headright"><div class="readout"><span>SUBMISSIONS</span><b><%= submissions.length %></b></div><span class="tag"><%= reviewMode %> active</span></div></header>
+  <div class="appbody admin-body">
+  <%- include('nav') %>
+  <section class="panel review-queue-list">
+    <div class="panel-heading"><div><p class="eyebrow">Queue</p><h2>Submissions to review</h2></div><strong><%= submissions.length %> open</strong></div>
+    <% if (!submissions.length) { %><p class="empty-inline">Nothing is waiting for review right now.</p><% } %>
+    <div class="compact-list"><% submissions.forEach((item) => { %><article class="review-queue-item"><div><strong><%= item.project?.title || item.projectId %></strong><small><%= item.maker?.name || 'Unknown maker' %> · <%= Math.round((item.claimedMinutes / 60) * 100) / 100 %> hours claimed · <%= item.devlogCount %> devlog<%= item.devlogCount === 1 ? '' : 's' %></small><small>First pass: <%= item.firstPass?.reviewer_name || item.reviewer?.name || 'Unclaimed' %> · Updated <%= formatDateTime(item.updatedAt) %></small></div><div class="review-queue-actions"><span class="status-pill status-<%= item.decision || item.phase %>"><%= item.decision ? statusLabel(item.decision) : statusLabel(item.phase) %></span><a class="button button-small" href="/admin/reviews/<%= item.id %>"><%= item.decision ? 'View review' : item.phase === 'second_pass' ? 'Second pass' : 'Start review' %></a></div></article><% }) %></div>
+  </section>
+  <% if (hasPermission(user, 'users.manage')) { %><section class="panel table-wrap">
+    <div class="panel-heading"><h2>Webhook deliveries</h2></div>
+    <table><thead><tr><th>Delivery ID</th><th>Event</th><th>External ID</th><th>Received</th></tr></thead><tbody>
+      <% deliveries.forEach((item) => { %><tr><td><code><%= item.id %></code></td><td><%= item.event %></td><td><%= item.payload.external_id %></td><td><%= formatDateTime(item.receivedAt) %></td></tr><% }) %>
+    </tbody></table>
+  </section><% } %>
+  </div>
+</section>
+<%- include('../partials/footer') %>

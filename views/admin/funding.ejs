@@ -1,0 +1,11 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / HARDWARE</span><h1>Funding requests</h1></div><div class="headright"><span class="tag"><%= requests.filter((item) => ['submitted', 'under_review'].includes(item.status)).length %> waiting</span></div></header>
+  <div class="appbody admin-body"><%- include('nav') %>
+    <section class="panel table-wrap"><table><thead><tr><th>Project</th><th>Maker</th><th>Estimate</th><th>Requested</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>
+      <% requests.forEach((item) => { %><tr><td><strong><%= item.project?.title || item.projectId %></strong><small><%= item.project?.projectType || 'hardware' %></small></td><td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || '' %></small></td><td><%= item.estimatedHours %> hr</td><td><strong>$<%= Number(item.requestedHertz).toFixed(2) %> USD</strong></td><td><span class="status-pill status-<%= item.status %>"><%= statusLabel(item.status) %></span></td><td><%= formatDateTime(item.updatedAt) %></td><td><a class="button button-small" href="/admin/funding/<%= item.id %>"><%= item.status === 'submitted' ? 'Review' : 'Inspect' %></a></td></tr><% }) %>
+      <% if (!requests.length) { %><tr><td colspan="7" class="empty-inline">No hardware funding requests yet.</td></tr><% } %>
+    </tbody></table></section>
+  </div>
+</section>
+<%- include('../partials/footer') %>

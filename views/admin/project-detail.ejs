@@ -1,0 +1,49 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead">
+    <div>
+      <span class="eyebrow">PROJECT / <%= project.id %> / <%= statusLabel(project.status) %></span>
+      <h1><%= project.title %></h1>
+    </div>
+    <div class="headright"><a class="button button-ghost" href="/admin/projects">All projects</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div>
+  </header>
+  <div class="appbody admin-body"><%- include('nav') %>
+
+  <div class="project-layout">
+    <div class="project-main-column">
+      <section class="panel">
+        <div class="panel-heading"><h2>Eligibility and evidence</h2></div>
+        <dl class="admin-detail-list">
+          <div><dt>Project type</dt><dd><%= statusLabel(project.projectType) %></dd></div>
+          <div><dt>Ham-radio relevance</dt><dd><%= project.radioRelevance %></dd></div>
+          <div><dt>Work tracking</dt><dd><%= project.hackatimeProjects.join(', ') || 'Manual work logs' %></dd></div>
+          <div><dt>Evidence</dt><dd><%= project.evidence.join(', ') %></dd></div>
+          <div><dt>Demo</dt><dd><% if (project.demoUrl) { %><a href="<%= project.demoUrl %>" target="_blank" rel="noreferrer">Open demo ↗</a><% } else { %>Not supplied<% } %></dd></div>
+          <div><dt>AI statement</dt><dd><%= project.aiStatement || 'None supplied' %></dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><h2>Devlog</h2><strong><%= Math.round(journals.reduce((sum, item) => sum + item.minutes, 0) / 6) / 10 %> hours</strong></div>
+        <% if (!journals.length) { %><p class="empty-inline">No devlogs.</p><% } %>
+        <div class="journal-list"><% journals.forEach((journal) => { const images = journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : []); %><article><header><div><h3><%= journal.title || 'Project update' %></h3></div><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><% if (images.length) { %><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((imageUrl) => { %><a class="journal-image" href="<%= imageUrl %>" target="_blank" rel="noreferrer"><img src="<%= imageUrl %>" alt="Progress evidence" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div><% } else { %><div class="missing-journal-image">Image missing</div><% } %></article><% }) %></div>
+      </section>
+
+      <section class="panel table-wrap">
+        <div class="panel-heading"><h2>Review history</h2></div>
+        <table><thead><tr><th>ID</th><th>Phase</th><th>Decision</th><th>Event</th><th>Updated</th></tr></thead><tbody><% submissions.forEach((item) => { %><tr><td><%= item.ariId || item.id %></td><td><%= statusLabel(item.phase) %></td><td><%= item.decision ? statusLabel(item.decision) : 'Pending' %></td><td><%= item.event || '—' %></td><td><%= formatDateTime(item.updatedAt) %></td></tr><% }) %></tbody></table>
+      </section>
+    </div>
+
+    <aside class="project-sidebar">
+      <section class="panel compact-panel"><p class="eyebrow">Maker</p><strong><%= maker?.name || 'Unknown' %></strong><p><%= maker?.email || '' %><br><%= maker?.slackId || 'No Slack ID' %></p></section>
+      <section class="panel compact-panel"><p class="eyebrow">Radio path</p><dl><div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div><div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div></dl></section>
+      <% if (country) { %><section class="panel compact-panel"><p class="eyebrow">Fulfilment</p><strong><%= statusLabel(country.fulfilmentMode) %></strong><p><%= country.fulfilmentNote %></p></section><% } %>
+      <% if (submissions[0]) { %><a class="button button-primary" href="/admin/reviews/<%= submissions[0].id %>">Open latest review</a><% } %>
+      <% if (project.status === 'rejected') { %><form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="building"><p class="eyebrow">Reopen project</p><p>Return this project to the maker so they can make changes and ship a new review.</p><button class="button button-primary" type="submit">Reopen for changes</button></form><% } %>
+      <form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="<%= project.status === 'archived' ? 'building' : 'archived' %>"><button class="button button-ghost" type="submit"><%= project.status === 'archived' ? 'Restore project' : 'Archive project' %></button><small>Approval, changes, and denial decisions are made through the review queue.</small></form>
+    </aside>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>
