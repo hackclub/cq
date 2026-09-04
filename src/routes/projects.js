@@ -266,14 +266,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       store.list("project"),
       store.list("journal"),
     ]);
-    const projects = allProjects
-      .filter((project) => project.userId === req.user.id && project.status !== "archived")
+    const scope = ["active", "all", "archived"].includes(req.query.view) ? req.query.view : "active";
+    const mine = allProjects.filter((project) => project.userId === req.user.id);
+    const projects = mine
+      .filter((project) => scope === "all" || (scope === "archived" ? project.status === "archived" : project.status !== "archived"))
       .map((project) => ({
         ...project,
         journalMinutes: journals.filter((item) => item.projectId === project.id).reduce((sum, item) => sum + item.minutes, 0),
       }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    res.render("projects/index", { title: "Your projects", projects });
+    res.render("projects/index", { title: "Your projects", projects, scope, counts: { active: mine.filter((p) => p.status !== "archived").length, all: mine.length, archived: mine.filter((p) => p.status === "archived").length } });
   });
 
   router.get("/new", async (req, res) => {
