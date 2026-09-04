@@ -106,7 +106,7 @@ export async function createApp({
     }
   });
 
-  app.use("/", publicRoutes());
+  app.use("/", publicRoutes({ store: dataStore }));
   app.use("/auth", authRoutes({ store: dataStore, config }));
   app.use("/app/hackatime", hackatimeRoutes({ client: hackatime, logger }));
   app.use("/app", dashboardRoutes({ store: dataStore, hackatimeClient: hackatime }));

@@ -125,6 +125,19 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     });
   });
 
+  router.get("/settings", requirePermission("users.manage"), async (req, res) => {
+    const launchGate = await store.get("setting", "launch_gate") || { enabled: false, message: "Coming soon", until: "" };
+    res.render("admin/settings", { title: "Organizer settings", launchGate });
+  });
+
+  router.post("/settings", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const launchGate = { id: "launch_gate", enabled: req.body.launch_gate === "on", message: String(req.body.message || "Coming soon").trim().slice(0, 120), until: String(req.body.until || "").trim().slice(0, 80), updatedAt: nowIso() };
+    await store.put("setting", "launch_gate", launchGate);
+    await writeAudit(store, req.user, { action: "settings.launch_gate", entityType: "setting", entityId: "launch_gate", summary: `${launchGate.enabled ? "Enabled" : "Disabled"} the homepage launch gate.`, after: launchGate });
+    setFlash(res, "success", "Homepage launch setting saved.");
+    res.redirect("/admin/settings");
+  });
+
   router.get("/funding", requirePermission("projects.review"), async (req, res) => {
     const [requests, projects, users] = await Promise.all([store.list("funding_request"), store.list("project"), store.list("user")]);
     const rows = sortNewest(requests).map((request) => ({

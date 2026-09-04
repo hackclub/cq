@@ -492,10 +492,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const timestamp = nowIso();
+    const designMinutes = projectDetails.journals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
+    if (designMinutes <= 0) {
+      setFlash(res, "error", "Add a design devlog before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
-      requestedHertz: Math.round(input.estimatedHours * 5 * 100) / 100,
+      requestedHertz: Math.round((designMinutes * 5 / 60) * 100) / 100,
+      designMinutes,
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
       reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
