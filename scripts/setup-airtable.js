@@ -67,6 +67,8 @@ export async function setupAirtable(config, fetchImpl = fetch) {
   };
 
   const metadataUrl = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(config.airtableBaseId)}/tables`;
+  const log = (...args) => { if (config.verbose !== false) console.log(`[airtable:${config.label || config.airtableBaseId}]`, ...args); };
+  log("Inspecting base schema…");
   let metadata;
   try {
     metadata = await request(metadataUrl);
@@ -82,6 +84,7 @@ export async function setupAirtable(config, fetchImpl = fetch) {
     const name = airtableTableName(config.airtableTablePrefix, type);
     const existingTable = (metadata.tables || []).find((table) => table.name === name);
     if (existingTable) {
+      log(`Found ${name}`);
       if (type === "submission") {
         const present = new Set((existingTable.fields || []).map((field) => field.name));
         for (const field of submissionFields) {
@@ -89,6 +92,7 @@ export async function setupAirtable(config, fetchImpl = fetch) {
           await request(`${metadataUrl}/${encodeURIComponent(existingTable.id)}/fields`, {
             method: "POST", body: JSON.stringify(field),
           });
+          log(`Added field ${field.name} to ${name}`);
         }
       }
       continue;
@@ -99,6 +103,7 @@ export async function setupAirtable(config, fetchImpl = fetch) {
     });
     existingNames.add(name);
     created.push(name);
+    log(`Created ${name}`);
   }
 
   const legacyUrl = `https://api.airtable.com/v0/${encodeURIComponent(config.airtableBaseId)}/${encodeURIComponent(config.airtableTableName)}`;
@@ -142,6 +147,7 @@ export async function setupAirtable(config, fetchImpl = fetch) {
         }),
       });
       migrated += 1;
+      log(`Migrated ${type}/${id}`);
     }
     offset = page.offset || "";
   } while (offset);
@@ -150,11 +156,18 @@ export async function setupAirtable(config, fetchImpl = fetch) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  setupAirtable(getConfig())
-    .then(({ created, migrated, skipped }) => {
-      console.log(`Airtable ready: ${created.length} tables created, ${migrated} records migrated, ${skipped} records skipped.`);
-      console.log("The legacy table was not changed or deleted.");
-    })
+  const baseConfig = getConfig();
+  const targets = [
+    { label: "dev", id: baseConfig.airtableBaseId, prefix: "DEV CQ" },
+    { label: "prod", id: baseConfig.airtableBaseId, prefix: "CQ" },
+  ];
+  if (!baseConfig.airtableBaseId) throw new Error("AIRTABLE_BASE_ID is required. Setup targets DEV CQ and CQ tables in this base by default.");
+  Promise.all(targets.map(async (target) => {
+    console.log(`\n=== Setting up ${target.label} CQ base (${target.id}) ===`);
+    const result = await setupAirtable({ ...baseConfig, airtableBaseId: target.id, airtableTablePrefix: target.prefix, label: target.label });
+    console.log(`[airtable:${target.label}] Ready: ${result.created.length} tables created, ${result.migrated} records migrated, ${result.skipped} skipped.`);
+    return result;
+  }))
     .catch((error) => {
       console.error(`Airtable setup failed: ${error.message}`);
       process.exitCode = 1;

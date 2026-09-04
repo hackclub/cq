@@ -27,6 +27,10 @@ run:
 npm run airtable:setup
 ```
 
+By default this configures both table namespaces in the same base: `DEV CQ ...`
+for development and `CQ ...` for production. It prints verbose progress for
+every table, field, and migrated record. Only `AIRTABLE_BASE_ID` is required.
+
 With Docker Compose, use:
 
 ```sh

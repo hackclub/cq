@@ -129,6 +129,7 @@ if (bomInput && bomRows && bomAdd) {
 }
 
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
+const safeImageUrl = (value) => /^https?:\/\//i.test(String(value || "")) ? String(value) : "";
 if (thumbnailUpload) {
   const input = thumbnailUpload.querySelector("[data-thumbnail-file]");
   const choose = thumbnailUpload.querySelector("[data-thumbnail-choose]");
@@ -141,7 +142,7 @@ if (thumbnailUpload) {
     preview.replaceChildren();
     if (!url.value) return;
     const item = document.createElement("div"); item.className = "upload-preview-item";
-    const image = document.createElement("img"); image.src = url.value; image.alt = "Project thumbnail";
+    const image = document.createElement("img"); image.src = safeImageUrl(url.value); image.alt = "Project thumbnail";
     const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove";
     remove.addEventListener("click", () => { url.value = ""; render(); });
     item.append(image, remove); preview.append(item);
@@ -177,7 +178,7 @@ for (const uploader of document.querySelectorAll("[data-shop-image-upload]")) {
     if (!preview || !url) return;
     preview.replaceChildren();
     if (!url.value) return;
-    const image = document.createElement("img"); image.src = url.value; image.alt = "Product image preview"; preview.append(image);
+    const image = document.createElement("img"); image.src = safeImageUrl(url.value); image.alt = "Product image preview"; preview.append(image);
   };
   input?.addEventListener("change", async () => {
     const file = input.files?.[0];
