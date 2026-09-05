@@ -221,11 +221,11 @@ export function sessionMiddleware(store, config) {
           ? await store.get("user", session.userId)
           : null;
       req.forceReauth = Boolean(session?.revokedAt);
-      req.user = user;
+      req.user = user?.banned ? null : user;
       req.session = session;
-      req.csrfToken = user ? session.csrfToken : null;
-      res.locals.user = user;
-      res.locals.userRoles = userRoles(user || {});
+      req.csrfToken = req.user ? session.csrfToken : null;
+      res.locals.user = req.user;
+      res.locals.userRoles = userRoles(req.user || {});
       res.locals.csrfToken = req.csrfToken;
       next();
     } catch (error) {

@@ -26,7 +26,7 @@
             <td>
               <form method="post" action="/admin/users/<%= item.id %>" class="user-role-form">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <div class="role-picker" aria-label="Roles for <%= item.name %>"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= item.roleKeys.includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %></div>
+                <details class="role-picker-details"><summary>Edit roles and access</summary><div class="role-picker" aria-label="Roles for <%= item.name %>"><% Object.entries(roleDefinitions).forEach(([key, definition]) => { %><label title="<%= definition.description %>"><input type="checkbox" name="roles" value="<%= key %>" <%= item.roleKeys.includes(key) ? 'checked' : '' %>> <%= definition.label %></label><% }) %><label class="checkbox-field"><input type="checkbox" name="banned" <%= item.banned ? 'checked' : '' %>> Banned</label></div></details>
                 <div class="user-role-actions"><label class="compact-input">Hertz adjustment<input type="number" name="hertz_delta" value="0" step="0.01" aria-label="Hertz adjustment for <%= item.name %>"></label><button class="button button-small" type="submit">Save access</button></div>
               </form>
             </td>

@@ -305,6 +305,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {
     const user = await store.get("user", req.params.id);
     if (!user) return res.sendStatus(404);
+    if (req.user.id === user.id && req.body.banned === "on") {
+      setFlash(res, "error", "You cannot ban your own account.");
+      return res.redirect("/admin/users");
+    }
     const before = structuredClone(user);
     const hertzDelta = Number.parseFloat(req.body.hertz_delta || "0");
     if (Number.isFinite(hertzDelta) && hertzDelta !== 0) {
@@ -315,6 +319,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     if (config.adminEmails.includes(user.email)) roles = [...new Set([...roles, "admin"])];
     if (user.id === req.user.id && userRoles(req.user).includes("admin")) roles = [...new Set([...roles, "admin"])];
     user.roles = roles;
+    user.banned = req.body.banned === "on";
     user.role = roles.includes("admin") ? "admin" : "participant";
     user.updatedAt = nowIso();
     await store.put("user", user.id, user);
