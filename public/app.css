@@ -1495,8 +1495,11 @@ th {
 .inventory-editor > summary::-webkit-details-marker { display: none; }
 .inventory-editor > summary .inventory-summary { display: flex; justify-content: space-between; align-items: center; }
 .inventory-editor[open] > summary { display: none; }
-.nav-loading { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: rgba(10,12,11,.12); transition: opacity .15s; z-index: 1000; }
-body.is-loading .nav-loading { opacity: 1; }
+.nav-loading { position: fixed; top: 0; left: 0; right: 0; height: 2px; pointer-events: none; opacity: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: opacity .15s, transform .35s ease; z-index: 1000; }
+body.is-loading .nav-loading { opacity: 1; transform: scaleX(.75); }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
+}
 
 .admin-body .admin-tabs {
   position: sticky;

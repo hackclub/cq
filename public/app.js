@@ -2,6 +2,11 @@ const menuButton = document.querySelector(".menu-button");
 const navigation = document.querySelector(".site-nav");
 
 window.addEventListener("beforeunload", () => document.body.classList.add("is-loading"));
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("a[href]");
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (new URL(link.href, location.href).origin === location.origin && !link.target && !link.hasAttribute("download")) document.body.classList.add("is-loading");
+});
 
 const utcClock = document.querySelector("[data-utc-clock]");
 if (utcClock) {
