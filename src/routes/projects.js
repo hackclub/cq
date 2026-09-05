@@ -508,11 +508,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const timestamp = nowIso();
     const designJournals = await store.list("journal");
     const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
-    if (designMinutes < 1) {
-      setFlash(res, "error", "Log design work in a devlog before requesting hardware funding.");
-      return res.redirect(`/app/projects/${project.id}#funding`);
-    }
-    const fundingMinutes = Math.round(designMinutes);
+    const fundingMinutes = designMinutes > 0 ? Math.round(designMinutes) : Math.round(input.estimatedHours * 60);
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
@@ -539,6 +535,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   router.post("/:id/submit", requireCsrf, async (req, res) => {
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
+    const trustLevel = await hackatimeClient.trustFactor?.(req.user.id);
+    if (trustLevel === "red") {
+      setFlash(res, "error", "Hackatime has marked this account as ineligible for submissions.");
+      return res.redirect(`/app/projects/${project.id}`);
+    }
     const programSettings = await store.get("setting", "program");
     if (programSettings?.submissionsClosed && !hasPermission(req.user, "users.manage")) {
       setFlash(res, "error", programSettings.submissionsMessage || "Project submissions are temporarily closed.");

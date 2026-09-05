@@ -116,6 +116,7 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
       id: profile.id ?? profile.user?.id ?? null,
       username: profile.username ?? profile.user?.username ?? profile.github_username ?? null,
       slackId: profile.slack_id ?? profile.user?.slack_id ?? null,
+      trustLevel: String(profile.trust_factor?.trust_level ?? profile.user?.trust_factor?.trust_level ?? "blue").toLowerCase(),
     };
     await store.put("hackatime_token", userId, {
       id: userId,
@@ -129,6 +130,18 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     });
     await store.delete("hackatime_cache", userId);
     return { returnTo: oauthState.returnTo, account };
+  }
+
+  async function trustFactor(userId) {
+    const token = await store.get("hackatime_token", userId);
+    if (!token?.accessToken) return null;
+    try {
+      const profile = await authenticatedGet(meEndpoint, token.accessToken);
+      return String(profile.trust_factor?.trust_level ?? profile.user?.trust_factor?.trust_level ?? "blue").toLowerCase();
+    } catch (error) {
+      if (error.status === 401) await disconnect(userId);
+      return null;
+    }
   }
 
   async function projects(userId, { force = false } = {}) {
@@ -188,5 +201,6 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     finishConnection,
     projects,
     disconnect,
+    trustFactor,
   };
 }
