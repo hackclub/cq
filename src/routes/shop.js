@@ -46,11 +46,7 @@ export function shopRoutes({ store, notifier }) {
     const id = `${req.user.id}_${product.id}`;
     const current = await store.get("cart", id);
     const requested = Math.max(1, Math.min(10, Number.parseInt(req.body.quantity || "1", 10) || 1));
-    const quantity = Math.min(10, product.stock, (current?.quantity ?? 0) + requested);
-    if (quantity < 1) {
-      setFlash(res, "error", `${product.name} is out of stock.`);
-      return res.redirect("/app/shop");
-    }
+    const quantity = Math.min(10, (current?.quantity ?? 0) + requested);
     await store.put("cart", id, { id, userId: req.user.id, productId: product.id, quantity });
     setFlash(res, "success", `${product.name} added to your cart.`);
     res.redirect(req.get("referer")?.includes("/app/shop/cart") ? "/app/shop/cart" : "/app/shop");
@@ -80,7 +76,7 @@ export function shopRoutes({ store, notifier }) {
     if (!product) return res.sendStatus(404);
     const quantity = Number.parseInt(req.body.quantity, 10);
     if (!Number.isInteger(quantity) || quantity <= 0) await store.delete("cart", id);
-    else await store.put("cart", id, { id, userId: req.user.id, productId: product.id, quantity: Math.min(10, product.stock, quantity) });
+    else await store.put("cart", id, { id, userId: req.user.id, productId: product.id, quantity: Math.min(10, quantity) });
     res.redirect("/app/shop/cart");
   });
 
@@ -97,7 +93,6 @@ export function shopRoutes({ store, notifier }) {
     if (!currentCart.items.length) errors.push("Your cart is empty.");
     if (currentCart.total > req.user.hertz) errors.push("You do not have enough hertz for this order.");
     currentCart.items.forEach((item) => {
-      if (item.quantity > item.stock) errors.push(`${item.name} only has ${item.stock} left.`);
     });
     if (errors.length) {
       return res.status(422).render("shop/cart", {
@@ -143,8 +138,6 @@ export function shopRoutes({ store, notifier }) {
         for (let index = 0; index < freshCart.items.length; index += 1) {
           const item = freshCart.items[index];
           const product = freshProducts[index];
-          product.stock -= item.quantity;
-          await store.put("product", product.id, product);
         }
         user.hertz = Math.max(0, Math.round((Number(user.hertz) - freshCart.total) * 100) / 100);
         user.updatedAt = timestamp;
