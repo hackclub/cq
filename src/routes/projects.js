@@ -291,6 +291,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
 
   router.post("/new", requireCsrf, async (req, res) => {
     const input = projectInput(req.body);
+    const program = await store.get("setting", "program");
+    if (input.track === "hardware" && program?.hardwareClosed) {
+      setFlash(res, "error", program.hardwareMessage || "Hardware projects are temporarily unavailable.");
+      return res.redirect("/app/projects/new");
+    }
     const context = await formContext(store, hackatimeClient, req.user.id);
     const errors = [...validateProject(input), ...validateHackatimeSelection(input, context.hackatime)];
     if (errors.length) {
@@ -484,6 +489,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     if (project.track !== "hardware") {
       setFlash(res, "error", "Only electronics hardware projects use the funding request flow.");
       return res.redirect(`/app/projects/${project.id}`);
+    }
+    const program = await store.get("setting", "program");
+    if (program?.hardwareClosed) {
+      setFlash(res, "error", program.hardwareMessage || "Hardware projects are temporarily unavailable.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
     }
     if (["funding_submitted", "funding_approved", "funding_issued"].includes(project.status)) {
       setFlash(res, "error", "This project already has a funding request in progress or issued.");

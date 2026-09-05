@@ -19,6 +19,8 @@
         <label>Shop message<input name="shop_message" value="<%= program.shopMessage || '' %>"></label>
         <label class="checkbox-field"><input type="checkbox" name="submissions_closed" <%= program.submissionsClosed ? 'checked' : '' %>> <span>Close submissions</span></label>
         <label>Submissions message<input name="submissions_message" value="<%= program.submissionsMessage || '' %>"></label>
+        <label class="checkbox-field"><input type="checkbox" name="hardware_closed" <%= program.hardwareClosed ? 'checked' : '' %>> <span>Disable hardware projects</span></label>
+        <label>Hardware message<input name="hardware_message" value="<%= program.hardwareMessage || '' %>"></label>
         <button class="button button-primary" type="submit">Save settings</button>
       </form>
     </section>
