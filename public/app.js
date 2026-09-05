@@ -1,6 +1,8 @@
 const menuButton = document.querySelector(".menu-button");
 const navigation = document.querySelector(".site-nav");
 
+window.addEventListener("beforeunload", () => document.body.classList.add("is-loading"));
+
 const utcClock = document.querySelector("[data-utc-clock]");
 if (utcClock) {
   const updateClock = () => {

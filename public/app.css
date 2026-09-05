@@ -1489,6 +1489,15 @@ th {
   background: transparent;
 }
 
+.apphead { padding-left: 20px; padding-right: 20px; }
+.inventory-editor { margin-bottom: 12px; }
+.inventory-editor > summary { cursor: pointer; list-style: none; }
+.inventory-editor > summary::-webkit-details-marker { display: none; }
+.inventory-editor > summary .inventory-summary { display: flex; justify-content: space-between; align-items: center; }
+.inventory-editor[open] > summary { display: none; }
+.nav-loading { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: rgba(10,12,11,.12); transition: opacity .15s; z-index: 1000; }
+body.is-loading .nav-loading { opacity: 1; }
+
 .admin-body .admin-tabs {
   position: sticky;
   top: 0;

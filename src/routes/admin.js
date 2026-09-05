@@ -503,6 +503,15 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.redirect("/admin/shop");
   });
 
+  router.post("/shop/:id/delete", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
+    const product = await store.get("product", req.params.id);
+    if (!product) return res.sendStatus(404);
+    await store.delete("product", product.id);
+    await writeAudit(store, req.user, { action: "product.deleted", entityType: "product", entityId: product.id, summary: `Deleted shop item ${product.name}.`, before: product });
+    setFlash(res, "success", `${product.name} deleted.`);
+    res.redirect("/admin/shop");
+  });
+
   router.get("/reviews", requirePermission("reviews.read"), async (req, res) => {
     const [submissions, projects, deliveries, users, journals] = await Promise.all([
       store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),

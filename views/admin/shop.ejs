@@ -20,7 +20,7 @@
   </section>
   <div class="inventory-grid">
     <% products.forEach((item) => { %>
-      <form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
+      <details class="inventory-editor"><summary><div class="panel inventory-card inventory-summary"><strong><%= item.name %></strong><span class="status-pill"><%= item.active ? 'ACTIVE' : 'HIDDEN' %></span></div></summary><form method="post" action="/admin/shop/<%= item.id %>" class="panel inventory-card">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <img src="<%= item.image || '/assets/radio_img.png' %>" alt="">
         <label>Name<input name="name" value="<%= item.name %>" required></label>
@@ -30,8 +30,8 @@
         <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
         <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
         <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
-        <button class="button button-primary" type="submit">Save product</button>
-      </form>
+        <div class="button-row"><button class="button button-primary" type="submit">Save product</button></form><form method="post" action="/admin/shop/<%= item.id %>/delete" data-confirm="Delete this shop item permanently?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Delete product</button></form></div>
+      </details>
     <% }) %>
   </div>
   </div>
