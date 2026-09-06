@@ -180,6 +180,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
     if (Number(req.body.approved_usd ?? req.body.approved_hertz) > requested) {
       setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
       return res.redirect(`/admin/funding/${request.id}`);
@@ -192,6 +193,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
       setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request);
@@ -232,8 +237,13 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? request.firstPass.approvedUsd ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
     if (decision === "approved" && approvedHertz <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedHertz - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request); const timestamp = nowIso();
