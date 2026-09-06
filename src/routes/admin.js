@@ -326,6 +326,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const beforeRoles = new Set(userRoles(before));
     const afterRoles = new Set(userRoles(user));
     const addedRoles = [...afterRoles].filter((role) => !beforeRoles.has(role));
+    if (addedRoles.includes("reviewer") || addedRoles.includes("second_pass_reviewer")) user.reviewerTraining = { required: true, status: "pending", assignedAt: nowIso() };
+    if (user.reviewerTraining?.status === "pending") await store.put("user", user.id, user);
     const removedRoles = [...beforeRoles].filter((role) => !afterRoles.has(role));
     const changes = [
       ...addedRoles.map((role) => `added permission: ${role}`),
@@ -389,6 +391,12 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     if (!project) return res.sendStatus(404);
     const before = structuredClone(project);
     const previousStatus = project.status;
+    if (req.body.unapprove === "1") {
+      if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
+      project.status = "building";
+      project.unapprovedAt = nowIso();
+      project.unapprovedById = req.user.id;
+    }
     if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
