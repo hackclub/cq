@@ -36,7 +36,7 @@ export function createReviewEnvironmentManager({ store, config, logger = console
     try {
       await proxmox(`/nodes/${encodeURIComponent(config.proxmoxNode)}/lxc/${config.proxmoxTemplateVmid}/clone`, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ newid: String(vmid), hostname: `cq-review-${id.slice(-8)}`, full: "0", target: config.proxmoxNode, storage: config.proxmoxStorage }),
+        body: new URLSearchParams({ newid: String(vmid), hostname: `cq-review-${id.slice(-8)}`, full: "0", target: config.proxmoxNode }),
       });
       await proxmox(`/nodes/${encodeURIComponent(config.proxmoxNode)}/lxc/${vmid}/status/start`, { method: "POST" });
       record.status = "ready";
