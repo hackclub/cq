@@ -1,6 +1,6 @@
 import { nowIso, randomId } from "./utils.js";
 
-const ACTIVE = new Set(["provisioning", "ready", "open", "stopping"]);
+const ACTIVE = new Set(["provisioning", "ready", "open", "stopping", "stopped", "restarting"]);
 
 export function createReviewEnvironmentManager({ store, config, logger = console }) {
   const maxActive = Math.max(1, Math.min(4, config.reviewEnvironmentMaxActive || 4));
@@ -13,7 +13,28 @@ export function createReviewEnvironmentManager({ store, config, logger = console
     return payload;
   }
   async function active() { return (await store.list("review_environment")).filter((item) => ACTIVE.has(item.status)); }
+  async function capacity() {
+    try { return await request("/v1/capacity"); }
+    catch {
+      const current = await active();
+      return { active: current.length, available: Math.max(0, maxActive - current.length), maximum: maxActive, unavailable: true };
+    }
+  }
+  async function sync(record) {
+    if (!record || !ACTIVE.has(record.status)) return record;
+    try {
+      const remote = await request(`/v1/environments/${encodeURIComponent(record.id)}`);
+      const updated = { ...record, ...remote, updatedAt: nowIso() };
+      await store.put("review_environment", record.id, updated);
+      return updated;
+    } catch (error) {
+      logger.warn?.("review sandbox status refresh failed", { id: record.id, error: error.message });
+      return record;
+    }
+  }
   async function launch({ projectId, reviewId, reviewerId, repositoryUrl }) {
+    const existing = (await active()).find((item) => item.reviewId === reviewId);
+    if (existing) return sync(existing);
     const current = await active();
     if (current.length >= maxActive) throw new Error("All review environments are currently in use.");
     const used = new Set(current.map((item) => item.vmid));
@@ -46,8 +67,22 @@ export function createReviewEnvironmentManager({ store, config, logger = console
       throw error;
     }
   }
+  async function extend(record, minutes = 30) {
+    if (!record || !ACTIVE.has(record.status)) throw new Error("No active review sandbox was found.");
+    const remote = await request(`/v1/environments/${encodeURIComponent(record.id)}?action=extend`, { method: "POST", body: { minutes } });
+    const updated = { ...record, ...remote, updatedAt: nowIso() };
+    await store.put("review_environment", record.id, updated);
+    return updated;
+  }
+  async function restart(record) {
+    if (!record || !ACTIVE.has(record.status)) throw new Error("No active review sandbox was found.");
+    const remote = await request(`/v1/environments/${encodeURIComponent(record.id)}?action=restart`, { method: "POST" });
+    const updated = { ...record, ...remote, updatedAt: nowIso() };
+    await store.put("review_environment", record.id, updated);
+    return updated;
+  }
   async function cleanup() { for (const record of (await active()).filter((item) => new Date(item.expiresAt).getTime() <= Date.now())) await destroy(record); }
   const timer = setInterval(() => cleanup().catch((error) => logger.error("review environment cleanup failed", error)), 60_000);
   timer.unref?.();
-  return { active, launch, destroy, cleanup, list: () => store.list("review_environment"), health: () => request("/v1/health") };
+  return { active, launch, destroy, extend, restart, sync, capacity, cleanup, list: () => store.list("review_environment"), health: () => request("/v1/health") };
 }
