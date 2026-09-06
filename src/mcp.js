@@ -18,12 +18,34 @@ const tools = [
 function result(id, value) { return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] } }; }
 function error(id, message) { return { jsonrpc: "2.0", id, error: { code: -32000, message } }; }
 
+export function createMcpHandler({ store, githubClient, hackatimeClient }) {
+  return async (message) => {
+    const { id, method, params = {} } = message;
+    if (method === "initialize") return result(id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "cq-readonly-review", version: "1.0.0" } });
+    if (method === "notifications/initialized") return null;
+    if (method === "tools/list") return result(id, { tools: tools.map(([name, description, properties]) => ({ name, description, inputSchema: { type: "object", properties, required: Object.keys(properties) } })) });
+    if (method !== "tools/call") return error(id, "Unsupported MCP method.");
+    const name = params.name; const args = params.arguments || {};
+    if (!tools.some((tool) => tool[0] === name)) return error(id, "Unknown or unavailable read-only tool.");
+    let value;
+    if (name === "get_project") value = await store.get("project", args.project_id);
+    else if (name === "get_submission") value = await store.get("submission", args.submission_id);
+    else if (name === "get_devlogs") value = (await store.list("journal")).filter((item) => item.projectId === args.project_id);
+    else if (name === "get_funding_request") value = (await store.list("funding_request")).find((item) => item.projectId === args.project_id) || null;
+    else if (name === "get_review_history") value = (await store.list("review_action")).filter((item) => item.projectId === args.project_id || item.submissionId === args.project_id);
+    else if (name === "get_repository_evidence") value = await githubClient.repository(args.repo_url);
+    else if (name === "get_hackatime_activity") value = await hackatimeClient.projects(args.user_id);
+    return value === undefined ? error(id, "Not found.") : result(id, value);
+  };
+}
+
 export async function runMcpServer({ config = getConfig(), store = null, githubClient = null, hackatimeClient = null } = {}) {
   const dataStore = store ?? await createStore(config);
   await seedStore(dataStore);
   const github = githubClient ?? createGitHubClient(config);
   const hackatime = hackatimeClient ?? createHackatimeClient(config, dataStore);
-  const handle = async (message) => {
+  const handle = createMcpHandler({ store: dataStore, githubClient: github, hackatimeClient: hackatime });
+  /* const handle = async (message) => {
     const { id, method, params = {} } = message;
     if (method === "initialize") return result(id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "cq-readonly-review", version: "1.0.0" } });
     if (method === "notifications/initialized") return null;
@@ -41,7 +63,7 @@ export async function runMcpServer({ config = getConfig(), store = null, githubC
     else if (name === "get_hackatime_activity") value = await hackatime.projects(args.user_id);
     if (value === undefined) return error(id, "Not found.");
     return result(id, value);
-  };
+  }; */
   const input = readline.createInterface({ input: process.stdin });
   input.on("line", async (line) => { try { const response = await handle(JSON.parse(line)); if (response) process.stdout.write(`${JSON.stringify(response)}\n`); } catch (e) { process.stdout.write(`${JSON.stringify(error(null, e.message))}\n`); } });
 }
