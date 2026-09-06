@@ -180,12 +180,13 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
-    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
+    const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd) || 0) * 100) / 100));
+    const approvedHertz = approvedUsd;
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedHertz <= 0)) {
+    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
       setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
@@ -222,7 +223,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? request.firstPass.approvedUsd ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
     if (decision === "approved" && approvedHertz <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
       return res.redirect(`/admin/funding/${request.id}`);
@@ -634,7 +635,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
-      hardwareEvidence: reviewedProject?.track !== "hardware" || req.body.hardware_evidence === "1" || req.body.reproducible === "1" || Boolean(prior.criteria?.reproducible) || Boolean(prior.criteria?.hardwareEvidence),
+      hardwareEvidence: reviewedProject?.track !== "hardware" || (["repository_manual", "design_files", "structured_bom", "firmware", "schematic_cad", "build_evidence", "final_test"].every((key) => req.body[key] === "1")) || Boolean(prior.criteria?.hardwareEvidence),
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");

@@ -151,7 +151,7 @@ const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
 // Hardware review convenience controls: let reviewers adjust each devlog
 // independently, while keeping every value capped by the recorded minutes.
 const reviewForm = document.querySelector("form[data-review-form]");
-if (reviewForm && document.querySelector(".admin-screen")) {
+if (reviewForm && document.querySelector(".admin-screen[data-project-track=hardware]")) {
   const entries = [...document.querySelectorAll(".journal-list article")];
   if (entries.length && !reviewForm.querySelector(".per-devlog-minutes")) {
     const fieldset = document.createElement("fieldset"); fieldset.className = "review-checklist per-devlog-minutes";
@@ -167,8 +167,9 @@ if (reviewForm && document.querySelector(".admin-screen")) {
     anchor?.closest("label")?.before(fieldset);
   }
   if (reviewForm.querySelector(".review-checklist") && !reviewForm.querySelector("input[name=hardware_evidence]")) {
-    const label = document.createElement("label"); label.innerHTML = '<input type="checkbox" name="hardware_evidence" value="1"> Hardware repository, design files, BOM, firmware, schematic/CAD, build evidence, and final test evidence checked';
-    reviewForm.querySelector(".review-checklist")?.append(label);
+    const checklist = reviewForm.querySelector(".review-checklist");
+    [["repository_manual", "Public repository checked (manual verification for non-GitHub providers)"], ["design_files", "Design files checked"], ["structured_bom", "Structured BOM checked"], ["firmware", "Firmware checked where applicable"], ["schematic_cad", "Schematic/CAD checked"], ["build_evidence", "Build evidence checked"], ["final_test", "Final test evidence checked"]].forEach(([name, text]) => { const label = document.createElement("label"); label.innerHTML = `<input type="checkbox" name="${name}" value="1"> ${text}`; checklist.append(label); });
+    const label = document.createElement("input"); label.type = "hidden"; label.name = "hardware_evidence"; label.value = "1"; checklist.append(label);
   }
 }
 

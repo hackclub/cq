@@ -1,5 +1,5 @@
 <%- include('../partials/head') %>
-<section id="main" class="screen-page app-screen admin-screen">
+<section id="main" class="screen-page app-screen admin-screen" data-project-track="<%= project.track %>">
   <% const reviewData = submission.firstPass || submission.review || {}; const awaitingSecondPass = submission.phase === 'second_pass' && !submission.decision; const canSecondPass = hasPermission(user, 'reviews.second_pass'); %>
   <header class="apphead"><div><span class="eyebrow">REVIEW / <%= submission.id %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
   <div class="appbody admin-body"><%- include('nav') %>
