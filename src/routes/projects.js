@@ -514,6 +514,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
+      requestedUsd: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
       requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
       designMinutes: fundingMinutes,
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
@@ -527,7 +528,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     });
     await writeAudit(store, req.user, {
       action: "funding.submitted", entityType: "funding_request", entityId: request.id,
-      summary: `Submitted a $${request.requestedHertz} hardware funding request for ${project.title}.`, after: request,
+      summary: `Submitted a $${request.requestedUsd} hardware funding request for ${project.title}.`, after: request,
     });
     await notifier.fundingSubmitted?.(req.user, project, request);
     setFlash(res, "success", "Funding request sent! The CQ team will review your design and build plan.");
