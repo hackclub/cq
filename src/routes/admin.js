@@ -578,10 +578,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const project = await store.get("project", submission.projectId);
     if (!project) return res.sendStatus(404);
     const reviewProject = projectForReview(submission, project);
-    const [maker, country, journals, actions, reviewers, github] = await Promise.all([
+    const [maker, country, journals, actions, reviewers, github, environments] = await Promise.all([
       store.get("user", project.userId), store.get("country", project.countryCode),
       store.list("journal"), store.list("review_action"), store.list("user"),
       githubClient.repository(reviewProject.repoUrl),
+      reviewEnvironments.list(),
     ]);
     const reviewJournals = journalsForReview(submission, journals).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
     res.render("admin/review-detail", {
@@ -590,8 +591,32 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
       reviewers,
       github,
+      reviewEnvironment: environments.find((item) => item.reviewId === submission.id && !["destroyed", "failed"].includes(item.status)) || null,
       loggedMinutes: reviewMinutes(reviewJournals),
     });
+  });
+
+  router.post("/reviews/:id/environment/launch", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    const project = submission && await store.get("project", submission.projectId);
+    if (!submission || !project) return res.sendStatus(404);
+    try {
+      const environment = await reviewEnvironments.launch({ projectId: project.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project.repoUrl });
+      await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project.title}.`, metadata: { projectId: project.id, submissionId: submission.id, vmid: environment.vmid } });
+      setFlash(res, "success", "Review environment launched.");
+    } catch (error) { setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${submission.id}`);
+  });
+
+  router.post("/reviews/:id/environment/destroy", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && !["destroyed", "failed"].includes(item.status));
+    if (!environment) { setFlash(res, "error", "No active review environment was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.destroy(environment);
+      await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
+      setFlash(res, "success", "Review environment destroyed.");
+    } catch (error) { setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
   });
 
   router.post("/reviews/:id/claim", requirePermission("projects.review"), requireCsrf, async (req, res) => {
