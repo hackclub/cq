@@ -152,6 +152,31 @@ if (legacyBom && !document.querySelector("[data-bom-input]")) {
 }
 
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
+
+// Hardware review convenience controls: let reviewers adjust each devlog
+// independently, while keeping every value capped by the recorded minutes.
+const reviewForm = document.querySelector("form[data-review-form]");
+if (reviewForm && document.querySelector(".admin-screen")) {
+  const entries = [...document.querySelectorAll(".journal-list article")];
+  if (entries.length && !reviewForm.querySelector(".per-devlog-minutes")) {
+    const fieldset = document.createElement("fieldset"); fieldset.className = "review-checklist per-devlog-minutes";
+    fieldset.innerHTML = "<legend>Approved minutes by devlog</legend>";
+    entries.forEach((entry, index) => {
+      const title = entry.querySelector("h3")?.textContent?.trim() || `Devlog ${index + 1}`;
+      const logged = Number((entry.querySelector(".devlog-meta strong")?.textContent || "0").replace(/[^0-9]/g, "")) || 0;
+      const label = document.createElement("label"); label.textContent = `${title} (max ${logged} min)`;
+      const input = document.createElement("input"); input.type = "number"; input.name = `journal_minutes_${index}`; input.min = "0"; input.max = String(logged); input.step = "1"; input.value = String(logged);
+      label.append(input); fieldset.append(label);
+    });
+    const anchor = reviewForm.querySelector("textarea[name=technical_note]") || reviewForm.querySelector("input[name=approved_minutes]");
+    anchor?.closest("label")?.before(fieldset);
+  }
+  if (reviewForm.querySelector(".review-checklist") && !reviewForm.querySelector("input[name=hardware_evidence]")) {
+    const label = document.createElement("label"); label.innerHTML = '<input type="checkbox" name="hardware_evidence" value="1"> Hardware repository, design files, BOM, firmware, schematic/CAD, build evidence, and final test evidence checked';
+    reviewForm.querySelector(".review-checklist")?.append(label);
+  }
+}
+
 const safeImageUrl = (value) => /^https?:\/\//i.test(String(value || "")) ? String(value) : "";
 if (thumbnailUpload) {
   const input = thumbnailUpload.querySelector("[data-thumbnail-file]");

@@ -627,7 +627,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
-      hardwareEvidence: reviewedProject?.track !== "hardware" || req.body.reproducible === "1" || Boolean(prior.criteria?.reproducible) || Boolean(prior.criteria?.hardwareEvidence),
+      hardwareEvidence: reviewedProject?.track !== "hardware" || req.body.hardware_evidence === "1" || req.body.reproducible === "1" || Boolean(prior.criteria?.reproducible) || Boolean(prior.criteria?.hardwareEvidence),
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
@@ -639,7 +639,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
     const precheckMinutes = reviewMinutes(precheckJournals);
-    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`]) || 0)))]));
+    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal, index) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`] ?? req.body[`journal_minutes_${index}`]) || 0)))]));
     const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
