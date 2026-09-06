@@ -130,6 +130,22 @@ if (bomInput && bomRows && bomAdd) {
   renderBom(); syncBom();
 }
 
+// Upgrade legacy funding forms to the structured BOM editor without requiring
+// a separate template variant.
+const legacyBom = document.querySelector('form.funding-request-form textarea[name="bom"]');
+if (legacyBom && !document.querySelector("[data-bom-input]")) {
+  const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "bom_items"; hidden.dataset.bomInput = "";
+  legacyBom.name = "bom_notes"; legacyBom.required = false; legacyBom.closest("label")?.classList.add("legacy-bom-notes");
+  legacyBom.form.append(hidden);
+  const wrap = document.createElement("div"); wrap.className = "bom-quick-entry";
+  wrap.innerHTML = '<strong>Structured bill of materials</strong><button type="button" class="button button-ghost">Add part</button><div class="bom-quick-rows"></div>';
+  legacyBom.closest("label")?.after(wrap);
+  const rows = wrap.querySelector(".bom-quick-rows"); const add = wrap.querySelector("button"); const items = [];
+  const sync = () => { hidden.value = JSON.stringify(items); };
+  const render = () => { rows.replaceChildren(); items.forEach((item, index) => { const row = document.createElement("div"); row.className = "bom-quick-row"; row.innerHTML = '<input placeholder="Part" required><input placeholder="Purpose"><input type="number" min="1" step="1" placeholder="Qty" required><input type="number" min="0" step="0.01" placeholder="Unit cost ($)"><input type="url" placeholder="Supplier link" required><button type="button" class="text-button danger-text">Remove</button>'; const fields = row.querySelectorAll("input"); ["name","purpose","quantity","unitCost","link"].forEach((key, i) => { fields[i].value = item[key] ?? ""; fields[i].addEventListener("input", () => { item[key] = fields[i].value; sync(); }); }); row.querySelector("button").addEventListener("click", () => { items.splice(index, 1); render(); sync(); }); rows.append(row); }); };
+  add.addEventListener("click", () => { items.push({}); render(); sync(); }); add.click();
+}
+
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
 const safeImageUrl = (value) => /^https?:\/\//i.test(String(value || "")) ? String(value) : "";
 if (thumbnailUpload) {
