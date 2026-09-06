@@ -180,7 +180,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
-    const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd) || 0) * 100) / 100));
+    const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
     const approvedHertz = approvedUsd;
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
