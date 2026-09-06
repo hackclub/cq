@@ -64,7 +64,7 @@ function projectForReview(submission, currentProject) {
 export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier, reviewEnvironments }) {
   const router = Router();
   router.use(async (req, res, next) => {
-    if (req.user?.reviewerTraining?.required && req.user.reviewerTraining.status === "pending" && (req.path.startsWith("/reviews") || req.path.startsWith("/funding"))) return res.status(403).render("error", { title: "Reviewer training required", message: "Complete the reviewer tutorial and wait for an administrator to approve your training before reviewing live projects." });
+    if (req.user?.reviewerTraining?.required && req.user.reviewerTraining.status === "pending" && (req.path.startsWith("/funding") || (req.path.startsWith("/reviews") && !req.path.includes("sub_reviewer_training")))) return res.status(403).render("error", { title: "Reviewer training required", message: "Complete the reviewer tutorial and wait for an administrator to approve your training before reviewing live projects." });
     return next();
   });
   router.use(requireOrganizer);
@@ -569,7 +569,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),
     ]);
     const rows = sortNewest(submissions)
-      .filter((submission) => !submission.decision && !["withdrawn", "error"].includes(submission.phase))
+      .filter((submission) => submission.projectId !== "cq_reviewer_training" && !submission.decision && !["withdrawn", "error"].includes(submission.phase))
       .map((submission) => {
       const currentProject = projects.find((item) => item.id === submission.projectId);
       const project = currentProject ? projectForReview(submission, currentProject) : null;
@@ -589,6 +589,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });
   });
+
+  router.get("/reviewer-training", requirePermission("reviews.read"), async (req, res) => res.redirect("/admin/reviews/sub_reviewer_training"));
 
   router.get("/reviews/:id", requirePermission("projects.review"), async (req, res) => {
     const submission = await store.get("submission", req.params.id);
