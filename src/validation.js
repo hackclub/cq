@@ -100,7 +100,6 @@ export function validateProject(input, { forSubmission = false, journalMinutes =
   if (!(input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl))) {
     errors.push(input.track === "hardware" ? "Add a public Git repository URL (GitHub, GitLab, Codeberg, or another provider)." : "Add a public GitHub repository URL.");
   }
-  if (!input.projectType) errors.push("Choose the kind of ham-radio project you are making.");
   if (input.radioRelevance.length < 40) {
     errors.push("Explain in at least 40 characters how the project directly relates to ham radio.");
   }
