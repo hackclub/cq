@@ -21,6 +21,7 @@ import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
 import { formatDate, formatDateTime, jsonArray, readFlash, statusLabel } from "./utils.js";
 import { createInternalFrequency } from "./internal-frequency.js";
+import { createMcpHandler } from "./mcp.js";
 
 const consoleLogger = {
   info: (...args) => console.info(...args),
@@ -82,6 +83,12 @@ export async function createApp({
   app.get("/healthz", (req, res) => res.status(200).type("text/plain").send("ok"));
   app.use("/ari/webhook", ariWebhookRoutes({ store: dataStore, config, notifier }));
   app.use(express.urlencoded({ extended: false, limit: "128kb" }));
+  app.use(express.json({ limit: "128kb" }));
+  const mcpHandler = createMcpHandler({ store: dataStore, githubClient: github, hackatimeClient: hackatime });
+  app.post("/mcp", async (req, res) => {
+    if (!config.mcpReadonlyToken || req.get("authorization") !== `Bearer ${config.mcpReadonlyToken}`) return res.status(401).json({ error: "Unauthorized" });
+    try { const response = await mcpHandler(req.body || {}); return response ? res.json(response) : res.status(202).end(); } catch (error) { return res.status(500).json({ error: error.message }); }
+  });
   app.use("/fonts/space-mono", express.static(
     spaceMonoFilesPath,
     { maxAge: config.isProduction ? "1y" : 0, immutable: config.isProduction },
