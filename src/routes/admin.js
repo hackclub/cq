@@ -438,13 +438,6 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
           user.updatedAt = timestamp;
           await store.put("user", user.id, user);
         }
-        for (const item of current.items) {
-          const product = await store.get("product", item.productId);
-          if (product) {
-            product.stock += item.quantity;
-            await store.put("product", product.id, product);
-          }
-        }
         current.refundedAt = timestamp;
       }
       current.status = requestedStatus;
