@@ -4,6 +4,8 @@ import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDe
 import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 
+const ACTIVE_REVIEW_ENVIRONMENT_STATUSES = new Set(["provisioning", "ready", "open", "stopping", "stopped", "restarting"]);
+
 function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
@@ -69,6 +71,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   });
   router.use(requireOrganizer);
   router.get("/review-environments", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.list()));
+  router.get("/review-environments/capacity", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.capacity()));
   router.post("/reviews/:id/environment", requirePermission("review.environments"), requireCsrf, async (req, res) => {
     const submission = await store.get("submission", req.params.id);
     if (!submission) return res.sendStatus(404);
@@ -85,6 +88,18 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const destroyed = await reviewEnvironments.destroy(environment);
     await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
     return res.json(destroyed);
+  });
+  router.post("/review-environments/:id/extend", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    try { return res.json(await reviewEnvironments.extend(environment, Number(req.body?.minutes || 30))); }
+    catch (error) { return res.status(503).json({ error: error.message }); }
+  });
+  router.post("/review-environments/:id/restart", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    try { return res.json(await reviewEnvironments.restart(environment)); }
+    catch (error) { return res.status(503).json({ error: error.message }); }
   });
   router.post("/session/verify", requireCsrf, async (req, res) => {
     if (!req.session) return res.sendStatus(401);
@@ -598,20 +613,25 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const project = await store.get("project", submission.projectId);
     if (!project) return res.sendStatus(404);
     const reviewProject = projectForReview(submission, project);
-    const [maker, country, journals, actions, reviewers, github, environments] = await Promise.all([
+    const [maker, country, journals, actions, reviewers, github, environments, reviewEnvironmentCapacity] = await Promise.all([
       store.get("user", project.userId), store.get("country", project.countryCode),
       store.list("journal"), store.list("review_action"), store.list("user"),
       githubClient.repository(reviewProject.repoUrl),
       reviewEnvironments.list(),
+      reviewEnvironments.capacity(),
     ]);
     const reviewJournals = journalsForReview(submission, journals).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+    const existingEnvironment = environments.find((item) => item.reviewId === submission.id && !["destroyed", "failed"].includes(item.status)) || null;
+    const reviewEnvironment = await reviewEnvironments.sync(existingEnvironment);
     res.render("admin/review-detail", {
       title: `Review ${reviewProject.title}`, submission, project: reviewProject, maker, country,
       journals: reviewJournals,
       actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
       reviewers,
       github,
-      reviewEnvironment: environments.find((item) => item.reviewId === submission.id && !["destroyed", "failed"].includes(item.status)) || null,
+      reviewEnvironment,
+      reviewEnvironmentCapacity,
+      reviewEnvironmentOwner: reviewEnvironment ? reviewers.find((item) => item.id === reviewEnvironment.reviewerId) : null,
       loggedMinutes: reviewMinutes(reviewJournals),
     });
   });
@@ -623,18 +643,40 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     try {
       const environment = await reviewEnvironments.launch({ projectId: project.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project.repoUrl });
       await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project.title}.`, metadata: { projectId: project.id, submissionId: submission.id, vmid: environment.vmid } });
-      setFlash(res, "success", "Review environment launched.");
+      setFlash(res, "success", "Review sandbox launched.");
     } catch (error) { setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${submission.id}`);
   });
 
   router.post("/reviews/:id/environment/destroy", requirePermission("review.environments"), requireCsrf, async (req, res) => {
     const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && !["destroyed", "failed"].includes(item.status));
-    if (!environment) { setFlash(res, "error", "No active review environment was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
     try {
       await reviewEnvironments.destroy(environment);
       await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
-      setFlash(res, "success", "Review environment destroyed.");
+      setFlash(res, "success", "Review sandbox ended and queued for deletion.");
+    } catch (error) { setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
+  });
+
+  router.post("/reviews/:id/environment/extend", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && ACTIVE_REVIEW_ENVIRONMENT_STATUSES.has(item.status));
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.extend(environment, 30);
+      await writeAudit(store, req.user, { action: "review.environment.extend", entityType: "review_environment", entityId: environment.id, summary: "Extended a review sandbox by 30 minutes." });
+      setFlash(res, "success", "Review sandbox extended by 30 minutes.");
+    } catch (error) { setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
+  });
+
+  router.post("/reviews/:id/environment/restart", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && ACTIVE_REVIEW_ENVIRONMENT_STATUSES.has(item.status));
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.restart(environment);
+      await writeAudit(store, req.user, { action: "review.environment.restart", entityType: "review_environment", entityId: environment.id, summary: "Restarted a review sandbox." });
+      setFlash(res, "success", "Review sandbox restarted.");
     } catch (error) { setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${req.params.id}`);
   });
