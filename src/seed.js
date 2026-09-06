@@ -58,7 +58,7 @@ const countries = [
   },
 ];
 
-export async function seedStore(store) {
+export async function seedStore(store, { includeTraining = true } = {}) {
   const [existingProducts, existingCountries] = await Promise.all([
     store.list("product"),
     store.list("country"),
@@ -80,7 +80,7 @@ export async function seedStore(store) {
       });
     }));
   }
-  if (!(await store.get("project", "cq_reviewer_training"))) {
+  if (includeTraining && !(await store.get("project", "cq_reviewer_training"))) {
     const timestamp = new Date().toISOString();
     await store.put("project", "cq_reviewer_training", { id: "cq_reviewer_training", userId: "cq_training_maker", title: "Reviewer training: Pocket signal meter", description: "Training-only example project for practicing evidence-based CQ reviews.", repoUrl: "https://github.com/hackclub/cq", demoUrl: "https://example.com/training-demo", thumbnailUrl: "https://example.com/training.jpg", hackatimeProjects: [], evidence: ["commits", "elapsed", "devlog"], track: "software", status: "submitted", projectType: "station-tooling", radioRelevance: "A small tool that visualizes amateur radio signal measurements for station operators.", countryCode: "AU", licenseGoal: "", callsign: "", aiStatement: "AI was used for brainstorming only.", tags: ["training"], originalWork: true, notSchoolAssignment: true, notPaidHackClubWork: true, createdAt: timestamp, updatedAt: timestamp });
     await store.put("user", "cq_training_maker", { id: "cq_training_maker", name: "CQ Training Example", email: "training@example.invalid", role: "participant", roles: ["participant"], hertz: 0, createdAt: timestamp, updatedAt: timestamp });
