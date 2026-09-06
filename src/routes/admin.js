@@ -179,8 +179,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const designChecked = req.body.design_checked === "1";
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
-    const requested = Math.max(0, Number(request.requestedHertz) || 0);
-    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_hertz) || 0) * 100) / 100));
+    const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
+    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
@@ -222,7 +222,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
     if (decision === "approved" && approvedHertz <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
       return res.redirect(`/admin/funding/${request.id}`);
@@ -625,6 +625,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
     const technicalNote = String(req.body.technical_note || prior.technical_note || "").trim().slice(0, 3000);
     const timeNote = String(req.body.time_note || prior.time_note || "").trim().slice(0, 2000);
+    const reviewedProject = await store.get("project", submission.projectId);
     const criteria = {
       radioRelated: req.body.radio_related === "1" || Boolean(prior.criteria?.radioRelated),
       shipped: req.body.shipped === "1" || Boolean(prior.criteria?.shipped),
@@ -633,6 +634,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
+      hardwareEvidence: reviewedProject?.track !== "hardware" || req.body.reproducible === "1" || Boolean(prior.criteria?.reproducible) || Boolean(prior.criteria?.hardwareEvidence),
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
@@ -644,7 +646,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
     const precheckMinutes = reviewMinutes(precheckJournals);
-    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
+    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`]) || 0)))]));
+    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -671,7 +674,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const journals = journalsForReview(submission, await store.list("journal"));
       const loggedMinutes = reviewMinutes(journals);
       const approvedMinutes = decision === "approved"
-        ? Math.min(loggedMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)))
+        ? Math.min(loggedMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)))
         : 0;
       const timestamp = nowIso();
       submission.phase = "reviewed";
