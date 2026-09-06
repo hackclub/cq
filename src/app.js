@@ -22,6 +22,7 @@ import { createStore } from "./store.js";
 import { formatDate, formatDateTime, hash, jsonArray, readFlash, statusLabel } from "./utils.js";
 import { createInternalFrequency } from "./internal-frequency.js";
 import { createMcpHandler } from "./mcp.js";
+import { createReviewEnvironmentManager } from "./review-environments.js";
 
 const consoleLogger = {
   info: (...args) => console.info(...args),
@@ -45,6 +46,7 @@ export async function createApp({
   const cdn = cdnClient ?? createCdnClient(config);
   if (!cdn.configured()) logger.error("R2 image uploads are not configured; shop and project image uploads will return 503.");
   const notifier = slackNotifier ?? createSlackNotifier(config, dataStore);
+  const reviewEnvironments = createReviewEnvironmentManager({ store: dataStore, config, logger });
   const app = express();
 
   app.locals.config = config;
@@ -62,6 +64,7 @@ export async function createApp({
   app.locals.isOrganizer = isOrganizer;
   app.locals.roleDefinitions = roleDefinitions;
   app.locals.userRoles = userRoles;
+  app.locals.reviewEnvironments = reviewEnvironments;
 
   app.set("view engine", "ejs");
   app.set("views", path.join(config.projectRoot, "views"));
@@ -123,7 +126,7 @@ export async function createApp({
   app.use("/app", dashboardRoutes({ store: dataStore, hackatimeClient: hackatime }));
   app.use("/app/projects", projectRoutes({ store: dataStore, config, ariClient: ari, hackatimeClient: hackatime, cdnClient: cdn, notifier }));
   app.use("/app/shop", shopRoutes({ store: dataStore, notifier }));
-  app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, githubClient: github, cdnClient: cdn, notifier }));
+  app.use("/admin", adminRoutes({ store: dataStore, config, ariClient: ari, githubClient: github, cdnClient: cdn, notifier, reviewEnvironments }));
 
   app.use((req, res) => {
     res.status(404).render("error", { title: "Signal lost", message: "That page is not on this frequency." });

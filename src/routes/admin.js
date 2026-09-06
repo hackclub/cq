@@ -61,9 +61,27 @@ function projectForReview(submission, currentProject) {
   };
 }
 
-export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
+export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier, reviewEnvironments }) {
   const router = Router();
   router.use(requireOrganizer);
+  router.get("/review-environments", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.list()));
+  router.post("/reviews/:id/environment", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    if (!submission) return res.sendStatus(404);
+    try {
+      const project = await store.get("project", submission.projectId);
+      const environment = await reviewEnvironments.launch({ projectId: project?.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project?.repoUrl });
+      await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project?.title || submission.projectId}.`, metadata: { projectId: project?.id, submissionId: submission.id } });
+      return res.json(environment);
+    } catch (error) { return res.status(503).json({ error: error.message }); }
+  });
+  router.delete("/review-environments/:id", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    const destroyed = await reviewEnvironments.destroy(environment);
+    await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
+    return res.json(destroyed);
+  });
   router.post("/session/verify", requireCsrf, async (req, res) => {
     if (!req.session) return res.sendStatus(401);
     const verifiedAt = nowIso();
