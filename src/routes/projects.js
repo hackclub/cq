@@ -203,6 +203,7 @@ function journalInput(body = {}) {
     text: String(body.text || "").trim().slice(0, 2000),
     imageUrls,
     imageUrl: imageUrls[0] || "",
+    ...(String(body.minutes || "").trim() ? { minutes: Math.max(0, Math.round(Number(body.minutes) || 0)) } : {}),
   };
 }
 
@@ -399,7 +400,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       await store.withLock(`devlog:${project.id}`, async () => {
         if (project.track === "hardware") {
           const timestamp = nowIso();
-          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), minutes: 0, hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
+          if (input.minutes < 1) throw new Error("Enter the whole number of minutes spent on this hardware update.");
+          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
           await store.put("journal", journal.id, journal);
           await store.put("project", project.id, { ...project, updatedAt: timestamp });
           return;
@@ -449,7 +451,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", errors[0]);
       return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
     }
-    await store.put("journal", journal.id, { ...journal, ...input, updatedAt: nowIso() });
+    await store.put("journal", journal.id, { ...journal, ...input, minutes: project.track === "hardware" ? input.minutes : journal.minutes, updatedAt: nowIso() });
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
     setFlash(res, "success", "Devlog updated.");
