@@ -180,6 +180,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > requested) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
     const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
     const approvedHertz = approvedUsd;
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
@@ -219,6 +223,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : request.firstPass.decision;
     const noteToMaker = String(req.body.note_to_maker || request.firstPass.noteToMaker || "").trim().slice(0, 3000);
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > Number(request.requestedUsd ?? request.requestedHertz)) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
     if (["changes", "rejected"].includes(decision) && noteToMaker.length < 5) {
       setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
