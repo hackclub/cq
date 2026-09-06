@@ -63,6 +63,10 @@ function projectForReview(submission, currentProject) {
 
 export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier, reviewEnvironments }) {
   const router = Router();
+  router.use(async (req, res, next) => {
+    if (req.user?.reviewerTraining?.required && req.user.reviewerTraining.status === "pending" && (req.path.startsWith("/reviews") || req.path.startsWith("/funding"))) return res.status(403).render("error", { title: "Reviewer training required", message: "Complete the reviewer tutorial and wait for an administrator to approve your training before reviewing live projects." });
+    return next();
+  });
   router.use(requireOrganizer);
   router.get("/review-environments", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.list()));
   router.post("/reviews/:id/environment", requirePermission("review.environments"), requireCsrf, async (req, res) => {
@@ -318,6 +322,16 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     });
     setFlash(res, "success", `${user.name} will need to sign in with Hack Club Auth again.`);
     res.redirect("/admin/users");
+  });
+
+  router.post("/users/:id/reviewer-training/complete", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const user = await store.get("user", req.params.id);
+    if (!user) return res.sendStatus(404);
+    user.reviewerTraining = { ...(user.reviewerTraining || {}), required: false, status: "approved", approvedAt: nowIso(), approvedById: req.user.id };
+    await store.put("user", user.id, user);
+    await writeAudit(store, req.user, { action: "reviewer.training_approved", entityType: "user", entityId: user.id, summary: `Approved reviewer training for ${user.name}.` });
+    setFlash(res, "success", `${user.name} can now review live projects.`);
+    return res.redirect("/admin/users");
   });
 
   router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {
