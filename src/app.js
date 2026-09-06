@@ -19,7 +19,7 @@ import { shopRoutes } from "./routes/shop.js";
 import { seedStore } from "./seed.js";
 import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
-import { formatDate, formatDateTime, jsonArray, readFlash, statusLabel } from "./utils.js";
+import { formatDate, formatDateTime, hash, jsonArray, readFlash, statusLabel } from "./utils.js";
 import { createInternalFrequency } from "./internal-frequency.js";
 import { createMcpHandler } from "./mcp.js";
 
@@ -86,7 +86,10 @@ export async function createApp({
   app.use(express.json({ limit: "128kb" }));
   const mcpHandler = createMcpHandler({ store: dataStore, githubClient: github, hackatimeClient: hackatime });
   app.post("/mcp", async (req, res) => {
-    if (!config.mcpReadonlyToken || req.get("authorization") !== `Bearer ${config.mcpReadonlyToken}`) return res.status(401).json({ error: "Unauthorized" });
+    const bearer = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const validStatic = config.mcpReadonlyToken && bearer === config.mcpReadonlyToken;
+    const validUserToken = bearer ? (await dataStore.list("mcp_token")).some((token) => !token.revokedAt && token.tokenHash === hash(bearer)) : false;
+    if (!validStatic && !validUserToken) return res.status(401).json({ error: "Unauthorized" });
     try { const response = await mcpHandler(req.body || {}); return response ? res.json(response) : res.status(202).end(); } catch (error) { return res.status(500).json({ error: error.message }); }
   });
   app.use("/fonts/space-mono", express.static(

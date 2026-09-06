@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { requireAuth } from "../auth.js";
+import { requireAuth, requireCsrf } from "../auth.js";
+import crypto from "node:crypto";
+import { hash, nowIso, randomId, setFlash } from "../utils.js";
 
 export function dashboardRoutes({ store, hackatimeClient }) {
   const router = Router();
@@ -40,7 +42,17 @@ export function dashboardRoutes({ store, hackatimeClient }) {
       errors: [],
       values: req.user,
       hackatime: await hackatimeClient.connection(req.user.id),
+      mcpTokens: (await store.list("mcp_token")).filter((token) => token.userId === req.user.id && !token.revokedAt),
     });
+  });
+
+  router.post("/profile/mcp-token", requireCsrf, async (req, res) => {
+    const raw = `cq_mcp_${crypto.randomBytes(32).toString("base64url")}`;
+    const id = randomId("mcp_");
+    await store.put("mcp_token", id, { id, userId: req.user.id, tokenHash: hash(raw), scopes: ["read"], createdAt: nowIso(), lastUsedAt: null });
+    res.locals.mcpToken = raw;
+    setFlash(res, "success", `MCP token created. Copy it now; it will not be shown again.`);
+    return res.render("profile", { title: "Your profile", errors: [], values: req.user, hackatime: await hackatimeClient.connection(req.user.id), mcpTokens: (await store.list("mcp_token")).filter((token) => token.userId === req.user.id && !token.revokedAt), oneTimeMcpToken: raw });
   });
 
   return router;
