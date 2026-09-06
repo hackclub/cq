@@ -39,7 +39,7 @@ export async function createApp({
 } = {}) {
   if (!config) throw new Error("createApp requires config");
   const dataStore = store ?? await createStore(config, storeOptions);
-  await seedStore(dataStore, { includeTraining: !config.nodeEnv || config.nodeEnv !== "test" });
+  await seedStore(dataStore);
   const ari = ariClient ?? createAriClient(config);
   const hackatime = hackatimeClient ?? createHackatimeClient(config, dataStore);
   const github = githubClient ?? createGitHubClient(config);
