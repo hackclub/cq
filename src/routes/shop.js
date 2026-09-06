@@ -132,8 +132,7 @@ export function shopRoutes({ store, notifier }) {
         };
         const freshProducts = await Promise.all(freshCart.items.map((item) => store.get("product", item.id)));
         freshCart.items.forEach((item, index) => {
-          const product = freshProducts[index];
-          if (product.stock < item.quantity) throw new Error(`${product.name} is no longer available in that quantity.`);
+          if (!freshProducts[index]?.active) throw new Error(`${item.name} is no longer available.`);
         });
         for (let index = 0; index < freshCart.items.length; index += 1) {
           const item = freshCart.items[index];
