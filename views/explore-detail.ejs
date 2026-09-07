@@ -1,0 +1,13 @@
+<%- include('partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
+    <div><span class="eyebrow">CQ / EXPLORE / <%= project.track === 'hardware' ? 'HARDWARE' : 'SOFTWARE' %></span><h1><%= project.title %></h1><p class="apphead-copy">Shared by <%= project.makerName %></p></div>
+    <div class="headright"><a class="button button-ghost" href="/app">Back to Explore</a></div>
+  </header>
+  <div class="appbody explore-detail">
+    <% if (project.thumbnailUrl) { %><img class="explore-detail-image" src="<%= project.thumbnailUrl %>" alt="<%= project.title %> project image"><% } %>
+    <section class="panel"><p class="eyebrow">About this project</p><p class="explore-description"><%= project.description %></p><p><strong>Radio connection:</strong> <%= project.radioRelevance %></p><% if (project.tags.length) { %><div class="tag-list"><% project.tags.forEach((tag) => { %><span><%= tag %></span><% }) %></div><% } %></section>
+    <section class="panel explore-links"><p class="eyebrow">Project links</p><div class="button-row"><a class="button" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Source code ↗</a><% if (project.demoUrl) { %><a class="button button-ghost" href="<%= project.demoUrl %>" target="_blank" rel="noreferrer">Demo / video ↗</a><% } %></div></section>
+  </div>
+</section>
+<%- include('partials/footer') %>

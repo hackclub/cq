@@ -359,7 +359,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const [projects, users, submissions] = await Promise.all([
       store.list("project"), store.list("user"), store.list("submission"),
     ]);
-    const rows = sortNewest(projects).map((project) => ({
+    const rows = sortNewest(projects.filter((project) => project.id !== "cq_reviewer_training")).map((project) => ({
       ...project,
       maker: users.find((user) => user.id === project.userId),
       latestSubmission: sortNewest(submissions.filter((item) => item.projectId === project.id))[0],
@@ -397,6 +397,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       project.unapprovedAt = nowIso();
       project.unapprovedById = req.user.id;
     }
+    if (req.body.visibility) {
+      if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
+      project.visibility = ["private", "unlisted", "public"].includes(req.body.visibility) ? req.body.visibility : (project.visibility || "unlisted");
+    }
     if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
@@ -408,7 +412,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     await store.put("project", project.id, project);
     await writeAudit(store, req.user, {
       action: "project.status_updated", entityType: "project", entityId: project.id,
-      summary: `Changed ${project.title} from ${previousStatus} to ${project.status}.`, before, after: project,
+      summary: req.body.visibility ? `Changed Explore visibility for ${project.title} to ${project.visibility}.` : `Changed ${project.title} from ${previousStatus} to ${project.status}.`, before, after: project,
     });
     if (previousStatus !== project.status) {
       const user = await store.get("user", project.userId);
@@ -703,6 +707,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       await store.put("submission", submission.id, submission);
       project.status = { approved: "approved", changes: "needs_changes", rejected: "rejected" }[decision];
       project.updatedAt = timestamp;
+      if (decision === "approved") project.approvedAt = timestamp;
       await store.put("project", project.id, project);
 
       const existingLedger = await store.get("ledger", submission.id);
