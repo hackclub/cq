@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { writeAudit } from "./audit.js";
 import { nowIso, publicUrl } from "./utils.js";
+import { finalizeUnifiedFields, submissionMinutes } from "./unified.js";
 
 function safeEqualHex(left, right) {
   if (!/^[a-f0-9]{64}$/i.test(left || "") || !/^[a-f0-9]{64}$/i.test(right || "")) return false;
@@ -147,13 +148,28 @@ export async function applyAriEvent(store, payload, deliveryId) {
       event === "review.reverted" ? "reverted" :
       event.startsWith("review.") && event !== "review.fraud" ? "reviewed" :
       submission.phase;
+    const decision = payload.decision ?? ({
+      "review.approved": "approved",
+      "review.changes": "changes",
+      "review.rejected": "rejected",
+    }[event] || null);
     submission.ariId = payload.id ?? submission.ariId;
     submission.phase = phase;
-    submission.decision = payload.decision ?? null;
+    submission.decision = decision;
     submission.event = event;
     submission.review = payload.review ?? payload.fraud ?? {};
     submission.lastError = null;
     submission.updatedAt = timestamp;
+    if (["approved", "changes", "rejected"].includes(decision)) {
+      const approvedMinutes = decision === "approved" ? Math.max(0, Number(payload.review?.approved_minutes ?? 0)) : 0;
+      submission.airtableFields = finalizeUnifiedFields(submission, {
+        decision,
+        claimedMinutes: submissionMinutes(submission),
+        approvedMinutes,
+        technicalNote: String(payload.review?.technical_note || payload.review?.technicalNote || ""),
+        timeNote: String(payload.review?.time_note || payload.review?.timeNote || ""),
+      });
+    }
     await store.put("submission", submission.id, submission);
 
     const projectStatus = {
@@ -167,6 +183,7 @@ export async function applyAriEvent(store, payload, deliveryId) {
     if (projectStatus && project) {
       project.status = projectStatus;
       project.updatedAt = timestamp;
+      if (event === "review.approved") project.approvedAt = timestamp;
       await store.put("project", project.id, project);
     }
 
