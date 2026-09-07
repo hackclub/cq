@@ -1,6 +1,7 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import express from "express";
+import compression from "compression";
 import helmet from "helmet";
 import { createAriClient } from "./ari.js";
 import { hasPermission, isOrganizer, roleDefinitions, sessionMiddleware, userRoles } from "./auth.js";
@@ -69,6 +70,7 @@ export async function createApp({
   app.set("view engine", "ejs");
   app.set("views", path.join(config.projectRoot, "views"));
   app.disable("x-powered-by");
+  app.use(compression());
 
   app.use(
     helmet({
