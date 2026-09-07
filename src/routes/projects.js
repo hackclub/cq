@@ -336,7 +336,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...journal,
         imageUrls: journalImages(journal),
       })),
-      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 }),
+      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
       ariConfigured: ariClient.configured(),
       projectLocked: project.status === "submitted",
       lockedJournalIds: [...new Set(projectDetails.submissions.flatMap((item) => {
@@ -571,7 +571,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
-    const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 });
+    const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
       return res.redirect(`/app/projects/${project.id}#submission`);
