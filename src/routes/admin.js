@@ -608,6 +608,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "This review already has a final decision. Reopen the project before it can be shipped again.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
+    if (submission.phase === "withdrawn") {
+      setFlash(res, "error", "This submission was withdrawn and cannot be reviewed. Wait for the maker to submit a new review.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
     if (secondPass && (submission.phase !== "second_pass" || !submission.firstPass)) {
       setFlash(res, "error", "This review is not waiting for second pass.");
       return res.redirect(`/admin/reviews/${submission.id}`);
