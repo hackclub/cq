@@ -54,6 +54,7 @@
             <% }) %>
           </div>
         <% } %>
+        <% if (removedJournals?.length) { %><details class="journal-edit"><summary>Removed devlogs / <%= removedJournals.length %></summary><p class="field-help">Removed devlogs are kept safely and do not count toward a submission until restored.</p><div class="compact-list"><% removedJournals.forEach((journal) => { %><div><span><strong><%= journal.title || 'Project update' %></strong><small>Removed <%= formatDateTime(journal.deletedAt) %></small></span><form method="post" action="/app/projects/<%= project.id %>/journals/<%= journal.id %>/restore"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="text-button" type="submit">Restore</button></form></div><% }) %></div></details><% } %>
       </section>
 
       <section class="panel submission-panel" id="submission">

@@ -506,9 +506,18 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   router.post("/shop/:id/delete", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
     const product = await store.get("product", req.params.id);
     if (!product) return res.sendStatus(404);
-    await store.delete("product", product.id);
-    await writeAudit(store, req.user, { action: "product.deleted", entityType: "product", entityId: product.id, summary: `Deleted shop item ${product.name}.`, before: product });
-    setFlash(res, "success", `${product.name} deleted.`);
+    await store.put("product", product.id, { ...product, active: false, archivedAt: nowIso(), updatedAt: nowIso() });
+    await writeAudit(store, req.user, { action: "product.archived", entityType: "product", entityId: product.id, summary: `Archived shop item ${product.name}.`, before: product });
+    setFlash(res, "success", `${product.name} archived. Existing order history is preserved.`);
+    res.redirect("/admin/shop");
+  });
+
+  router.post("/shop/:id/restore", requirePermission("shop.manage"), requireCsrf, async (req, res) => {
+    const product = await store.get("product", req.params.id);
+    if (!product || !product.archivedAt) return res.sendStatus(404);
+    await store.put("product", product.id, { ...product, active: true, archivedAt: null, updatedAt: nowIso() });
+    await writeAudit(store, req.user, { action: "product.restored", entityType: "product", entityId: product.id, summary: `Restored shop item ${product.name}.`, before: product });
+    setFlash(res, "success", `${product.name} restored to the shop.`);
     res.redirect("/admin/shop");
   });
 

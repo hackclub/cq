@@ -40,6 +40,7 @@ function normalizeProjects(body) {
 }
 
 export function createHackatimeClient(config, store, fetchImpl = fetch) {
+  const refreshes = new Map();
   async function authenticatedGet(endpoint, accessToken) {
     const response = await fetchImpl(endpoint, {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
@@ -144,32 +145,45 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     }
   }
 
+  async function refreshProjects(userId, status, cached) {
+    if (refreshes.has(userId)) return refreshes.get(userId);
+    const refresh = (async () => {
+      const token = await store.get("hackatime_token", userId);
+      try {
+        const url = new URL(projectsEndpoint);
+        url.searchParams.set("include_archived", "false");
+        const body = await authenticatedGet(url, token.accessToken);
+        const normalized = normalizeProjects(body);
+        const record = { id: userId, userId, projects: normalized, fetchedAt: nowIso() };
+        await store.put("hackatime_cache", userId, record);
+        return { ...status, projects: normalized, fetchedAt: record.fetchedAt };
+      } catch (error) {
+        if (error.status === 401) {
+          await store.delete("hackatime_token", userId);
+          await store.delete("hackatime_cache", userId);
+          return { ...status, connected: false, projects: [], fetchedAt: null, error: "reconnect" };
+        }
+        if (cached) return { ...status, projects: cached.projects, fetchedAt: cached.fetchedAt, error: "stale" };
+        return { ...status, projects: [], fetchedAt: null, error: "unavailable" };
+      } finally {
+        refreshes.delete(userId);
+      }
+    })();
+    refreshes.set(userId, refresh);
+    return refresh;
+  }
+
   async function projects(userId, { force = false } = {}) {
     const status = await connection(userId);
     if (!status.configured || !status.connected) return { ...status, projects: [], fetchedAt: null };
 
     const cached = await store.get("hackatime_cache", userId);
     const cacheFresh = cached && Date.now() - new Date(cached.fetchedAt).getTime() < cacheLifetimeMs;
-    if (!force && cacheFresh) return { ...status, projects: cached.projects, fetchedAt: cached.fetchedAt };
-
-    const token = await store.get("hackatime_token", userId);
-    try {
-      const url = new URL(projectsEndpoint);
-      url.searchParams.set("include_archived", "false");
-      const body = await authenticatedGet(url, token.accessToken);
-      const normalized = normalizeProjects(body);
-      const record = { id: userId, userId, projects: normalized, fetchedAt: nowIso() };
-      await store.put("hackatime_cache", userId, record);
-      return { ...status, projects: normalized, fetchedAt: record.fetchedAt };
-    } catch (error) {
-      if (error.status === 401) {
-        await store.delete("hackatime_token", userId);
-        await store.delete("hackatime_cache", userId);
-        return { ...status, connected: false, projects: [], fetchedAt: null, error: "reconnect" };
-      }
-      if (cached) return { ...status, projects: cached.projects, fetchedAt: cached.fetchedAt, error: "stale" };
-      return { ...status, projects: [], fetchedAt: null, error: "unavailable" };
+    if (cached && !force) {
+      if (!cacheFresh) void refreshProjects(userId, status, cached).catch(() => {});
+      return { ...status, projects: cached.projects, fetchedAt: cached.fetchedAt, ...(cacheFresh ? {} : { error: "stale" }) };
     }
+    return refreshProjects(userId, status, cached);
   }
 
   async function disconnect(userId) {
