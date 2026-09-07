@@ -177,8 +177,7 @@ function readiness(project, journals, user, { hasPriorSubmission = false } = {})
   if (![user.firstName, user.lastName, user.birthday, user.addressLine1, user.city, user.region, user.postalCode, user.addressCountry].every(Boolean)) {
     errors.push("Complete your legal name, birthday, and address in your profile before submitting.");
   }
-  if (hasPriorSubmission && journals.length === 0) errors.push("Add new devlogs before submitting a project update.");
-  if (hasPriorSubmission && !project.isUpdate) errors.push("Mark this as an update and describe the meaningful new work before resubmitting.");
+  if (hasPriorSubmission && journals.length === 0) errors.push("Add new devlogs before resubmitting a project already approved through CQ.");
   return { errors, journalMinutes };
 }
 
