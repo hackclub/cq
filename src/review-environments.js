@@ -9,7 +9,18 @@ export function createReviewEnvironmentManager({ store, config, logger = console
     if (!config.reviewAgentUrl || !config.reviewAgentToken) throw new Error("Review environment service is not configured.");
     const response = await fetch(`${config.reviewAgentUrl}${path}`, { method, headers: { Accept: "application/json", Authorization: `Bearer ${config.reviewAgentToken}`, ...(config.cloudflareAccessClientId ? { "CF-Access-Client-Id": config.cloudflareAccessClientId, "CF-Access-Client-Secret": config.cloudflareAccessClientSecret } : {}), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Review environment service failed (${response.status}).`);
+    if (!response.ok) {
+      const details = {
+        url: response.url,
+        status: response.status,
+        server: response.headers.get("server") || undefined,
+        cfRay: response.headers.get("cf-ray") || undefined,
+        via: response.headers.get("via") || undefined,
+      };
+      logger.warn?.("review environment service response", details);
+      const suffix = Object.entries(details).filter(([, value]) => value).map(([key, value]) => `${key}=${value}`).join(" ");
+      throw new Error(`${payload.error || `Review environment service failed (${response.status}).`} [${suffix}]`);
+    }
     return payload;
   }
   async function active() { return (await store.list("review_environment")).filter((item) => ACTIVE.has(item.status)); }
