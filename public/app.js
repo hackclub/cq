@@ -2,11 +2,6 @@ const menuButton = document.querySelector(".menu-button");
 const navigation = document.querySelector(".site-nav");
 
 window.addEventListener("beforeunload", () => document.body.classList.add("is-loading"));
-document.addEventListener("click", (event) => {
-  const link = event.target.closest("a[href]");
-  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  if (new URL(link.href, location.href).origin === location.origin && !link.target && !link.hasAttribute("download")) document.body.classList.add("is-loading");
-});
 
 const utcClock = document.querySelector("[data-utc-clock]");
 if (utcClock) {
@@ -24,11 +19,10 @@ menuButton?.addEventListener("click", () => {
   navigation?.classList.toggle("open", !expanded);
 });
 
-for (const form of document.querySelectorAll("form[data-confirm]")) {
-  form.addEventListener("submit", (event) => {
-    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
-  });
-}
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("form[data-confirm]");
+  if (form && !window.confirm(form.dataset.confirm)) event.preventDefault();
+});
 
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest("form[data-async-sandbox]");
@@ -58,6 +52,102 @@ document.addEventListener("submit", async (event) => {
       if (button) { button.disabled = false; button.textContent = originalLabel; }
     }
 });
+
+let navigationRequest = null;
+
+function syncPageChrome(nextDocument) {
+  for (const selector of [".softkeys", ".status", ".top .right"]) {
+    const current = document.querySelector(selector);
+    const next = nextDocument.querySelector(selector);
+    if (current && next) current.replaceWith(next);
+  }
+  document.title = nextDocument.title;
+  document.body.className = nextDocument.body.className;
+}
+
+function renderNavigationDocument(nextDocument, url, { push = true } = {}) {
+  const currentDisplay = document.querySelector(".display");
+  const nextDisplay = nextDocument.querySelector(".display");
+  if (!currentDisplay || !nextDisplay) throw new Error("This response cannot be shown without a full navigation.");
+  currentDisplay.replaceWith(nextDisplay);
+  syncPageChrome(nextDocument);
+  if (push) history.pushState({}, "", url);
+  window.scrollTo({ top: 0, behavior: "auto" });
+  initializePage();
+}
+
+async function softNavigate(url, { push = true, response = null } = {}) {
+  navigationRequest?.abort();
+  const controller = new AbortController();
+  navigationRequest = controller;
+  document.body.classList.add("is-loading");
+  try {
+    const page = response || await fetch(url, {
+      headers: { Accept: "text/html", "X-CQ-Navigation": "1" },
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
+    if (!page.ok || !String(page.headers.get("content-type") || "").includes("text/html")) throw new Error(`Navigation failed (${page.status}).`);
+    const finalUrl = page.url || String(url);
+    if (new URL(finalUrl, location.href).origin !== location.origin) return location.assign(finalUrl);
+    const nextDocument = new DOMParser().parseFromString(await page.text(), "text/html");
+    renderNavigationDocument(nextDocument, finalUrl, { push });
+  } catch (error) {
+    if (error.name !== "AbortError") location.assign(url);
+  } finally {
+    if (navigationRequest === controller) navigationRequest = null;
+    document.body.classList.remove("is-loading");
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("a[href]");
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target || link.hasAttribute("download")) return;
+  const url = new URL(link.href, location.href);
+  if (url.origin !== location.origin || url.pathname.startsWith("/auth/login") || (url.pathname === location.pathname && url.search === location.search && url.hash)) return;
+  event.preventDefault();
+  softNavigate(url.href);
+});
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("form");
+  if (!form || event.defaultPrevented || form.matches("[data-async-sandbox]")) return;
+  if ([...form.querySelectorAll('input[type="file"]')].some((input) => input.files?.length)) return;
+  const method = String(form.method || "GET").toUpperCase();
+  if (!["GET", "POST"].includes(method)) return;
+  event.preventDefault();
+  const submitter = event.submitter;
+  const data = submitter ? new FormData(form, submitter) : new FormData(form);
+  const encoded = new URLSearchParams();
+  for (const [name, value] of data) if (!(value instanceof File)) encoded.append(name, value);
+  const button = submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+  if (button) button.disabled = true;
+  document.body.classList.add("is-loading");
+  try {
+    if (method === "GET") {
+      const url = new URL(form.action || location.href, location.href);
+      url.search = encoded.toString();
+      return await softNavigate(url.href);
+    }
+    const response = await fetch(form.action || location.href, {
+      method,
+      body: encoded,
+      headers: { Accept: "text/html", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "X-CQ-Navigation": "1" },
+      credentials: "same-origin",
+      redirect: "follow",
+    });
+    await softNavigate(response.url || form.action, { response });
+  } catch {
+    form.submit();
+  } finally {
+    if (button?.isConnected) button.disabled = false;
+    document.body.classList.remove("is-loading");
+  }
+});
+
+window.addEventListener("popstate", () => softNavigate(location.href, { push: false }));
+
+function initializePage() {
 
 const toast = document.querySelector(".toast");
 if (toast) {
@@ -391,6 +481,7 @@ if (canvas) {
   resize();
 
   function paint() {
+    if (!canvas.isConnected) return;
     tick += 0.018;
     const w = canvas.width;
     const h = canvas.height;
@@ -420,3 +511,7 @@ if (canvas) {
 
   paint();
 }
+
+}
+
+initializePage();
