@@ -5,9 +5,11 @@ const ACTIVE = new Set(["provisioning", "ready", "open", "stopping", "stopped", 
 export function createReviewEnvironmentManager({ store, config, logger = console }) {
   const maxActive = Math.max(1, Math.min(4, config.reviewEnvironmentMaxActive || 4));
   const ttlMs = Math.max(15, config.reviewEnvironmentTtlMinutes || 120) * 60_000;
+  let capacityCache = null;
+  let capacityCacheAt = 0;
   async function request(path, { method = "GET", body } = {}) {
     if (!config.reviewAgentUrl || !config.reviewAgentToken) throw new Error("Review environment service is not configured.");
-    const response = await fetch(`${config.reviewAgentUrl}${path}`, { method, headers: { Accept: "application/json", Authorization: `Bearer ${config.reviewAgentToken}`, ...(config.cloudflareAccessClientId ? { "CF-Access-Client-Id": config.cloudflareAccessClientId, "CF-Access-Client-Secret": config.cloudflareAccessClientSecret } : {}), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(`${config.reviewAgentUrl}${path}`, { method, headers: { Accept: "application/json", Authorization: `Bearer ${config.reviewAgentToken}`, ...(config.cloudflareAccessClientId ? { "CF-Access-Client-Id": config.cloudflareAccessClientId, "CF-Access-Client-Secret": config.cloudflareAccessClientSecret } : {}), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(path === "/v1/capacity" ? 5_000 : 30_000) });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const details = {
@@ -25,10 +27,18 @@ export function createReviewEnvironmentManager({ store, config, logger = console
   }
   async function active() { return (await store.list("review_environment")).filter((item) => ACTIVE.has(item.status)); }
   async function capacity() {
-    try { return await request("/v1/capacity"); }
+    if (capacityCache && Date.now() - capacityCacheAt < 5_000) return capacityCache;
+    try {
+      const value = await request("/v1/capacity");
+      capacityCache = value;
+      capacityCacheAt = Date.now();
+      return value;
+    }
     catch {
       const current = await active();
-      return { active: current.length, available: Math.max(0, maxActive - current.length), maximum: maxActive, unavailable: true };
+      capacityCache = { active: current.length, available: Math.max(0, maxActive - current.length), maximum: maxActive, unavailable: true };
+      capacityCacheAt = Date.now();
+      return capacityCache;
     }
   }
   async function sync(record) {
