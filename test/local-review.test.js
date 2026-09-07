@@ -93,6 +93,13 @@ test("projects ship into local review when Ari is not configured", async () => {
   const restore = await agent.post("/app/projects/cq_local/journals/log_local/restore").type("form").send({ _csrf: csrf(removedPage.text) });
   assert.equal(restore.status, 302);
   assert.equal((await store.get("journal", "log_local")).deletedAt, null);
+  const profile = await agent.get("/app/profile");
+  const createMcpToken = await agent.post("/app/profile/mcp-token").type("form").send({ _csrf: csrf(profile.text) });
+  assert.equal(createMcpToken.status, 200);
+  const mcpToken = (await store.list("mcp_token"))[0];
+  const revokeMcpToken = await agent.post(`/app/profile/mcp-token/${mcpToken.id}/revoke`).type("form").send({ _csrf: csrf(createMcpToken.text) });
+  assert.equal(revokeMcpToken.status, 302);
+  assert.ok((await store.get("mcp_token", mcpToken.id)).revokedAt);
 });
 
 test("hardware funding is approved and issued before a final ship can enter review", async () => {
