@@ -40,8 +40,8 @@ document.addEventListener("submit", async (event) => {
     try {
       const response = await fetch(form.action, {
         method: form.method || "POST",
-        body: new FormData(form),
-        headers: { Accept: "application/json", "X-CQ-Partial": "sandbox" },
+        body: new URLSearchParams(new FormData(form)),
+        headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "X-CQ-Partial": "sandbox" },
         credentials: "same-origin",
       });
       const result = await response.json().catch(() => ({}));
