@@ -119,5 +119,13 @@ export function dashboardRoutes({ store, hackatimeClient }) {
     return res.render("profile", { title: "Your profile", errors: [], values: req.user, hackatime: await hackatimeClient.connection(req.user.id), mcpTokens: (await store.list("mcp_token")).filter((token) => token.userId === req.user.id && !token.revokedAt), oneTimeMcpToken: raw });
   });
 
+  router.post("/profile/mcp-token/:id/revoke", requireCsrf, async (req, res) => {
+    const token = await store.get("mcp_token", req.params.id);
+    if (!token || token.userId !== req.user.id || token.revokedAt) return res.sendStatus(404);
+    await store.put("mcp_token", token.id, { ...token, revokedAt: nowIso() });
+    setFlash(res, "success", "MCP token revoked.");
+    res.redirect("/app/profile");
+  });
+
   return router;
 }

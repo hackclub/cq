@@ -118,7 +118,7 @@ export async function createApp({
         req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && (!Number.isFinite(verifiedAt) || verifiedAt + verificationWindow <= Date.now()),
       );
       res.locals.internalFrequency = createInternalFrequency(config, req.user, req.session, req.path);
-      res.locals.cartCount = req.user
+      res.locals.cartCount = req.user && req.path.startsWith("/app/shop")
         ? (await dataStore.list("cart")).filter((item) => item.userId === req.user.id).reduce((sum, item) => sum + item.quantity, 0)
         : 0;
       next();

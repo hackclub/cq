@@ -86,6 +86,13 @@ test("projects ship into local review when Ari is not configured", async () => {
   });
   assert.equal(editAfterWithdraw.status, 302);
   assert.equal((await store.get("journal", "log_local")).title, "Updated after withdrawal");
+  const remove = await agent.post("/app/projects/cq_local/journals/log_local/delete").type("form").send({ _csrf: csrf(afterWithdraw.text) });
+  assert.equal(remove.status, 302);
+  assert.ok((await store.get("journal", "log_local")).deletedAt);
+  const removedPage = await agent.get("/app/projects/cq_local");
+  const restore = await agent.post("/app/projects/cq_local/journals/log_local/restore").type("form").send({ _csrf: csrf(removedPage.text) });
+  assert.equal(restore.status, 302);
+  assert.equal((await store.get("journal", "log_local")).deletedAt, null);
 });
 
 test("hardware funding is approved and issued before a final ship can enter review", async () => {

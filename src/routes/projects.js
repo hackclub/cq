@@ -107,13 +107,16 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
 }
 
 async function details(store, projectId) {
-  const [journals, submissions] = await Promise.all([
+  const [allJournals, submissions] = await Promise.all([
     store.list("journal"),
     store.list("submission"),
   ]);
+  const journals = allJournals.filter((item) => !item.deletedAt);
   return {
     journals: journals.filter((item) => item.projectId === projectId).sort((a, b) =>
       b.entryDate.localeCompare(a.entryDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))),
+    removedJournals: allJournals.filter((item) => item.projectId === projectId && item.deletedAt).sort((a, b) =>
+      String(b.deletedAt).localeCompare(String(a.deletedAt))),
     submissions: submissions.filter((item) => item.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
 }
@@ -321,8 +324,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const [projectDetails, country, hackatime, fundingRequests] = await Promise.all([
       details(store, project.id),
       store.get("country", project.countryCode),
-      hackatimeClient.projects(req.user.id, { force: true }),
-      store.list("funding_request"),
+      project.track === "software" ? hackatimeClient.projects(req.user.id) : Promise.resolve({ connected: false, projects: [], fetchedAt: null }),
+      project.track === "hardware" ? store.list("funding_request") : Promise.resolve([]),
     ]);
     if (project.hackatimeProjects.length && !project.hackatimeBaseline) {
       project.hackatimeBaseline = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
@@ -333,6 +336,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       title: project.title,
       project,
       ...projectDetails,
+      removedJournals: projectDetails.removedJournals,
       journals: projectDetails.journals.map((journal) => ({
         ...journal,
         imageUrls: journalImages(journal),
@@ -467,8 +471,21 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", "A devlog included in a shipped version cannot be removed.");
       return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
     }
-    await store.delete("journal", journal.id);
-    setFlash(res, "success", "Devlog removed.");
+    const timestamp = nowIso();
+    await store.put("journal", journal.id, { ...journal, deletedAt: timestamp, updatedAt: timestamp });
+    await writeAudit(store, req.user, { action: "devlog.removed", entityType: "journal", entityId: journal.id, summary: `Moved devlog “${journal.title}” to removed items.`, before: journal });
+    setFlash(res, "success", "Devlog moved to removed items. You can restore it from this project page.");
+    res.redirect(`/app/projects/${project.id}#work-log`);
+  });
+
+  router.post("/:id/journals/:journalId/restore", requireCsrf, async (req, res) => {
+    const project = await ownedProject(store, req.params.id, req.user.id);
+    const journal = await store.get("journal", req.params.journalId);
+    if (!project || journal?.projectId !== project.id || !journal.deletedAt) return res.sendStatus(404);
+    const timestamp = nowIso();
+    await store.put("journal", journal.id, { ...journal, deletedAt: null, restoredAt: timestamp, updatedAt: timestamp });
+    await writeAudit(store, req.user, { action: "devlog.restored", entityType: "journal", entityId: journal.id, summary: `Restored devlog “${journal.title}”.`, before: journal });
+    setFlash(res, "success", "Devlog restored.");
     res.redirect(`/app/projects/${project.id}#work-log`);
   });
 
