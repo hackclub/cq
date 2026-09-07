@@ -90,10 +90,17 @@ export async function createApp({
   const mcpHandler = createMcpHandler({ store: dataStore, githubClient: github, hackatimeClient: hackatime });
   app.post("/mcp", async (req, res) => {
     const bearer = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const validStatic = config.mcpReadonlyToken && bearer === config.mcpReadonlyToken;
-    const validUserToken = bearer ? (await dataStore.list("mcp_token")).some((token) => !token.revokedAt && token.tokenHash === hash(bearer)) : false;
-    if (!validStatic && !validUserToken) return res.status(401).json({ error: "Unauthorized" });
-    try { const response = await mcpHandler(req.body || {}); return response ? res.json(response) : res.status(202).end(); } catch (error) { return res.status(500).json({ error: error.message }); }
+    const validStatic = Boolean(config.mcpReadonlyToken && bearer === config.mcpReadonlyToken);
+    const userToken = bearer ? (await dataStore.list("mcp_token")).find((token) => !token.revokedAt && token.tokenHash === hash(bearer)) : null;
+    if (!validStatic && !userToken) return res.status(401).json({ error: "Unauthorized" });
+    const tokenUser = userToken ? await dataStore.get("user", userToken.userId) : null;
+    if (userToken && (!tokenUser || tokenUser.banned)) return res.status(401).json({ error: "Unauthorized" });
+    const actor = validStatic ? { privileged: true, source: "static" } : { userId: tokenUser.id, privileged: isOrganizer(tokenUser), source: "user" };
+    try {
+      const response = await mcpHandler(req.body || {}, actor);
+      logger.info(`MCP read-only request from ${actor.privileged ? "organizer" : actor.userId}`);
+      return response ? res.json(response) : res.status(202).end();
+    } catch (error) { return res.status(500).json({ error: error.message }); }
   });
   app.use("/fonts/space-mono", express.static(
     spaceMonoFilesPath,

@@ -512,21 +512,31 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const timestamp = nowIso();
     const designJournals = await store.list("journal");
     const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
-    const fundingMinutes = designMinutes > 0 ? Math.round(designMinutes) : Math.round(input.estimatedHours * 60);
-    const bomTotal = input.bomItems.length
-      ? Math.round(input.bomItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0) * 100) / 100
-      : Math.round((fundingMinutes * 5 / 60) * 100) / 100;
+    const fundingMinutes = Math.round(designMinutes);
+    if (fundingMinutes <= 0) {
+      setFlash(res, "error", "Add at least one timed design devlog before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    if (!input.bomItems.length) {
+      setFlash(res, "error", "Add the parts as a structured BOM before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const bomTotal = Math.round(input.bomItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0) * 100) / 100;
+    const fundingCapUsd = Math.round((fundingMinutes * 5 / 60) * 100) / 100;
     if (bomTotal <= 0) {
       setFlash(res, "error", "Add priced BOM parts before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    if (bomTotal > fundingCapUsd) {
+      setFlash(res, "error", "The parts total is above the funding supported by your documented design time. Add more design work before requesting funding.");
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const fundingTier = bomTotal <= 20 ? 1 : bomTotal <= 50 ? 2 : bomTotal <= 100 ? 3 : 4;
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
-      status: "submitted", estimatedHours: input.estimatedHours,
+      status: "submitted",
       requestedUsd: bomTotal,
-      bomTotal, fundingTier,
-      requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
+      bomTotal, fundingTier, fundingCapUsd,
       designMinutes: fundingMinutes,
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),

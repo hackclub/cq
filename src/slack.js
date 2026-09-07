@@ -115,18 +115,18 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       );
     },
     fundingSubmitted(user, project, request) {
-      return userMessage(user, "funding.submitted", `🧰 Your hardware funding request for *${project.title}* ($${Number(request.requestedHertz).toFixed(2)}) is in the CQ review queue.`, request.id);
+      return userMessage(user, "funding.submitted", `🧰 Your hardware funding request for *${project.title}* ($${Number(request.requestedUsd ?? request.requestedHertz ?? 0).toFixed(2)}) is in the CQ review queue.`, request.id);
     },
     fundingDecision(user, project, request) {
       const messages = {
-        approved: `✅ Funding for *${project.title}* was approved for $${Number(request.review?.approvedHertz || 0).toFixed(2)}. We’ll message you when it has been issued.`,
+        approved: `✅ Funding for *${project.title}* was approved for $${Number(request.review?.approvedUsd ?? request.review?.approvedHertz ?? 0).toFixed(2)}. We’ll message you when it has been issued.`,
         changes_requested: `🛠️ Your funding request for *${project.title}* needs changes.${request.review?.noteToMaker ? `\n> ${request.review.noteToMaker}` : ""}`,
         rejected: `⛔ Funding for *${project.title}* was declined.${request.review?.noteToMaker ? `\n> ${request.review.noteToMaker}` : ""}`,
       };
       return userMessage(user, `funding.${request.status}`, messages[request.status] ?? `There is an update on funding for *${project.title}*.`, request.id);
     },
     fundingIssued(user, project, request) {
-      return userMessage(user, "funding.issued", `🎉 $${Number(request.review?.approvedHertz || 0).toFixed(2)} in funding for *${project.title}* has been issued. You can now build, document your progress, and ship the finished project.`, request.id);
+      return userMessage(user, "funding.issued", `🎉 $${Number(request.review?.approvedUsd ?? request.review?.approvedHertz ?? 0).toFixed(2)} in funding for *${project.title}* has been issued. You can now build, document your progress, and ship the finished project.`, request.id);
     },
     projectDecision(user, project, event, review = {}) {
       const messages = {
