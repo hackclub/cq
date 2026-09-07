@@ -30,6 +30,35 @@ for (const form of document.querySelectorAll("form[data-confirm]")) {
   });
 }
 
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("form[data-async-sandbox]");
+  if (!form || event.defaultPrevented) return;
+  event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const originalLabel = button?.textContent;
+    if (button) { button.disabled = true; button.textContent = "Working…"; }
+    try {
+      const response = await fetch(form.action, {
+        method: form.method || "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json", "X-CQ-Partial": "sandbox" },
+        credentials: "same-origin",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "The sandbox action could not be completed.");
+      const page = await fetch(location.href, { headers: { "X-CQ-Partial": "sandbox" }, credentials: "same-origin" });
+      if (!page.ok) throw new Error("The sandbox changed, but its updated status could not be loaded.");
+      const documentAfterAction = new DOMParser().parseFromString(await page.text(), "text/html");
+      const next = documentAfterAction.querySelector("#review-sandbox");
+      const current = document.querySelector("#review-sandbox");
+      if (!next || !current) throw new Error("The sandbox status could not be updated.");
+      current.replaceWith(next);
+    } catch (error) {
+      window.alert(error.message || "The sandbox action could not be completed.");
+      if (button) { button.disabled = false; button.textContent = originalLabel; }
+    }
+});
+
 const toast = document.querySelector(".toast");
 if (toast) {
   window.setTimeout(() => {

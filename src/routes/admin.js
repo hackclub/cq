@@ -65,6 +65,7 @@ function projectForReview(submission, currentProject) {
 
 export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier, reviewEnvironments }) {
   const router = Router();
+  const wantsJson = (req) => req.get("x-cq-partial") === "sandbox" || req.accepts(["json", "html"]) === "json";
   router.use(async (req, res, next) => {
     if (req.user?.reviewerTraining?.required && req.user.reviewerTraining.status === "pending" && (req.path.startsWith("/funding") || (req.path.startsWith("/reviews") && !req.path.includes("sub_reviewer_training")))) return res.status(403).render("error", { title: "Reviewer training required", message: "Complete the reviewer tutorial and wait for an administrator to approve your training before reviewing live projects." });
     return next();
@@ -643,8 +644,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     try {
       const environment = await reviewEnvironments.launch({ projectId: project.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project.repoUrl });
       await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project.title}.`, metadata: { projectId: project.id, submissionId: submission.id, vmid: environment.vmid } });
+      if (wantsJson(req)) return res.json({ ok: true, environment });
       setFlash(res, "success", "Review sandbox launched.");
-    } catch (error) { setFlash(res, "error", error.message); }
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${submission.id}`);
   });
 
@@ -654,8 +656,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     try {
       await reviewEnvironments.destroy(environment);
       await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
+      if (wantsJson(req)) return res.json({ ok: true });
       setFlash(res, "success", "Review sandbox ended and queued for deletion.");
-    } catch (error) { setFlash(res, "error", error.message); }
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${req.params.id}`);
   });
 
@@ -665,8 +668,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     try {
       await reviewEnvironments.extend(environment, 30);
       await writeAudit(store, req.user, { action: "review.environment.extend", entityType: "review_environment", entityId: environment.id, summary: "Extended a review sandbox by 30 minutes." });
+      if (wantsJson(req)) return res.json({ ok: true });
       setFlash(res, "success", "Review sandbox extended by 30 minutes.");
-    } catch (error) { setFlash(res, "error", error.message); }
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${req.params.id}`);
   });
 
@@ -676,8 +680,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     try {
       await reviewEnvironments.restart(environment);
       await writeAudit(store, req.user, { action: "review.environment.restart", entityType: "review_environment", entityId: environment.id, summary: "Restarted a review sandbox." });
+      if (wantsJson(req)) return res.json({ ok: true });
       setFlash(res, "success", "Review sandbox restarted.");
-    } catch (error) { setFlash(res, "error", error.message); }
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
     res.redirect(`/admin/reviews/${req.params.id}`);
   });
 
