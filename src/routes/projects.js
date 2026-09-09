@@ -38,6 +38,7 @@ function formValues(project) {
     license_goal: project.licenseGoal,
     ai_statement: project.aiStatement,
     tags: project.tags.join(", "),
+    visibility: project.visibility || "unlisted",
     is_update: project.isUpdate,
     update_message: project.updateMessage,
     original_work: project.originalWork,
@@ -87,6 +88,7 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     callsign: input.callsign,
     aiStatement: input.aiStatement,
     tags: input.tags,
+    visibility: input.visibility,
     isUpdate: input.isUpdate,
     updateMessage: input.updateMessage,
     originalWork: input.originalWork,
@@ -175,8 +177,7 @@ function readiness(project, journals, user, { hasPriorSubmission = false } = {})
   if (![user.firstName, user.lastName, user.birthday, user.addressLine1, user.city, user.region, user.postalCode, user.addressCountry].every(Boolean)) {
     errors.push("Complete your legal name, birthday, and address in your profile before submitting.");
   }
-  if (hasPriorSubmission && journals.length === 0) errors.push("Add new devlogs before submitting a project update.");
-  if (hasPriorSubmission && !project.isUpdate) errors.push("Mark this as an update and describe the meaningful new work before resubmitting.");
+  if (hasPriorSubmission && journals.length === 0) errors.push("Add new devlogs before resubmitting a project already approved through CQ.");
   return { errors, journalMinutes };
 }
 
@@ -335,7 +336,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...journal,
         imageUrls: journalImages(journal),
       })),
-      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 }),
+      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
       ariConfigured: ariClient.configured(),
       projectLocked: project.status === "submitted",
       lockedJournalIds: [...new Set(projectDetails.submissions.flatMap((item) => {
@@ -559,7 +560,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
-    const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.length > 0 });
+    const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
       return res.redirect(`/app/projects/${project.id}#submission`);

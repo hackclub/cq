@@ -13,7 +13,7 @@
 </head>
 <body class="<%= [typeof bodyClass === 'string' ? bodyClass : '', organizerWarningRequired ? 'organizer-unverified' : ''].filter(Boolean).join(' ') %>">
   <a class="skip-link" href="#main">Skip to content</a>
-  <% const channel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' ? ['005.000', 'MEM 02 / STATION'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
+  <% const channel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' || currentPath.startsWith('/app/explore') ? ['005.000', 'MEM 02 / EXPLORE'] : currentPath === '/app/dashboard' ? ['005.050', 'MEM 03 / MY CQ'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
   <div class="desk">
     <section class="radio">
       <i class="screw tl" aria-hidden="true"></i><i class="screw tr" aria-hidden="true"></i><i class="screw bl" aria-hidden="true"></i><i class="screw br" aria-hidden="true"></i>
