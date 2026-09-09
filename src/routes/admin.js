@@ -179,14 +179,23 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const designChecked = req.body.design_checked === "1";
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
-    const requested = Math.max(0, Number(request.requestedHertz) || 0);
-    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_hertz) || 0) * 100) / 100));
+    const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > requested) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedHertz <= 0)) {
+    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
       setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request);
@@ -195,11 +204,11 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const timestamp = nowIso();
     request.status = "second_pass";
     request.reviewerId = req.user.id; request.reviewerName = req.user.name;
-    request.firstPass = { decision, noteToMaker, internalNote, approvedHertz: decision === "approved" ? approvedHertz : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
+    request.firstPass = { decision, noteToMaker, internalNote, approvedUsd: decision === "approved" ? approvedUsd : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
     request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
-    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedHertz });
-    await writeAudit(store, req.user, { action: "funding.first_pass", entityType: "funding_request", entityId: request.id, summary: `Completed first pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedUsd });
+    await writeAudit(store, req.user, { action: "funding.first_pass", entityType: "funding_request", entityId: request.id, summary: `Completed first pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedUsd } });
     setFlash(res, "success", "First pass saved. A second-pass reviewer must confirm it before the maker is notified.");
     res.redirect(`/admin/funding/${request.id}`);
   });
@@ -218,25 +227,34 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : request.firstPass.decision;
     const noteToMaker = String(req.body.note_to_maker || request.firstPass.noteToMaker || "").trim().slice(0, 3000);
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > Number(request.requestedUsd ?? request.requestedHertz)) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
     if (["changes", "rejected"].includes(decision) && noteToMaker.length < 5) {
       setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
-    if (decision === "approved" && approvedHertz <= 0) {
+    const approvedUsd = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? request.firstPass.approvedUsd ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    if (decision === "approved" && approvedUsd <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request); const timestamp = nowIso();
     const [project, maker] = await Promise.all([store.get("project", request.projectId), store.get("user", request.userId)]);
     request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
-    request.review = { decision, noteToMaker, internalNote, approvedHertz, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
+    request.review = { decision, noteToMaker, internalNote, approvedUsd, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
     request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
-    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedHertz, availableUsd: -approvedHertz, status: "allocated", issued: false });
+    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedUsd, availableUsd: -approvedUsd, status: "allocated", issued: false });
     if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
-    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
-    await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedUsd });
+    await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedUsd } });
     if (maker && project) await notifier.fundingDecision?.(maker, project, request);
     setFlash(res, "success", "Second pass confirmed and the participant was notified.");
     res.redirect(`/admin/funding/${request.id}`);
@@ -625,6 +643,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
     const technicalNote = String(req.body.technical_note || prior.technical_note || "").trim().slice(0, 3000);
     const timeNote = String(req.body.time_note || prior.time_note || "").trim().slice(0, 2000);
+    const reviewedProject = await store.get("project", submission.projectId);
     const criteria = {
       radioRelated: req.body.radio_related === "1" || Boolean(prior.criteria?.radioRelated),
       shipped: req.body.shipped === "1" || Boolean(prior.criteria?.shipped),
@@ -633,6 +652,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
+      hardwareEvidence: reviewedProject?.track !== "hardware" || (["repository_manual", "design_files", "structured_bom", "firmware", "schematic_cad", "build_evidence", "final_test"].every((key) => req.body[key] === "1")) || Boolean(prior.criteria?.hardwareEvidence),
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
@@ -644,7 +664,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
     const precheckMinutes = reviewMinutes(precheckJournals);
-    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
+    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal, index) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`] ?? req.body[`journal_minutes_${index}`]) || 0)))]));
+    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -671,7 +692,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const journals = journalsForReview(submission, await store.list("journal"));
       const loggedMinutes = reviewMinutes(journals);
       const approvedMinutes = decision === "approved"
-        ? Math.min(loggedMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)))
+        ? Math.min(loggedMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)))
         : 0;
       const timestamp = nowIso();
       submission.phase = "reviewed";

@@ -130,7 +130,49 @@ if (bomInput && bomRows && bomAdd) {
   renderBom(); syncBom();
 }
 
+// Upgrade legacy funding forms to the structured BOM editor without requiring
+// a separate template variant.
+const legacyBom = document.querySelector('form.funding-request-form textarea[name="bom"]');
+if (legacyBom && !document.querySelector("[data-bom-input]")) {
+  const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "bom_items"; hidden.dataset.bomInput = "";
+  legacyBom.name = "bom_notes"; legacyBom.required = false; legacyBom.closest("label")?.classList.add("legacy-bom-notes");
+  legacyBom.form.append(hidden);
+  const wrap = document.createElement("div"); wrap.className = "bom-quick-entry";
+  wrap.innerHTML = '<strong>Structured bill of materials</strong><button type="button" class="button button-ghost">Add part</button><div class="bom-quick-rows"></div>';
+  legacyBom.closest("label")?.after(wrap);
+  const rows = wrap.querySelector(".bom-quick-rows"); const add = wrap.querySelector("button"); const items = [];
+  const sync = () => { hidden.value = JSON.stringify(items); };
+  const render = () => { rows.replaceChildren(); items.forEach((item, index) => { const row = document.createElement("div"); row.className = "bom-quick-row"; row.innerHTML = '<input placeholder="Part" required><input placeholder="Purpose"><input type="number" min="1" step="1" placeholder="Qty" required><input type="number" min="0" step="0.01" placeholder="Unit cost ($)"><input type="url" placeholder="Supplier link" required><button type="button" class="text-button danger-text">Remove</button>'; const fields = row.querySelectorAll("input"); ["name","purpose","quantity","unitCost","link"].forEach((key, i) => { fields[i].value = item[key] ?? ""; fields[i].addEventListener("input", () => { item[key] = fields[i].value; sync(); }); }); row.querySelector("button").addEventListener("click", () => { items.splice(index, 1); render(); sync(); }); rows.append(row); }); };
+  add.addEventListener("click", () => { items.push({}); render(); sync(); }); add.click();
+}
+
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
+
+// Hardware review convenience controls: let reviewers adjust each devlog
+// independently, while keeping every value capped by the recorded minutes.
+const reviewForm = document.querySelector("form[data-review-form]");
+if (reviewForm && document.querySelector(".admin-screen[data-project-track=hardware]")) {
+  const entries = [...document.querySelectorAll(".journal-list article")];
+  if (entries.length && !reviewForm.querySelector(".per-devlog-minutes")) {
+    const fieldset = document.createElement("fieldset"); fieldset.className = "review-checklist per-devlog-minutes";
+    fieldset.innerHTML = "<legend>Approved minutes by devlog</legend>";
+    entries.forEach((entry, index) => {
+      const title = entry.querySelector("h3")?.textContent?.trim() || `Devlog ${index + 1}`;
+      const logged = Number((entry.querySelector(".devlog-meta strong")?.textContent || "0").replace(/[^0-9]/g, "")) || 0;
+      const label = document.createElement("label"); label.textContent = `${title} (max ${logged} min)`;
+      const input = document.createElement("input"); input.type = "number"; input.name = `journal_minutes_${index}`; input.min = "0"; input.max = String(logged); input.step = "1"; input.value = String(logged);
+      label.append(input); fieldset.append(label);
+    });
+    const anchor = reviewForm.querySelector("textarea[name=technical_note]") || reviewForm.querySelector("input[name=approved_minutes]");
+    anchor?.closest("label")?.before(fieldset);
+  }
+  if (reviewForm.querySelector(".review-checklist") && !reviewForm.querySelector("input[name=hardware_evidence]")) {
+    const checklist = reviewForm.querySelector(".review-checklist");
+    [["repository_manual", "Public repository checked (manual verification for non-GitHub providers)"], ["design_files", "Design files checked"], ["structured_bom", "Structured BOM checked"], ["firmware", "Firmware checked where applicable"], ["schematic_cad", "Schematic/CAD checked"], ["build_evidence", "Build evidence checked"], ["final_test", "Final test evidence checked"]].forEach(([name, text]) => { const label = document.createElement("label"); label.innerHTML = `<input type="checkbox" name="${name}" value="1"> ${text}`; checklist.append(label); });
+    const label = document.createElement("input"); label.type = "hidden"; label.name = "hardware_evidence"; label.value = "1"; checklist.append(label);
+  }
+}
+
 const safeImageUrl = (value) => /^https?:\/\//i.test(String(value || "")) ? String(value) : "";
 if (thumbnailUpload) {
   const input = thumbnailUpload.querySelector("[data-thumbnail-file]");
