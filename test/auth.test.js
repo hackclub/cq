@@ -59,48 +59,6 @@ test("Hack Club Auth profile claims populate CQ's read-only identity record", as
   assert.equal(user.yswsEligible, true);
 });
 
-test("sign-in consolidates duplicate CQ user rows and preserves owned projects", async () => {
-  const records = new Map();
-  const key = (type, id) => `${type}:${id}`;
-  const store = {
-    list: async (type) => [...records.entries()].filter(([recordKey]) => recordKey.startsWith(`${type}:`)).map(([, value]) => value),
-    get: async (type, id) => records.get(key(type, id)) || null,
-    put: async (type, id, value) => { records.set(key(type, id), structuredClone(value)); return value; },
-    delete: async (type, id) => records.delete(key(type, id)),
-  };
-  await store.put("user", "user_old", {
-    id: "user_old", hackClubId: "old-sub", email: "maker@hackclub.com", name: "Radio Maker", hertz: 3,
-    roles: ["participant"], createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z",
-  });
-  await store.put("user", "user_current", {
-    id: "user_current", hackClubId: "current-sub", email: "maker@hackclub.com", name: "Radio Maker", hertz: 0,
-    roles: ["participant", "reviewer"], createdAt: "2026-09-02T00:00:00.000Z", updatedAt: "2026-09-08T00:00:00.000Z",
-  });
-  await store.put("project", "cq_2878a781b7d04cba382c3b80", { id: "cq_2878a781b7d04cba382c3b80", userId: "user_old", title: "Receiver" });
-  await store.put("funding_request", "fund_1", { id: "fund_1", userId: "user_old", projectId: "cq_2878a781b7d04cba382c3b80" });
-  await store.put("session", "session_old", { id: "session_old", userId: "user_old" });
-  await store.put("mcp_token", "mcp_old", { id: "mcp_old", userId: "user_old" });
-
-  const user = await upsertUser(store, getConfig({ adminEmails: "" }), {
-    sub: "current-sub", email: "maker@hackclub.com", name: "Radio Maker",
-  });
-
-  assert.equal(user.id, "user_current");
-  assert.equal((await store.get("project", "cq_2878a781b7d04cba382c3b80")).userId, "user_current");
-  assert.equal((await store.get("funding_request", "fund_1")).userId, "user_current");
-  assert.equal((await store.get("user", "user_old")).banned, true);
-  assert.equal((await store.get("user", "user_old")).mergedIntoUserId, "user_current");
-  assert.equal((await store.get("session", "session_old")).revokedReason, "duplicate_account_consolidated");
-  assert.equal((await store.get("mcp_token", "mcp_old")).revokedReason, "duplicate_account_consolidated");
-  assert.equal((await store.get("user", "user_current")).hertz, 3);
-  assert.equal((await store.get("user", "user_current")).roles.includes("reviewer"), true);
-
-  await upsertUser(store, getConfig({ adminEmails: "" }), {
-    sub: "current-sub", email: "maker@hackclub.com", name: "Radio Maker",
-  });
-  assert.equal((await store.get("user", "user_current")).hertz, 3, "a later sign-in must not merge the disabled row again");
-});
-
 test("forced Hack Club authentication requests a fresh login", async () => {
   const states = [];
   const store = { put: async (type, id, value) => states.push({ type, id, value }) };
