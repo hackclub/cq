@@ -223,6 +223,10 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(secondDecision.status, 302);
   assert.equal((await store.get("project", projectPath.split("/").pop())).status, "approved");
   assert.equal((await store.list("review_action")).length, 3);
+  const unifiedReady = await store.get("submission", submissions[0].id);
+  assert.equal(unifiedReady.airtableFields["Review Status"], "Approved — ready for Unified");
+  assert.equal(unifiedReady.airtableFields["Override Hours Spent"], "0.75");
+  assert.match(unifiedReady.airtableFields["Override hours spent justification"], /Review basis: Confirmed the antenna build/);
   const completedQueue = await secondAgent.get("/admin/reviews");
   assert.match(completedQueue.text, /Nothing is waiting for review right now/);
   // The form caps approval at the 45 minutes actually evidenced in devlogs.
@@ -339,6 +343,12 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
     active: "1",
   });
   assert.equal(updateProduct.status, 302);
+  const archiveProduct = await agent.post("/admin/shop/yagi-kit/delete").type("form").send({ _csrf: csrf((await agent.get("/admin/shop")).text) });
+  assert.equal(archiveProduct.status, 302);
+  assert.equal((await store.get("product", "yagi-kit")).active, false);
+  const restoreProduct = await agent.post("/admin/shop/yagi-kit/restore").type("form").send({ _csrf: csrf((await agent.get("/admin/shop")).text) });
+  assert.equal(restoreProduct.status, 302);
+  assert.equal((await store.get("product", "yagi-kit")).active, true);
   const adminNotifications = await agent.get("/admin/notifications");
   assert.equal(adminNotifications.status, 200);
   assert.match(adminNotifications.text, /Slack notifications/);

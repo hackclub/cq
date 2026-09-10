@@ -19,8 +19,9 @@ import { shopRoutes } from "./routes/shop.js";
 import { seedStore } from "./seed.js";
 import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
-import { formatDate, formatDateTime, jsonArray, readFlash, statusLabel } from "./utils.js";
+import { formatDate, formatDateTime, hash, jsonArray, readFlash, statusLabel } from "./utils.js";
 import { createInternalFrequency } from "./internal-frequency.js";
+import { createMcpHandler } from "./mcp.js";
 
 const consoleLogger = {
   info: (...args) => console.info(...args),
@@ -82,6 +83,22 @@ export async function createApp({
   app.get("/healthz", (req, res) => res.status(200).type("text/plain").send("ok"));
   app.use("/ari/webhook", ariWebhookRoutes({ store: dataStore, config, notifier }));
   app.use(express.urlencoded({ extended: false, limit: "128kb" }));
+  app.use(express.json({ limit: "128kb" }));
+  const mcpHandler = createMcpHandler({ store: dataStore, githubClient: github, hackatimeClient: hackatime });
+  app.post("/mcp", async (req, res) => {
+    const bearer = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const validStatic = Boolean(config.mcpReadonlyToken && bearer === config.mcpReadonlyToken);
+    const userToken = bearer ? (await dataStore.list("mcp_token")).find((token) => !token.revokedAt && token.tokenHash === hash(bearer)) : null;
+    if (!validStatic && !userToken) return res.status(401).json({ error: "Unauthorized" });
+    const tokenUser = userToken ? await dataStore.get("user", userToken.userId) : null;
+    if (userToken && (!tokenUser || tokenUser.banned)) return res.status(401).json({ error: "Unauthorized" });
+    const actor = validStatic ? { privileged: true, source: "static" } : { userId: tokenUser.id, privileged: isOrganizer(tokenUser), source: "user" };
+    try {
+      const response = await mcpHandler(req.body || {}, actor);
+      logger.info(`MCP read-only request from ${actor.privileged ? "organizer" : actor.userId}`);
+      return response ? res.json(response) : res.status(202).end();
+    } catch (error) { return res.status(500).json({ error: error.message }); }
+  });
   app.use("/fonts/space-mono", express.static(
     spaceMonoFilesPath,
     { maxAge: config.isProduction ? "1y" : 0, immutable: config.isProduction },
@@ -98,7 +115,7 @@ export async function createApp({
         req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && (!Number.isFinite(verifiedAt) || verifiedAt + verificationWindow <= Date.now()),
       );
       res.locals.internalFrequency = createInternalFrequency(config, req.user, req.session, req.path);
-      res.locals.cartCount = req.user
+      res.locals.cartCount = req.user && req.path.startsWith("/app/shop")
         ? (await dataStore.list("cart")).filter((item) => item.userId === req.user.id).reduce((sum, item) => sum + item.quantity, 0)
         : 0;
       next();
