@@ -142,10 +142,40 @@ export async function exchangeHackClubCode(config, code, oauthState, fetchImpl =
   return profile;
 }
 
+// Airtable has no uniqueness constraint on CQ's JSON-backed rows. Serialising a
+// first sign-in within the running app prevents two OAuth callbacks from both
+// observing an empty user list and creating separate accounts.
+const userUpserts = new Map();
+
 export async function upsertUser(store, config, profile) {
+  const identity = String(profile?.sub || "").trim();
+  if (!identity) throw new Error("Hack Club Auth did not return a stable user ID.");
+  const previous = userUpserts.get(identity) || Promise.resolve();
+  const current = previous.catch(() => {}).then(() => upsertUserOnce(store, config, profile));
+  userUpserts.set(identity, current);
+  try {
+    return await current;
+  } finally {
+    if (userUpserts.get(identity) === current) userUpserts.delete(identity);
+  }
+}
+
+async function upsertUserOnce(store, config, profile) {
   const users = await store.list("user");
   const email = String(profile.email).toLowerCase();
-  const existing = users.find((user) => user.hackClubId === profile.sub || user.email === email);
+  const normalizedEmail = (user) => String(user?.email || "").trim().toLowerCase();
+  const matches = users.filter((user) => user.hackClubId === profile.sub || normalizedEmail(user) === email);
+  // Old CQ deployments could create two rows for one Hack Club identity. Prefer the
+  // exact stable OAuth subject, then the most recently used non-disabled record.
+  // Picking deterministically is important: Array.find made the selected account
+  // depend on Airtable record order, so a maker could appear to lose their projects.
+  const existing = [...matches].sort((left, right) => {
+    const score = (user) => (user.hackClubId === profile.sub ? 100 : 0) + (!user.banned ? 10 : 0);
+    const byScore = score(right) - score(left);
+    if (byScore) return byScore;
+    const byUpdatedAt = String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""));
+    return byUpdatedAt || String(left.id).localeCompare(String(right.id));
+  })[0];
   const timestamp = nowIso();
   const existingRoles = userRoles(existing || {});
   const roles = config.adminEmails.includes(email)
@@ -158,7 +188,9 @@ export async function upsertUser(store, config, profile) {
   const street = String(address.street_address ?? "").split(/\r?\n/);
   const addressValue = (name, fallback = "") => addressClaimed ? String(address[name] ?? "").trim() : fallback;
   const user = {
-    id: existing?.id ?? randomId("user_"),
+    // New accounts have a stable key derived from the verified OAuth subject.
+    // Existing random IDs are retained so their records keep working unchanged.
+    id: existing?.id ?? `user_${hash(profile.sub).slice(0, 24)}`,
     hackClubId: profile.sub,
     email,
     name: claimedText("name", existing?.name) || claimedText("nickname", existing?.name) || email.split("@")[0],
@@ -183,7 +215,97 @@ export async function upsertUser(store, config, profile) {
     updatedAt: timestamp,
   };
   await store.put("user", user.id, user);
+  const unmergedDuplicates = matches.filter((candidate) => candidate.id !== user.id && candidate.mergedIntoUserId !== user.id);
+  if (unmergedDuplicates.length) await consolidateDuplicateUsers(store, user, unmergedDuplicates);
   return user;
+}
+
+// A duplicate CQ account is not a second Hack Club account. It is two local rows
+// representing the same verified OAuth identity. Keep the newer canonical row,
+// move owned records to it, and disable the redundant row rather than deleting
+// evidence or leaving a second route into the account.
+export async function consolidateDuplicateUsers(store, canonicalUser, duplicates) {
+  const timestamp = nowIso();
+  const duplicateIds = new Set(duplicates.map((user) => user.id));
+  if (!duplicateIds.size) return { mergedUserIds: [], moved: {} };
+
+  const moveUserId = async (type, { merge } = {}) => {
+    const records = await store.list(type);
+    let count = 0;
+    for (const record of records) {
+      if (!duplicateIds.has(record.userId)) continue;
+      const next = merge ? await merge(record, records) : { ...record, userId: canonicalUser.id, updatedAt: timestamp };
+      if (next) await store.put(type, next.id, next);
+      count += 1;
+    }
+    return count;
+  };
+
+  const moved = {
+    projects: await moveUserId("project"),
+    fundingRequests: await moveUserId("funding_request"),
+    orders: await moveUserId("order"),
+    ledgerEntries: await moveUserId("ledger"),
+    notifications: await moveUserId("notification"),
+    hackatimeOAuth: await moveUserId("hackatime_oauth"),
+  };
+
+  // Carts are the only user-owned records that can collide. Merge matching product
+  // rows instead of silently dropping an item from either account.
+  moved.cartItems = await moveUserId("cart", {
+    merge: async (record, records) => {
+      const target = records.find((candidate) => candidate.userId === canonicalUser.id && candidate.productId === record.productId);
+      if (!target) return { ...record, userId: canonicalUser.id, updatedAt: timestamp };
+      await store.put("cart", target.id, {
+        ...target,
+        quantity: Math.max(1, Number(target.quantity || 0) + Number(record.quantity || 0)),
+        updatedAt: timestamp,
+      });
+      await store.delete("cart", record.id);
+      return null;
+    },
+  });
+
+  // Hackatime state is keyed by user ID, not just a userId field. Preserve an
+  // existing canonical connection; otherwise move the duplicate's connection.
+  for (const type of ["hackatime_token", "hackatime_cache"]) {
+    let canonicalRecord = await store.get(type, canonicalUser.id);
+    for (const duplicate of duplicates) {
+      const record = await store.get(type, duplicate.id);
+      if (!record) continue;
+      if (!canonicalRecord) {
+        canonicalRecord = { ...record, id: canonicalUser.id, userId: canonicalUser.id, updatedAt: timestamp };
+        await store.put(type, canonicalUser.id, canonicalRecord);
+      }
+      await store.delete(type, duplicate.id);
+    }
+  }
+
+  // Never transfer sessions from the redundant account. Revoke them before the
+  // duplicate record is disabled so there is only one active CQ account.
+  const sessions = await store.list("session");
+  for (const session of sessions.filter((record) => duplicateIds.has(record.userId) && !record.revokedAt)) {
+    await store.put("session", session.id, { ...session, revokedAt: timestamp, revokedReason: "duplicate_account_consolidated" });
+  }
+
+  const canonicalRoles = new Set(userRoles(canonicalUser));
+  for (const duplicate of duplicates) for (const role of userRoles(duplicate)) canonicalRoles.add(role);
+  canonicalUser.roles = [...canonicalRoles];
+  canonicalUser.role = canonicalUser.roles.includes("admin") ? "admin" : "participant";
+  canonicalUser.hertz = duplicates.reduce((total, duplicate) => total + Math.max(0, Number(duplicate.hertz) || 0), Math.max(0, Number(canonicalUser.hertz) || 0));
+  canonicalUser.updatedAt = timestamp;
+  await store.put("user", canonicalUser.id, canonicalUser);
+
+  for (const duplicate of duplicates) {
+    await store.put("user", duplicate.id, {
+      ...duplicate,
+      banned: true,
+      mergedIntoUserId: canonicalUser.id,
+      mergedAt: timestamp,
+      updatedAt: timestamp,
+    });
+  }
+  return { mergedUserIds: [...duplicateIds], moved };
 }
 
 export async function createSession(store, config, res, userId) {
