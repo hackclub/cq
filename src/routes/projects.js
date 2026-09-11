@@ -718,15 +718,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     try {
       const result = await ariClient.status({ externalId: project.id, ariId: submission.ariId });
       if (!result.ok) throw new Error(result.body?.message || `The review service returned ${result.status}`);
-      const previousPhase = submission.phase;
       submission.ariId = result.body.id ?? submission.ariId;
       submission.phase = result.body.phase;
       submission.decision = result.body.decision ?? null;
       submission.updatedAt = nowIso();
       await store.put("submission", submission.id, submission);
-      if (previousPhase !== submission.phase && ["review", "under_review", "second_pass"].includes(submission.phase)) {
-        await notifier.projectUnderReview(req.user, project);
-      }
       setFlash(res, "success", "Review status refreshed.");
     } catch (error) {
       req.app.locals.logger.error("Ari status refresh failed", error);

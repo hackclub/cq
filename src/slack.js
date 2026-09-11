@@ -106,14 +106,6 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
         project.id,
       );
     },
-    projectUnderReview(user, project) {
-      return userMessage(
-        user,
-        "project.under_review",
-        `👀 *${project.title}* is now being reviewed. No action is needed unless the reviewer asks for changes.`,
-        project.id,
-      );
-    },
     fundingSubmitted(user, project, request) {
       return userMessage(user, "funding.submitted", `🧰 Your hardware funding request for *${project.title}* ($${Number(request.requestedUsd ?? request.requestedHertz ?? 0).toFixed(2)}) is in the CQ review queue.`, request.id);
     },

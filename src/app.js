@@ -20,7 +20,7 @@ import { shopRoutes } from "./routes/shop.js";
 import { seedStore } from "./seed.js";
 import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
-import { formatDate, formatDateTime, hash, jsonArray, readFlash, statusLabel } from "./utils.js";
+import { formatDate, formatDateTime, hash, jsonArray, participantStatusLabel, readFlash, statusLabel } from "./utils.js";
 import { createInternalFrequency } from "./internal-frequency.js";
 import { createMcpHandler } from "./mcp.js";
 import { createReviewEnvironmentManager } from "./review-environments.js";
@@ -60,6 +60,7 @@ export async function createApp({
   app.locals.formatDate = formatDate;
   app.locals.formatDateTime = formatDateTime;
   app.locals.statusLabel = statusLabel;
+  app.locals.participantStatusLabel = participantStatusLabel;
   app.locals.renderMarkdown = renderMarkdown;
   app.locals.hasPermission = hasPermission;
   app.locals.isOrganizer = isOrganizer;

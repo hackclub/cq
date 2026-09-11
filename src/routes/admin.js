@@ -731,9 +731,6 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       entityType: "submission", entityId: submission.id,
       summary: `${release ? "Released" : "Claimed"} review ${submission.id}.`, before, after: submission,
     });
-    const project = await store.get("project", submission.projectId);
-    const maker = project ? await store.get("user", project.userId) : null;
-    if (!release && project && maker) await notifier.projectUnderReview(maker, project);
     setFlash(res, "success", release ? "Submission returned to the queue." : "Submission claimed.");
     res.redirect(`/admin/reviews/${submission.id}`);
   });
