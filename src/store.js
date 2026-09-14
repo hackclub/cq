@@ -143,6 +143,7 @@ export const airtableEntityTables = Object.freeze({
   hackatime_oauth: "Hackatime OAuth States",
   hackatime_token: "Hackatime Tokens",
   hackatime_cache: "Hackatime Cache",
+  mcp_token: "MCP Tokens",
   setting: "Settings",
   program_funding: "Program Funding",
 });
@@ -175,6 +176,7 @@ function airtableSummary(type, value = {}) {
     hackatime_oauth: [value.id, "Pending", value.userId],
     hackatime_token: [value.account?.username || value.id, "Connected", value.userId || value.id],
     hackatime_cache: [value.id, value.fetchedAt || "Cached", value.userId || value.id],
+    mcp_token: [value.id, value.revokedAt ? "Revoked" : "Active", value.userId],
   };
   const [name, status, owner] = summaries[type] || [value.name || value.id, value.status, value.userId];
   return { Name: text(name), Status: text(status), Owner: text(owner) };

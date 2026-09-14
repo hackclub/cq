@@ -14,6 +14,7 @@
     <div class="button-row"><a class="button button-primary" href="https://auth.hackclub.com/">Update in Hack Club Auth ↗</a><a class="button button-ghost" href="/auth/login?return_to=%2Fapp%2Fprofile&amp;reauth=1">Refresh details</a></div>
   </section>
   <aside class="summary integration-card">
+    <section><p class="eyebrow">Developer access</p><h2>Read-only MCP</h2><p>Create a token for review assistants to read your CQ projects and activity. Tokens cannot access admin tools or make changes.</p><form method="post" action="/app/profile/mcp-token"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-primary" type="submit">Create MCP token</button></form><% if (typeof oneTimeMcpToken !== 'undefined') { %><p><strong>Copy this token now:</strong></p><input value="<%= oneTimeMcpToken %>" readonly onclick="this.select()"><% } %><% if (mcpTokens.length) { %><div class="compact-list"><% mcpTokens.forEach((token) => { %><div><span><strong>Read-only token</strong><small>Created <%= formatDate(token.createdAt) %></small></span><form method="post" action="/app/profile/mcp-token/<%= token.id %>/revoke" data-confirm="Revoke this MCP token?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="text-button danger-text" type="submit">Revoke</button></form></div><% }) %></div><% } %></section>
     <div>
       <p class="eyebrow">Coding activity</p>
       <h2>Hackatime</h2>

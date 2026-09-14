@@ -30,7 +30,7 @@
         <label>Description<textarea name="description" rows="3"><%= item.description %></textarea></label>
         <label>Sort order<input type="number" name="sort_order" value="<%= item.sortOrder %>"></label>
         <label class="checkbox-field"><input type="checkbox" name="active" value="1" <%= item.active ? 'checked' : '' %>> Active</label>
-        <div class="button-row"><button class="button button-primary" type="submit">Save product</button></form><form method="post" action="/admin/shop/<%= item.id %>/delete" data-confirm="Delete this shop item permanently?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Delete product</button></form></div>
+        <div class="button-row"><button class="button button-primary" type="submit">Save product</button></form><% if (item.archivedAt) { %><form method="post" action="/admin/shop/<%= item.id %>/restore"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-ghost" type="submit">Restore product</button></form><% } else { %><form method="post" action="/admin/shop/<%= item.id %>/delete" data-confirm="Archive this shop item? It will be hidden from the shop and can be restored later."><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-danger" type="submit">Archive product</button></form><% } %></div>
       </details>
     <% }) %>
   </div>

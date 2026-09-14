@@ -82,5 +82,6 @@ export function getConfig(overrides = {}) {
       overrides.ariSigningSecret ??
       process.env.ARI_SIGNING_SECRET ??
       "",
+    mcpReadonlyToken: overrides.mcpReadonlyToken ?? process.env.MCP_READONLY_TOKEN ?? "",
   };
 }
