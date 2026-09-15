@@ -50,6 +50,8 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.equal((await store.list("audit")).some((item) => item.action === "project.shipped"), true);
 
   const shippedProject = await agent.get("/app/projects/cq_local");
+  assert.match(shippedProject.text, /Under review/);
+  assert.doesNotMatch(shippedProject.text, /Second pass/);
   const lockedEdit = await agent.post("/app/projects/cq_local/edit").type("form").send({ _csrf: csrf(shippedProject.text), title: "Changed after shipping" });
   assert.equal(lockedEdit.status, 302);
   assert.equal((await store.get("project", "cq_local")).title, "Digital receiver");

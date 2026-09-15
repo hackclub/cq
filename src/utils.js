@@ -78,6 +78,11 @@ export function statusLabel(status) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+export function participantStatusLabel(status) {
+  if (["submitted", "processing", "review", "under_review", "second_pass"].includes(status)) return "Under review";
+  return statusLabel(status);
+}
+
 export function formatDate(value) {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-AU", {
