@@ -59,6 +59,7 @@ export function projectInput(body = {}) {
     hackatimeProjects: splitList(body.hackatime_projects).slice(0, 20),
     evidence: ["commits", "elapsed", "devlog"],
     track: body.track === "software" ? "software" : "hardware",
+    visibility: ["private", "unlisted", "public"].includes(body.visibility) ? body.visibility : "unlisted",
     projectType: allowedTypes.includes(body.project_type) ? body.project_type : "",
     radioRelevance: text(body.radio_relevance, 800),
     countryCode: text(body.country_code, 10).toUpperCase(),
@@ -96,6 +97,9 @@ export function validateFundingRequest(input) {
 export function validateProject(input, { forSubmission = false, journalMinutes = 0, journalCount = 0 } = {}) {
   const errors = [];
   if (input.title.length < 2) errors.push("Give the project a name of at least 2 characters.");
+  if (/^(test(?:ing)?|lorem ipsum|untitled|new project|my project|project)(?:[\s\d._-]*)$/i.test(input.title)) {
+    errors.push("Give your project a specific, descriptive name rather than a placeholder.");
+  }
   if (input.description.length < 20) errors.push("Describe the project in at least 20 characters.");
   if (!(input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl))) {
     errors.push(input.track === "hardware" ? "Add a public Git repository URL (GitHub, GitLab, Codeberg, or another provider)." : "Add a public GitHub repository URL.");

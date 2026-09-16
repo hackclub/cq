@@ -98,8 +98,10 @@
           <div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div>
           <div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div>
           <div><dt>Hackatime</dt><dd><%= project.hackatimeProjects.join(', ') || 'Using work logs' %></dd></div>
+          <div><dt>Explore</dt><dd><%= statusLabel(project.visibility || 'unlisted') %></dd></div>
         </dl>
       </section>
+      <% if (project.status === 'approved' && project.visibility === 'public') { %><section class="panel compact-panel safety-mini"><strong>Shared in Explore</strong><p>Visitors see the last approved version of this project, not unreviewed edits.</p><a href="/app/explore/<%= project.id %>">Open listing ›</a></section><% } %>
       <% if (country) { %>
         <section class="panel compact-panel safety-mini">
           <strong>Your local radio guidance</strong>
