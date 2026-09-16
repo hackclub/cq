@@ -203,6 +203,7 @@ function journalInput(body = {}) {
     text: String(body.text || "").trim().slice(0, 2000),
     imageUrls,
     imageUrl: imageUrls[0] || "",
+    ...(String(body.minutes || "").trim() ? { minutes: Math.max(0, Math.round(Number(body.minutes) || 0)) } : {}),
   };
 }
 
@@ -399,7 +400,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       await store.withLock(`devlog:${project.id}`, async () => {
         if (project.track === "hardware") {
           const timestamp = nowIso();
-          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), minutes: 0, hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
+          if (input.minutes < 1) throw new Error("Enter the whole number of minutes spent on this hardware update.");
+          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
           await store.put("journal", journal.id, journal);
           await store.put("project", project.id, { ...project, updatedAt: timestamp });
           return;
@@ -449,7 +451,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", errors[0]);
       return res.redirect(`/app/projects/${project.id}#devlog-${journal.id}`);
     }
-    await store.put("journal", journal.id, { ...journal, ...input, updatedAt: nowIso() });
+    await store.put("journal", journal.id, { ...journal, ...input, minutes: project.track === "hardware" ? input.minutes : journal.minutes, updatedAt: nowIso() });
     project.updatedAt = nowIso();
     await store.put("project", project.id, project);
     setFlash(res, "success", "Devlog updated.");
@@ -509,9 +511,19 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const designJournals = await store.list("journal");
     const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
     const fundingMinutes = designMinutes > 0 ? Math.round(designMinutes) : Math.round(input.estimatedHours * 60);
+    const bomTotal = input.bomItems.length
+      ? Math.round(input.bomItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0) * 100) / 100
+      : Math.round((fundingMinutes * 5 / 60) * 100) / 100;
+    if (bomTotal <= 0) {
+      setFlash(res, "error", "Add priced BOM parts before requesting hardware funding.");
+      return res.redirect(`/app/projects/${project.id}#funding`);
+    }
+    const fundingTier = bomTotal <= 20 ? 1 : bomTotal <= 50 ? 2 : bomTotal <= 100 ? 3 : 4;
     const request = {
       id: randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted", estimatedHours: input.estimatedHours,
+      requestedUsd: bomTotal,
+      bomTotal, fundingTier,
       requestedHertz: Math.round((fundingMinutes * 5 / 60) * 100) / 100,
       designMinutes: fundingMinutes,
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
@@ -525,7 +537,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     });
     await writeAudit(store, req.user, {
       action: "funding.submitted", entityType: "funding_request", entityId: request.id,
-      summary: `Submitted a $${request.requestedHertz} hardware funding request for ${project.title}.`, after: request,
+      summary: `Submitted a $${request.requestedUsd} hardware funding request for ${project.title}.`, after: request,
     });
     await notifier.fundingSubmitted?.(req.user, project, request);
     setFlash(res, "success", "Funding request sent! The CQ team will review your design and build plan.");
