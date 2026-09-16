@@ -4,6 +4,8 @@ import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDe
 import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 
+const ACTIVE_REVIEW_ENVIRONMENT_STATUSES = new Set(["provisioning", "ready", "open", "stopping", "stopped", "restarting"]);
+
 function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
@@ -61,9 +63,45 @@ function projectForReview(submission, currentProject) {
   };
 }
 
-export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
+export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier, reviewEnvironments }) {
   const router = Router();
+  const wantsJson = (req) => req.get("x-cq-partial") === "sandbox" || req.accepts(["json", "html"]) === "json";
+  router.use(async (req, res, next) => {
+    if (req.user?.reviewerTraining?.required && req.user.reviewerTraining.status === "pending" && (req.path.startsWith("/funding") || (req.path.startsWith("/reviews") && !req.path.includes("sub_reviewer_training")))) return res.status(403).render("error", { title: "Reviewer training required", message: "Complete the reviewer tutorial and wait for an administrator to approve your training before reviewing live projects." });
+    return next();
+  });
   router.use(requireOrganizer);
+  router.get("/review-environments", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.list()));
+  router.get("/review-environments/capacity", requirePermission("review.environments"), async (req, res) => res.json(await reviewEnvironments.capacity()));
+  router.post("/reviews/:id/environment", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    if (!submission) return res.sendStatus(404);
+    try {
+      const project = await store.get("project", submission.projectId);
+      const environment = await reviewEnvironments.launch({ projectId: project?.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project?.repoUrl });
+      await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project?.title || submission.projectId}.`, metadata: { projectId: project?.id, submissionId: submission.id } });
+      return res.json(environment);
+    } catch (error) { return res.status(503).json({ error: error.message }); }
+  });
+  router.delete("/review-environments/:id", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    const destroyed = await reviewEnvironments.destroy(environment);
+    await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
+    return res.json(destroyed);
+  });
+  router.post("/review-environments/:id/extend", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    try { return res.json(await reviewEnvironments.extend(environment, Number(req.body?.minutes || 30))); }
+    catch (error) { return res.status(503).json({ error: error.message }); }
+  });
+  router.post("/review-environments/:id/restart", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = await store.get("review_environment", req.params.id);
+    if (!environment) return res.sendStatus(404);
+    try { return res.json(await reviewEnvironments.restart(environment)); }
+    catch (error) { return res.status(503).json({ error: error.message }); }
+  });
   router.post("/session/verify", requireCsrf, async (req, res) => {
     if (!req.session) return res.sendStatus(401);
     const verifiedAt = nowIso();
@@ -302,6 +340,16 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.redirect("/admin/users");
   });
 
+  router.post("/users/:id/reviewer-training/complete", requirePermission("users.manage"), requireCsrf, async (req, res) => {
+    const user = await store.get("user", req.params.id);
+    if (!user) return res.sendStatus(404);
+    user.reviewerTraining = { ...(user.reviewerTraining || {}), required: false, status: "approved", approvedAt: nowIso(), approvedById: req.user.id };
+    await store.put("user", user.id, user);
+    await writeAudit(store, req.user, { action: "reviewer.training_approved", entityType: "user", entityId: user.id, summary: `Approved reviewer training for ${user.name}.` });
+    setFlash(res, "success", `${user.name} can now review live projects.`);
+    return res.redirect("/admin/users");
+  });
+
   router.post("/users/:id", requirePermission("users.manage"), requireCsrf, async (req, res) => {
     const user = await store.get("user", req.params.id);
     if (!user) return res.sendStatus(404);
@@ -517,7 +565,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),
     ]);
     const rows = sortNewest(submissions)
-      .filter((submission) => !submission.decision && !["withdrawn", "error"].includes(submission.phase))
+      .filter((submission) => submission.projectId !== "cq_reviewer_training" && !submission.decision && !["withdrawn", "error"].includes(submission.phase))
       .map((submission) => {
       const currentProject = projects.find((item) => item.id === submission.projectId);
       const project = currentProject ? projectForReview(submission, currentProject) : null;
@@ -538,26 +586,84 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     });
   });
 
+  router.get("/reviewer-training", requirePermission("reviews.read"), async (req, res) => res.redirect("/admin/reviews/sub_reviewer_training"));
+
   router.get("/reviews/:id", requirePermission("projects.review"), async (req, res) => {
     const submission = await store.get("submission", req.params.id);
     if (!submission) return res.sendStatus(404);
     const project = await store.get("project", submission.projectId);
     if (!project) return res.sendStatus(404);
     const reviewProject = projectForReview(submission, project);
-    const [maker, country, journals, actions, reviewers, github] = await Promise.all([
+    const [maker, country, journals, actions, reviewers, github, environments, reviewEnvironmentCapacity] = await Promise.all([
       store.get("user", project.userId), store.get("country", project.countryCode),
       store.list("journal"), store.list("review_action"), store.list("user"),
       githubClient.repository(reviewProject.repoUrl),
+      reviewEnvironments.list(),
+      reviewEnvironments.capacity(),
     ]);
     const reviewJournals = journalsForReview(submission, journals).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+    const existingEnvironment = environments.find((item) => item.reviewId === submission.id && !["destroyed", "failed"].includes(item.status)) || null;
+    const reviewEnvironment = await reviewEnvironments.sync(existingEnvironment);
     res.render("admin/review-detail", {
       title: `Review ${reviewProject.title}`, submission, project: reviewProject, maker, country,
       journals: reviewJournals,
       actions: sortNewest(actions.filter((item) => item.submissionId === submission.id)),
       reviewers,
       github,
+      reviewEnvironment,
+      reviewEnvironmentCapacity,
+      reviewEnvironmentOwner: reviewEnvironment ? reviewers.find((item) => item.id === reviewEnvironment.reviewerId) : null,
       loggedMinutes: reviewMinutes(reviewJournals),
     });
+  });
+
+  router.post("/reviews/:id/environment/launch", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const submission = await store.get("submission", req.params.id);
+    const project = submission && await store.get("project", submission.projectId);
+    if (!submission || !project) return res.sendStatus(404);
+    try {
+      const environment = await reviewEnvironments.launch({ projectId: project.id, reviewId: submission.id, reviewerId: req.user.id, repositoryUrl: project.repoUrl });
+      await writeAudit(store, req.user, { action: "review.environment.launch", entityType: "review_environment", entityId: environment.id, summary: `Launched a disposable review environment for ${project.title}.`, metadata: { projectId: project.id, submissionId: submission.id, vmid: environment.vmid } });
+      if (wantsJson(req)) return res.json({ ok: true, environment });
+      setFlash(res, "success", "Review sandbox launched.");
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${submission.id}`);
+  });
+
+  router.post("/reviews/:id/environment/destroy", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && !["destroyed", "failed"].includes(item.status));
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.destroy(environment);
+      await writeAudit(store, req.user, { action: "review.environment.destroy", entityType: "review_environment", entityId: environment.id, summary: "Destroyed a disposable review environment." });
+      if (wantsJson(req)) return res.json({ ok: true });
+      setFlash(res, "success", "Review sandbox ended and queued for deletion.");
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
+  });
+
+  router.post("/reviews/:id/environment/extend", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && ACTIVE_REVIEW_ENVIRONMENT_STATUSES.has(item.status));
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.extend(environment, 30);
+      await writeAudit(store, req.user, { action: "review.environment.extend", entityType: "review_environment", entityId: environment.id, summary: "Extended a review sandbox by 30 minutes." });
+      if (wantsJson(req)) return res.json({ ok: true });
+      setFlash(res, "success", "Review sandbox extended by 30 minutes.");
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
+  });
+
+  router.post("/reviews/:id/environment/restart", requirePermission("review.environments"), requireCsrf, async (req, res) => {
+    const environment = (await reviewEnvironments.list()).find((item) => item.reviewId === req.params.id && ACTIVE_REVIEW_ENVIRONMENT_STATUSES.has(item.status));
+    if (!environment) { setFlash(res, "error", "No active review sandbox was found."); return res.redirect(`/admin/reviews/${req.params.id}`); }
+    try {
+      await reviewEnvironments.restart(environment);
+      await writeAudit(store, req.user, { action: "review.environment.restart", entityType: "review_environment", entityId: environment.id, summary: "Restarted a review sandbox." });
+      if (wantsJson(req)) return res.json({ ok: true });
+      setFlash(res, "success", "Review sandbox restarted.");
+    } catch (error) { if (wantsJson(req)) return res.status(503).json({ error: error.message }); setFlash(res, "error", error.message); }
+    res.redirect(`/admin/reviews/${req.params.id}`);
   });
 
   router.post("/reviews/:id/claim", requirePermission("projects.review"), requireCsrf, async (req, res) => {
