@@ -104,7 +104,7 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.ok((await store.get("mcp_token", mcpToken.id)).revokedAt);
 });
 
-test("hardware funding is approved and issued before a final ship can enter review", async () => {
+test("hardware design funding and final build review keep time, grants, hertz, and program value separate", async () => {
   const config = getConfig({ nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true, dataEncryptionKey: Buffer.alloc(32, 9).toString("base64"), adminEmails: "hardware@example.com" });
   const store = new LocalEncryptedStore(config, { memory: true });
   const app = await createApp({ config, store, logger: { info() {}, error() {} } });
@@ -123,7 +123,7 @@ test("hardware funding is approved and issued before a final ship can enter revi
   assert.equal((await store.get("project", "cq_hardware")).status, "funding_submitted");
   const fundingReview = await agent.get(`/admin/funding/${funding.id}`);
   assert.equal(fundingReview.status, 200);
-  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_usd: "55", note_to_maker: "Looks buildable." });
+  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable." });
   assert.equal(approve.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "second_pass");
   const secondAgent = request.agent(app);
@@ -131,14 +131,55 @@ test("hardware funding is approved and issued before a final ship can enter revi
   const secondUser = (await store.list("user")).find((item) => item.email === "second-pass@example.com");
   await store.put("user", secondUser.id, { ...secondUser, roles: ["participant", "second_pass_reviewer"], role: "participant" });
   const secondFundingReview = await secondAgent.get(`/admin/funding/${funding.id}`);
-  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_usd: "55", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
+  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
   assert.equal(secondApprove.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "approved");
   assert.equal((await store.get("funding_request", funding.id)).review.approvedUsd, 55);
+  assert.equal((await store.get("funding_request", funding.id)).review.approvedDesignMinutes, 660);
   assert.equal((await store.get("user", user.id)).hertz, initialHertz);
+  assert.deepEqual((await store.get("project", "cq_hardware")).fundedDesignJournalIds, ["log_hardware_design"]);
+  const designValue = await store.get("program_funding", `design_${funding.id}`);
+  const grantAllocation = await store.get("program_funding", `grant_${funding.id}`);
+  assert.equal(designValue.generatedUsd, 55);
+  assert.equal(grantAllocation.allocatedUsd, 55);
+  assert.equal(grantAllocation.issued, false);
+  const forbiddenIssue = await secondAgent.post(`/admin/funding/${funding.id}/issue`).type("form").send({ _csrf: csrf(secondFundingReview.text) });
+  assert.equal(forbiddenIssue.status, 403);
   const approvedPage = await agent.get(`/admin/funding/${funding.id}`);
   const issue = await agent.post(`/admin/funding/${funding.id}/issue`).type("form").send({ _csrf: csrf(approvedPage.text), hcb_grant_reference: "grant-123" });
   assert.equal(issue.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "issued");
   assert.equal((await store.get("project", "cq_hardware")).status, "funding_issued");
+  assert.equal((await store.get("program_funding", `grant_${funding.id}`)).status, "issued");
+
+  await store.put("journal", "log_hardware_build", { id: "log_hardware_build", projectId: "cq_hardware", title: "Assembled and tested receiver", text: "Assembled the receiver, loaded the firmware, and documented a successful signal test.", minutes: 60, entryDate: "2026-09-02", imageUrls: ["https://example.com/build.jpg"], createdAt: "2026-09-02T00:00:00.000Z", updatedAt: "2026-09-02T00:00:00.000Z" });
+  const readyPage = await agent.get("/app/projects/cq_hardware");
+  const ship = await agent.post("/app/projects/cq_hardware/submit").type("form").send({ _csrf: csrf(readyPage.text) });
+  assert.equal(ship.status, 302);
+  const submission = (await store.list("submission"))[0];
+  assert.deepEqual(submission.journalIds, ["log_hardware_build"]);
+
+  const reviewPage = await agent.get(`/admin/reviews/${submission.id}`);
+  const reviewFields = {
+    _csrf: csrf(reviewPage.text), decision: "approved", radio_related: "1", shipped: "1", public_source: "1", reproducible: "1", evidence_sufficient: "1", eligible_work: "1", distinct_hours: "1",
+    repository_manual: "1", design_files: "1", structured_bom: "1", firmware_na: "1", schematic_cad_na: "1", build_evidence: "1", final_test: "1",
+    journal_minutes_log_hardware_build: "60", technical_note: "Verified the assembled receiver and successful test evidence.", time_note: "",
+  };
+  const firstReview = await agent.post(`/admin/reviews/${submission.id}/decision`).type("form").send(reviewFields);
+  assert.equal(firstReview.status, 302);
+  const secondReviewPage = await secondAgent.get(`/admin/reviews/${submission.id}`);
+  const finalReview = await secondAgent.post(`/admin/reviews/${submission.id}/decision`).type("form").send({ ...reviewFields, _csrf: csrf(secondReviewPage.text), second_pass: "1" });
+  assert.equal(finalReview.status, 302);
+  assert.equal((await store.get("submission", submission.id)).review.approved_minutes, 60);
+  assert.equal((await store.get("user", user.id)).hertz, initialHertz + 5);
+  assert.equal((await store.get("program_funding", `hours_${submission.id}`)).generatedUsd, 5);
+  const ledger = (await store.list("program_funding")).filter((entry) => entry.status !== "reversed");
+  assert.equal(ledger.reduce((sum, entry) => sum + entry.availableUsd, 0), 5);
+
+  const projectAdminPage = await agent.get("/admin/projects/cq_hardware");
+  const reopen = await agent.post("/admin/projects/cq_hardware").type("form").send({ _csrf: csrf(projectAdminPage.text), unapprove: "1" });
+  assert.equal(reopen.status, 302);
+  assert.equal((await store.get("user", user.id)).hertz, initialHertz);
+  assert.equal((await store.get("program_funding", `hours_${submission.id}`)).status, "reversed");
+  assert.equal((await store.get("program_funding", `hours_${submission.id}`)).availableUsd, 0);
 });

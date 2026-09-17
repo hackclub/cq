@@ -17,7 +17,39 @@ function sessionIsActive(session) {
 
 async function recordProgramFunding(store, id, entry) {
   const existing = await store.get("program_funding", id);
-  await store.put("program_funding", id, { id, ...existing, ...entry, updatedAt: nowIso() });
+  const timestamp = nowIso();
+  await store.put("program_funding", id, { id, createdAt: existing?.createdAt || timestamp, ...existing, ...entry, updatedAt: timestamp });
+}
+
+async function reverseProgramFunding(store, id, reason) {
+  const existing = await store.get("program_funding", id);
+  if (!existing || existing.status === "reversed") return;
+  await recordProgramFunding(store, id, {
+    status: "reversed", generatedUsd: 0, allocatedUsd: 0, availableUsd: 0,
+    reversedAt: nowIso(), reversalReason: reason,
+  });
+}
+
+function journalMinuteReview(body, journals, previous = {}) {
+  const minutes = {};
+  for (const journal of journals) {
+    const key = `journal_minutes_${journal.id}`;
+    const fallback = previous[journal.id] ?? journal.minutes;
+    minutes[journal.id] = Math.min(
+      Math.max(0, Math.round(Number(journal.minutes) || 0)),
+      Math.max(0, Math.round(Number(Object.hasOwn(body, key) ? body[key] : fallback) || 0)),
+    );
+  }
+  return minutes;
+}
+
+function minuteTotal(minutes) {
+  return Object.values(minutes).reduce((sum, value) => sum + value, 0);
+}
+
+function fundingAccess(req, res, next) {
+  if (hasPermission(req.user, "projects.review") || hasPermission(req.user, "funding.read")) return next();
+  return res.status(403).render("error", { title: "Permission required", message: "Your organizer roles do not allow this action." });
 }
 
 async function revokeSessions(store, sessions, actor) {
@@ -44,6 +76,16 @@ function journalsForReview(submission, journals) {
 
 function reviewMinutes(journals) {
   return Math.round(journals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0));
+}
+
+function journalsForFunding(request, journals) {
+  if (Array.isArray(request.designJournalSnapshots)) return structuredClone(request.designJournalSnapshots);
+  const projectJournals = journals.filter((journal) => journal.projectId === request.projectId && !journal.deletedAt);
+  if (request.designJournalIds?.length) {
+    const included = new Set(request.designJournalIds);
+    return projectJournals.filter((journal) => included.has(journal.id));
+  }
+  return projectJournals.filter((journal) => !request.createdAt || String(journal.createdAt || "") <= request.createdAt);
 }
 
 function projectForReview(submission, currentProject) {
@@ -146,12 +188,13 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   router.get("/", async (req, res) => {
     const canUsers = hasPermission(req.user, "users.manage");
     const canReview = hasPermission(req.user, "projects.review");
+    const canFunding = canReview || hasPermission(req.user, "funding.read");
     const canOrders = hasPermission(req.user, "orders.manage");
     const canShop = hasPermission(req.user, "shop.manage");
     const [users, projects, orders, submissions, deliveries, products, fundingRequests] = await Promise.all([
       canUsers ? store.list("user") : [], canReview ? store.list("project") : [], canOrders ? store.list("order") : [],
       canReview ? store.list("submission") : [], canUsers ? store.list("delivery") : [], canShop ? store.list("product") : [],
-      canReview ? store.list("funding_request") : [],
+      canFunding ? store.list("funding_request") : [],
     ]);
     res.render("admin/index", {
       title: "Admin dashboard",
@@ -185,24 +228,31 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.redirect("/admin/settings");
   });
 
-  router.get("/funding", requirePermission("projects.review"), async (req, res) => {
-    const [requests, projects, users] = await Promise.all([store.list("funding_request"), store.list("project"), store.list("user")]);
+  router.get("/funding", fundingAccess, async (req, res) => {
+    const [requests, projects, users, ledger] = await Promise.all([store.list("funding_request"), store.list("project"), store.list("user"), store.list("program_funding")]);
     const rows = sortNewest(requests).map((request) => ({
       ...request,
       project: projects.find((project) => project.id === request.projectId),
       maker: users.find((user) => user.id === request.userId),
       reviewer: users.find((user) => user.id === request.reviewerId),
     }));
-    res.render("admin/funding", { title: "Hardware funding", requests: rows });
+    const activeLedger = ledger.filter((entry) => entry.status !== "reversed");
+    const fundingSummary = {
+      generatedUsd: activeLedger.reduce((sum, entry) => sum + (Number(entry.generatedUsd) || 0), 0),
+      allocatedUsd: activeLedger.reduce((sum, entry) => sum + (Number(entry.allocatedUsd) || 0), 0),
+      availableUsd: activeLedger.reduce((sum, entry) => sum + (Number(entry.availableUsd) || 0), 0),
+    };
+    res.render("admin/funding", { title: "Hardware funding", requests: rows, ledger: sortNewest(ledger), fundingSummary });
   });
 
-  router.get("/funding/:id", requirePermission("projects.review"), async (req, res) => {
+  router.get("/funding/:id", fundingAccess, async (req, res) => {
     const request = await store.get("funding_request", req.params.id);
     if (!request) return res.sendStatus(404);
-    const [project, maker, actions] = await Promise.all([
-      store.get("project", request.projectId), store.get("user", request.userId), store.list("review_action"),
+    const [project, maker, actions, journals] = await Promise.all([
+      store.get("project", request.projectId), store.get("user", request.userId), store.list("review_action"), store.list("journal"),
     ]);
-    res.render("admin/funding-detail", { title: "Hardware funding review", request, project, maker, actions: sortNewest(actions.filter((item) => item.fundingRequestId === request.id)) });
+    const designJournals = journalsForFunding(request, journals);
+    res.render("admin/funding-detail", { title: "Hardware funding review", request: { ...request, designJournalSnapshots: designJournals }, project, maker, designJournals, actions: sortNewest(actions.filter((item) => item.fundingRequestId === request.id)) });
   });
 
   router.post("/funding/:id/decision", requirePermission("projects.review"), requireCsrf, async (req, res) => {
@@ -220,6 +270,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
     const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    const designJournals = journalsForFunding(request, await store.list("journal"));
+    const journalApprovedMinutes = journalMinuteReview(req.body, designJournals);
+    const approvedDesignMinutes = minuteTotal(journalApprovedMinutes);
+    const approvedFundingCapUsd = Math.round((approvedDesignMinutes * 5 / 60) * 100) / 100;
     if (decision === "approved" && !request.bomItems?.length) {
       setFlash(res, "error", "This request needs an exact structured BOM before it can be approved.");
       return res.redirect(`/admin/funding/${request.id}`);
@@ -237,6 +291,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
+    if (decision === "approved" && approvedUsd > approvedFundingCapUsd) {
+      setFlash(res, "error", `The approved design time supports at most $${approvedFundingCapUsd.toFixed(2)} in funding.`);
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
     if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
       setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
@@ -245,9 +303,18 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const project = await store.get("project", request.projectId);
     const maker = await store.get("user", request.userId);
     const timestamp = nowIso();
+    request.designJournalIds = designJournals.map((journal) => journal.id);
+    request.designJournalSnapshots = structuredClone(designJournals);
     request.status = "second_pass";
     request.reviewerId = req.user.id; request.reviewerName = req.user.name;
-    request.firstPass = { decision, noteToMaker, internalNote, approvedUsd: decision === "approved" ? approvedUsd : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
+    request.firstPass = {
+      decision, noteToMaker, internalNote,
+      approvedUsd: decision === "approved" ? approvedUsd : 0,
+      approvedDesignMinutes: decision === "approved" ? approvedDesignMinutes : 0,
+      approvedFundingCapUsd: decision === "approved" ? approvedFundingCapUsd : 0,
+      journalApprovedMinutes,
+      criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp,
+    };
     request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
     await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedUsd });
@@ -280,12 +347,20 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     const approvedUsd = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz ?? request.firstPass.approvedUsd ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
     const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    const designJournals = journalsForFunding(request, await store.list("journal"));
+    const journalApprovedMinutes = journalMinuteReview(req.body, designJournals, request.firstPass.journalApprovedMinutes || {});
+    const approvedDesignMinutes = minuteTotal(journalApprovedMinutes);
+    const approvedFundingCapUsd = Math.round((approvedDesignMinutes * 5 / 60) * 100) / 100;
     if (decision === "approved" && !request.bomItems?.length) {
       setFlash(res, "error", "This request needs an exact structured BOM before it can be approved.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
     if (decision === "approved" && approvedUsd <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && approvedUsd > approvedFundingCapUsd) {
+      setFlash(res, "error", `The approved design time supports at most $${approvedFundingCapUsd.toFixed(2)} in funding.`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
@@ -295,11 +370,38 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const before = structuredClone(request); const timestamp = nowIso();
     const [project, maker] = await Promise.all([store.get("project", request.projectId), store.get("user", request.userId)]);
     request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
-    request.review = { decision, noteToMaker, internalNote, approvedUsd, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
+    request.review = {
+      decision, noteToMaker, internalNote, approvedUsd,
+      approvedDesignMinutes: decision === "approved" ? approvedDesignMinutes : 0,
+      approvedFundingCapUsd: decision === "approved" ? approvedFundingCapUsd : 0,
+      journalApprovedMinutes,
+      criteria: request.firstPass.criteria, firstPass: request.firstPass,
+      secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote },
+    };
     request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
-    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedUsd, availableUsd: -approvedUsd, status: "allocated", issued: false });
-    if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
+    if (decision === "approved") {
+      await recordProgramFunding(store, `design_${request.id}`, {
+        type: "approved_design_hours", sourceId: request.id, projectId: request.projectId,
+        approvedMinutes: approvedDesignMinutes, generatedUsd: approvedFundingCapUsd,
+        allocatedUsd: 0, availableUsd: approvedFundingCapUsd, status: "available",
+      });
+      await recordProgramFunding(store, `grant_${request.id}`, {
+        type: "hardware_grant", sourceId: request.id, projectId: request.projectId,
+        generatedUsd: 0, allocatedUsd: approvedUsd, availableUsd: -approvedUsd,
+        status: "allocated", issued: false,
+      });
+    } else {
+      await reverseProgramFunding(store, `design_${request.id}`, `Funding ${decision}`);
+      await reverseProgramFunding(store, `grant_${request.id}`, `Funding ${decision}`);
+    }
+    if (project) await store.put("project", project.id, {
+      ...project,
+      status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision],
+      fundedDesignJournalIds: decision === "approved" ? (request.designJournalIds || []) : [],
+      approvedDesignMinutes: decision === "approved" ? approvedDesignMinutes : 0,
+      updatedAt: timestamp,
+    });
     await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedUsd });
     await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedUsd } });
     if (maker && project) await notifier.fundingDecision?.(maker, project, request);
@@ -307,12 +409,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.redirect(`/admin/funding/${request.id}`);
   });
 
-  router.post("/funding/:id/issue", requirePermission("projects.review"), requireCsrf, async (req, res) => {
-    const grantIssuers = new Set((config.grantIssuerEmails.length ? config.grantIssuerEmails : config.adminEmails));
-    if (!grantIssuers.has(String(req.user.email || "").toLowerCase())) {
-      setFlash(res, "error", "Only an authorised grant issuer can issue hardware funding.");
-      return res.redirect(`/admin/funding/${req.params.id}`);
-    }
+  router.post("/funding/:id/issue", requirePermission("funding.issue"), requireCsrf, async (req, res) => {
     const request = await store.get("funding_request", req.params.id);
     if (!request) return res.sendStatus(404);
     if (request.status !== "approved") {
@@ -324,6 +421,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     request.status = "issued"; request.issuedAt = timestamp; request.issuedById = req.user.id;
     request.hcbGrantReference = String(req.body.hcb_grant_reference || "").trim().slice(0, 200); request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
+    await recordProgramFunding(store, `grant_${request.id}`, {
+      status: "issued", issued: true, issuedAt: timestamp, issuedById: req.user.id,
+      hcbGrantReference: request.hcbGrantReference,
+    });
     if (project) await store.put("project", project.id, { ...project, status: "funding_issued", updatedAt: timestamp });
     await writeAudit(store, req.user, { action: "funding.issued", entityType: "funding_request", entityId: request.id, summary: `Marked funding issued for ${project?.title || request.projectId}.`, before, after: request });
     if (maker && project) await notifier.fundingIssued?.(maker, project, request);
@@ -471,6 +572,21 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       project.status = "building";
       project.unapprovedAt = nowIso();
       project.unapprovedById = req.user.id;
+      const approvedSubmission = sortNewest((await store.list("submission")).filter((item) => item.projectId === project.id && item.decision === "approved"))[0];
+      if (approvedSubmission) {
+        const hertzEntry = await store.get("ledger", approvedSubmission.id);
+        const maker = await store.get("user", project.userId);
+        if (hertzEntry && maker) {
+          maker.hertz = Math.max(0, Math.round((Number(maker.hertz || 0) - Number(hertzEntry.delta || 0)) * 100) / 100);
+          maker.updatedAt = nowIso();
+          await store.put("user", maker.id, maker);
+          await store.delete("ledger", approvedSubmission.id);
+        }
+        await reverseProgramFunding(store, `hours_${approvedSubmission.id}`, "Project approval removed");
+        await store.put("submission", approvedSubmission.id, {
+          ...approvedSubmission, phase: "reverted", decision: null, event: "review.reverted", updatedAt: nowIso(),
+        });
+      }
     }
     if (req.body.visibility) {
       if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
@@ -774,6 +890,27 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const technicalNote = String(req.body.technical_note || prior.technical_note || "").trim().slice(0, 3000);
     const timeNote = String(req.body.time_note || prior.time_note || "").trim().slice(0, 2000);
     const reviewedProject = await store.get("project", submission.projectId);
+    const hardwareChecks = {
+      repositoryManual: req.body.repository_manual === "1" || Boolean(prior.criteria?.hardwareChecks?.repositoryManual),
+      designFiles: req.body.design_files === "1" || Boolean(prior.criteria?.hardwareChecks?.designFiles),
+      structuredBom: req.body.structured_bom === "1" || Boolean(prior.criteria?.hardwareChecks?.structuredBom),
+      firmware: req.body.firmware === "1" || Boolean(prior.criteria?.hardwareChecks?.firmware),
+      firmwareNotApplicable: req.body.firmware_na === "1" || Boolean(prior.criteria?.hardwareChecks?.firmwareNotApplicable),
+      schematicCad: req.body.schematic_cad === "1" || Boolean(prior.criteria?.hardwareChecks?.schematicCad),
+      schematicCadNotApplicable: req.body.schematic_cad_na === "1" || Boolean(prior.criteria?.hardwareChecks?.schematicCadNotApplicable),
+      buildEvidence: req.body.build_evidence === "1" || Boolean(prior.criteria?.hardwareChecks?.buildEvidence),
+      finalTest: req.body.final_test === "1" || Boolean(prior.criteria?.hardwareChecks?.finalTest),
+    };
+    const hardwareEvidence = reviewedProject?.track !== "hardware" || (
+      hardwareChecks.repositoryManual && hardwareChecks.designFiles && hardwareChecks.structuredBom &&
+      (hardwareChecks.firmware || hardwareChecks.firmwareNotApplicable) &&
+      (hardwareChecks.schematicCad || hardwareChecks.schematicCadNotApplicable) &&
+      hardwareChecks.buildEvidence && hardwareChecks.finalTest
+    );
+    const contradictoryHardwareChecks = reviewedProject?.track === "hardware" && (
+      (hardwareChecks.firmware && hardwareChecks.firmwareNotApplicable) ||
+      (hardwareChecks.schematicCad && hardwareChecks.schematicCadNotApplicable)
+    );
     const criteria = {
       radioRelated: req.body.radio_related === "1" || Boolean(prior.criteria?.radioRelated),
       shipped: req.body.shipped === "1" || Boolean(prior.criteria?.shipped),
@@ -782,10 +919,15 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
-      hardwareEvidence: reviewedProject?.track !== "hardware" || (["repository_manual", "design_files", "structured_bom", "firmware", "schematic_cad", "build_evidence", "final_test"].every((key) => req.body[key] === "1")) || Boolean(prior.criteria?.hardwareEvidence),
+      hardwareEvidence,
+      hardwareChecks,
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
+    if (decision === "approved" && contradictoryHardwareChecks) {
+      setFlash(res, "error", "For firmware and schematic/CAD evidence, choose either verified or not applicable, not both.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
     if (decision === "approved" && (!Object.values(criteria).every(Boolean) || technicalNote.length < 5)) {
@@ -794,8 +936,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
     const precheckMinutes = reviewMinutes(precheckJournals);
-    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal, index) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`] ?? req.body[`journal_minutes_${index}`]) || 0)))]));
-    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)));
+    const perJournalMinutes = journalMinuteReview(req.body, precheckJournals, prior.journalApprovedMinutes || {});
+    const requestedMinutes = Math.min(precheckMinutes, minuteTotal(perJournalMinutes));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -807,6 +949,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         decision, approved_minutes: decision === "approved" ? requestedMinutes : 0,
         approved_hours: Math.round(((decision === "approved" ? requestedMinutes : 0) / 60) * 100) / 100,
         note_to_maker: noteToMaker, internal_note: internalNote, technical_note: technicalNote, time_note: timeNote, criteria,
+        journalApprovedMinutes: perJournalMinutes,
         reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp,
       };
       submission.assignedReviewerId = req.user.id;
@@ -822,7 +965,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       const journals = journalsForReview(submission, await store.list("journal"));
       const loggedMinutes = reviewMinutes(journals);
       const approvedMinutes = decision === "approved"
-        ? Math.min(loggedMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)))
+        ? Math.min(loggedMinutes, minuteTotal(perJournalMinutes))
         : 0;
       const timestamp = nowIso();
       submission.phase = "reviewed";
@@ -833,6 +976,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         approved_hours: Math.round((approvedMinutes / 60) * 100) / 100,
         note_to_maker: noteToMaker, internal_note: internalNote,
         technical_note: technicalNote, time_note: timeNote, criteria,
+        journalApprovedMinutes: perJournalMinutes,
         reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp,
         first_pass: submission.firstPass,
         second_pass: { reviewer_id: req.user.id, reviewer_name: req.user.name, reviewed_at: timestamp, internal_note: internalNote },

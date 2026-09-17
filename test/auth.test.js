@@ -14,6 +14,11 @@ test("organizer roles grant only their declared permissions", () => {
   assert.equal(hasPermission(operations, "orders.manage"), true);
   assert.equal(hasPermission(operations, "users.manage"), false);
 
+  const grantIssuer = { roles: ["participant", "grant_issuer"] };
+  assert.equal(hasPermission(grantIssuer, "funding.read"), true);
+  assert.equal(hasPermission(grantIssuer, "funding.issue"), true);
+  assert.equal(hasPermission(grantIssuer, "projects.review"), false);
+
   const admin = { role: "admin" };
   assert.equal(hasPermission(admin, "users.manage"), true);
   const auditor = { roles: ["participant", "auditor"] };
