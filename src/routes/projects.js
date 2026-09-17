@@ -158,8 +158,8 @@ function hackatimeActivity(project, journals, hackatime) {
   };
 }
 
-function submissionJournals(journals, submissions) {
-  const usedIds = new Set(submissions.flatMap((item) => item.journalIds || []));
+function submissionJournals(journals, submissions, excludedIds = []) {
+  const usedIds = new Set([...submissions.flatMap((item) => item.journalIds || []), ...excludedIds]);
   if (usedIds.size) return journals.filter((journal) => !usedIds.has(journal.id));
   if (submissions.length) {
     const latestCreatedAt = submissions[0].createdAt;
@@ -341,7 +341,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...journal,
         imageUrls: journalImages(journal),
       })),
-      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
+      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions, project.track === "hardware" ? (project.fundedDesignJournalIds || []) : []), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
       ariConfigured: ariClient.configured(),
       projectLocked: project.status === "submitted",
       lockedJournalIds: [...new Set(projectDetails.submissions.flatMap((item) => {
@@ -527,7 +527,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     }
     const timestamp = nowIso();
     const designJournals = await store.list("journal");
-    const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
+    const fundingJournals = designJournals.filter((journal) => journal.projectId === project.id && !journal.deletedAt);
+    const designMinutes = fundingJournals.reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
     const fundingMinutes = Math.round(designMinutes);
     if (fundingMinutes <= 0) {
       setFlash(res, "error", "Add at least one timed design devlog before requesting hardware funding.");
@@ -554,6 +555,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       requestedUsd: bomTotal,
       bomTotal, fundingTier, fundingCapUsd,
       designMinutes: fundingMinutes,
+      designJournalIds: fundingJournals.map((journal) => journal.id),
+      designJournalSnapshots: structuredClone(fundingJournals),
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
       reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
@@ -598,7 +601,8 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", "Send your design and funding request first. You can ship the finished hardware project after funding is issued.");
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
-    const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
+    const fundedDesignJournalIds = project.track === "hardware" ? (project.fundedDesignJournalIds || []) : [];
+    const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions, fundedDesignJournalIds);
     const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
