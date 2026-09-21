@@ -88,6 +88,22 @@ test("projects ship into local review when Ari is not configured", async () => {
   });
   assert.equal(editAfterWithdraw.status, 302);
   assert.equal((await store.get("journal", "log_local")).title, "Updated after withdrawal");
+
+  await store.put("submission", submission.id, { ...submission, phase: "reviewed", decision: "changes", event: "review.changes" });
+  await store.put("project", "cq_local", { ...(await store.get("project", "cq_local")), status: "needs_changes", isUpdate: false, updateMessage: "" });
+  await store.put("journal", "log_resubmit", {
+    id: "log_resubmit", projectId: "cq_local", title: "Addressed review feedback",
+    text: "Completed another decoding pass and documented the requested changes.",
+    imageUrl: "https://example.com/resubmit.jpg", imageUrls: ["https://example.com/resubmit.jpg"],
+    entryDate: "2026-09-01", minutes: 366, createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z",
+  });
+  const changesPage = await agent.get("/app/projects/cq_local");
+  assert.doesNotMatch(changesPage.text, /Mark this as an update/);
+  assert.doesNotMatch(changesPage.text, /Before you can ship/);
+  const resubmit = await agent.post("/app/projects/cq_local/submit").type("form").send({ _csrf: csrf(changesPage.text) });
+  assert.equal(resubmit.status, 302);
+  assert.equal((await store.list("submission")).length, 2);
+  assert.equal((await store.get("project", "cq_local")).status, "submitted");
 });
 
 test("hardware funding is approved and issued before a final ship can enter review", async () => {
