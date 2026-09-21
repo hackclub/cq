@@ -1,0 +1,16 @@
+<% const draft = fundingDraft || {}; %>
+<form class="form-stack funding-request-form" method="post" action="/app/projects/<%= project.id %>/funding/submit" data-confirm="Send this design and funding request for review?">
+  <p class="field-help">Funding is based on reviewed design minutes at $5/hour. The request must match the exact structured BOM total.</p>
+  <label>Build plan<textarea name="build_plan" minlength="40" required><%= draft.buildPlan || project.buildPlan || '' %></textarea></label>
+  <div class="bom-editor">
+    <div class="panel-heading"><strong>Structured bill of materials</strong><button class="button button-ghost" type="button" data-bom-add>Add part</button></div>
+    <input type="hidden" name="bom_items" value="<%= JSON.stringify(draft.bomItems || project.bomItems || []) %>" data-bom-input>
+    <input type="hidden" name="bom" value="<%= draft.bom || project.bom || '' %>">
+    <div class="table-wrap"><table class="funding-bom-table"><thead><tr><th>Part</th><th>Purpose</th><th>Qty</th><th>Each (USD)</th><th>Supplier URL</th><th>Supplier</th><th></th></tr></thead><tbody data-bom-rows></tbody></table></div>
+  </div>
+  <label>Design link<input type="url" name="design_url" value="<%= draft.designUrl || project.designUrl || '' %>" required></label>
+  <label>Firmware/code link <span class="optional">optional</span><input type="url" name="firmware_url" value="<%= draft.firmwareUrl || project.firmwareUrl || '' %>"></label>
+  <label>Test plan<textarea name="test_plan" minlength="30" required><%= draft.testPlan || project.testPlan || '' %></textarea></label>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <button class="button button-primary" type="submit"><%= draft.status === 'changes_requested' ? 'Resubmit funding request' : 'Send design and funding request' %></button>
+</form>

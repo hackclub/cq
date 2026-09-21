@@ -266,6 +266,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const noteToMaker = String(req.body.note_to_maker || "").trim().slice(0, 3000);
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
     const designChecked = req.body.design_checked === "1";
+    const repositoryChecked = req.body.repository_checked === "1";
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
     const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
@@ -287,8 +288,8 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
-      setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
+    if (decision === "approved" && (!repositoryChecked || !designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
+      setFlash(res, "error", "Check the repository, design, BOM, and plan, then enter the approved funding amount.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
     if (decision === "approved" && approvedUsd > approvedFundingCapUsd) {
@@ -313,7 +314,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
       approvedDesignMinutes: decision === "approved" ? approvedDesignMinutes : 0,
       approvedFundingCapUsd: decision === "approved" ? approvedFundingCapUsd : 0,
       journalApprovedMinutes,
-      criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp,
+      criteria: { repositoryChecked, designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp,
     };
     request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
@@ -569,7 +570,7 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const previousStatus = project.status;
     if (req.body.unapprove === "1") {
       if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
-      project.status = "building";
+      project.status = project.track === "hardware" && project.fundedDesignJournalIds?.length ? "funding_issued" : "building";
       project.unapprovedAt = nowIso();
       project.unapprovedById = req.user.id;
       const approvedSubmission = sortNewest((await store.list("submission")).filter((item) => item.projectId === project.id && item.decision === "approved"))[0];
@@ -987,7 +988,9 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         decision, claimedMinutes: loggedMinutes, approvedMinutes, technicalNote, timeNote,
       });
       await store.put("submission", submission.id, submission);
-      project.status = { approved: "approved", changes: "needs_changes", rejected: "rejected" }[decision];
+      project.status = decision === "changes" && project.track === "hardware"
+        ? "funding_issued"
+        : { approved: "approved", changes: "needs_changes", rejected: "rejected" }[decision];
       project.updatedAt = timestamp;
       if (decision === "approved") project.approvedAt = timestamp;
       await store.put("project", project.id, project);

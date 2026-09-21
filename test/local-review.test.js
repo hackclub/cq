@@ -105,7 +105,7 @@ test("projects ship into local review when Ari is not configured", async () => {
 });
 
 test("hardware design funding and final build review keep time, grants, hertz, and program value separate", async () => {
-  const config = getConfig({ nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true, dataEncryptionKey: Buffer.alloc(32, 9).toString("base64"), adminEmails: "hardware@example.com" });
+  const config = getConfig({ nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true, dataEncryptionKey: Buffer.alloc(32, 9).toString("base64"), adminEmails: "hardware@example.com", ariProgramId: "cq-test", ariSigningSecret: "configured-but-not-used-for-hardware" });
   const store = new LocalEncryptedStore(config, { memory: true });
   const app = await createApp({ config, store, logger: { info() {}, error() {} } });
   const agent = request.agent(app);
@@ -121,17 +121,43 @@ test("hardware design funding and final build review keep time, grants, hertz, a
   const funding = (await store.list("funding_request"))[0];
   assert.equal(funding.requestedUsd, 55);
   assert.equal((await store.get("project", "cq_hardware")).status, "funding_submitted");
+  const lockedDesign = await agent.post("/app/projects/cq_hardware/journals/log_hardware_design/delete").type("form").send({ _csrf: csrf(await agent.get("/app/projects/cq_hardware").then((response) => response.text)) });
+  assert.equal(lockedDesign.status, 302);
+  assert.equal((await store.get("journal", "log_hardware_design")).deletedAt, undefined);
   const fundingReview = await agent.get(`/admin/funding/${funding.id}`);
   assert.equal(fundingReview.status, 200);
-  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable." });
-  assert.equal(approve.status, 302);
+  assert.match(fundingReview.text, /public repository shows the design work/i);
+  const returnForChanges = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "changes", note_to_maker: "Clarify the build plan before approval." });
+  assert.equal(returnForChanges.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "second_pass");
   const secondAgent = request.agent(app);
   await secondAgent.post("/auth/dev-login").type("form").send({ name: "Second pass", email: "second-pass@example.com", return_to: "/admin" });
   const secondUser = (await store.list("user")).find((item) => item.email === "second-pass@example.com");
   await store.put("user", secondUser.id, { ...secondUser, roles: ["participant", "second_pass_reviewer"], role: "participant" });
   const secondFundingReview = await secondAgent.get(`/admin/funding/${funding.id}`);
-  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
+  const secondReturn = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "changes", note_to_maker: "Clarify the build plan before approval.", internal_note: "Confirmed." });
+  assert.equal(secondReturn.status, 302);
+  assert.equal((await store.get("project", "cq_hardware")).status, "funding_changes");
+  const changesPage = await agent.get("/app/projects/cq_hardware");
+  assert.match(changesPage.text, /Resubmit funding request/);
+  const resubmit = await agent.post("/app/projects/cq_hardware/funding/submit").type("form").send({
+    _csrf: csrf(changesPage.text),
+    build_plan: "Design the RF front end, assemble the receiver, then test it with a known local repeater signal.",
+    bom: "Receiver IC — 1 — $55 — https://example.com/parts/receiver",
+    bom_items: JSON.stringify([{ name: "Receiver IC", purpose: "RF receiver", quantity: 1, unitCost: 55, link: "https://example.com/parts/receiver", distributor: "Example Parts" }]),
+    design_url: "https://github.com/maker/receiver/tree/main/hardware",
+    firmware_url: "",
+    test_plan: "Receive a known local signal and document the measured output and final assembled hardware.",
+  });
+  assert.equal(resubmit.status, 302);
+  assert.equal((await store.list("funding_request")).length, 1);
+  assert.equal((await store.get("funding_request", funding.id)).revision, 2);
+  assert.equal((await store.get("funding_request", funding.id)).reviewHistory.length, 1);
+  const revisedFundingReview = await agent.get(`/admin/funding/${funding.id}`);
+  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(revisedFundingReview.text), decision: "approved", repository_checked: "1", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable." });
+  assert.equal(approve.status, 302);
+  const revisedSecondFundingReview = await secondAgent.get(`/admin/funding/${funding.id}`);
+  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(revisedSecondFundingReview.text), decision: "approved", approved_usd: "55", journal_minutes_log_hardware_design: "660", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
   assert.equal(secondApprove.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "approved");
   assert.equal((await store.get("funding_request", funding.id)).review.approvedUsd, 55);
@@ -158,6 +184,8 @@ test("hardware design funding and final build review keep time, grants, hertz, a
   assert.equal(ship.status, 302);
   const submission = (await store.list("submission"))[0];
   assert.deepEqual(submission.journalIds, ["log_hardware_build"]);
+  assert.equal(submission.ariId, null);
+  assert.equal(submission.phase, "review");
 
   const reviewPage = await agent.get(`/admin/reviews/${submission.id}`);
   const reviewFields = {
