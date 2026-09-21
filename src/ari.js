@@ -189,9 +189,7 @@ export async function applyAriEvent(store, payload, deliveryId) {
 
     if (["review.approved", "review.changes", "review.rejected", "review.reverted", "review.requeued"].includes(event) && project) {
       const approvedMinutes = event === "review.approved" ? Math.max(0, Number(payload.review?.approved_minutes ?? 0)) : 0;
-      const desiredHertz = project.track !== "hardware"
-        ? Math.round(((approvedMinutes * 5) / 60) * 100) / 100
-        : 0;
+      const desiredHertz = Math.round(((approvedMinutes * 5) / 60) * 100) / 100;
       const ledger = await store.get("ledger", submission.id);
       const previousHertz = Math.max(0, Number(ledger?.delta) || 0);
       const user = await store.get("user", project.userId);
@@ -208,6 +206,21 @@ export async function applyAriEvent(store, payload, deliveryId) {
         });
       } else if (ledger) {
         await store.delete("ledger", submission.id);
+      }
+      const fundingEntry = await store.get("program_funding", `hours_${submission.id}`);
+      if (event === "review.approved") {
+        await store.put("program_funding", `hours_${submission.id}`, {
+          id: `hours_${submission.id}`,
+          createdAt: fundingEntry?.createdAt || timestamp,
+          type: "approved_hours", sourceId: submission.id, projectId: project.id,
+          approvedMinutes, generatedUsd: desiredHertz, allocatedUsd: 0,
+          availableUsd: desiredHertz, status: "available", updatedAt: timestamp,
+        });
+      } else if (fundingEntry && fundingEntry.status !== "reversed") {
+        await store.put("program_funding", fundingEntry.id, {
+          ...fundingEntry, generatedUsd: 0, allocatedUsd: 0, availableUsd: 0,
+          status: "reversed", reversedAt: timestamp, reversalReason: event, updatedAt: timestamp,
+        });
       }
     }
     await writeAudit(store, { id: "ari", name: "Project review service" }, {

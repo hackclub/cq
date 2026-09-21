@@ -19,6 +19,11 @@ export const roleDefinitions = {
     description: "Double-check first-pass project and hardware-funding reviews before they become final.",
     permissions: ["projects.review", "reviews.read", "reviews.second_pass", "review.environments"],
   },
+  grant_issuer: {
+    label: "Grant issuer",
+    description: "Record approved hardware grants as issued after completing the HCB handoff.",
+    permissions: ["funding.read", "funding.issue"],
+  },
   shop_editor: {
     label: "Shop editor",
     description: "Add products and manage shop pricing, stock, and availability.",

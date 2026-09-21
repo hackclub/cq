@@ -20,10 +20,10 @@ test("Ari delivery signatures cover timestamp, delivery ID, and exact body", () 
   assert.equal(verifyAriDelivery({ rawBody, timestamp: "1", deliveryId, signature, secret }), false);
 });
 
-test("approved events award hertz once and reverts remove them", async () => {
+test("approved hardware build events award hertz and program value once, then reverse both", async () => {
   const store = new LocalEncryptedStore(config, { memory: true });
   await store.put("user", "user_1", { id: "user_1", hertz: 2, updatedAt: "" });
-  await store.put("project", "cq_1", { id: "cq_1", userId: "user_1", status: "submitted", updatedAt: "" });
+  await store.put("project", "cq_1", { id: "cq_1", userId: "user_1", track: "hardware", status: "submitted", updatedAt: "" });
   await store.put("submission", "ship_1", {
     id: "ship_1", projectId: "cq_1", externalId: "cq_1", phase: "review", createdAt: "2026-01-01", updatedAt: "",
   });
@@ -38,6 +38,7 @@ test("approved events award hertz once and reverts remove them", async () => {
   await applyAriEvent(store, approved, "delivery_1");
   assert.equal((await store.get("user", "user_1")).hertz, 12.42);
   assert.equal((await store.get("project", "cq_1")).status, "approved");
+  assert.equal((await store.get("program_funding", "hours_ship_1")).generatedUsd, 10.42);
   assert.equal((await store.list("audit")).length, 1);
 
   await applyAriEvent(store, {
@@ -49,5 +50,7 @@ test("approved events award hertz once and reverts remove them", async () => {
   }, "delivery_2");
   assert.equal((await store.get("user", "user_1")).hertz, 2);
   assert.equal((await store.get("project", "cq_1")).status, "building");
+  assert.equal((await store.get("program_funding", "hours_ship_1")).status, "reversed");
+  assert.equal((await store.get("program_funding", "hours_ship_1")).availableUsd, 0);
   assert.equal((await store.list("audit")).length, 2);
 });
