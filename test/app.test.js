@@ -73,10 +73,30 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   });
   assert.equal(login.status, 302);
 
-  const dashboard = await agent.get("/app");
+  const dashboard = await agent.get("/app/dashboard");
   assert.equal(dashboard.status, 200);
   assert.match(dashboard.text, /Good to hear you/);
   assert.match(dashboard.text, /Admin/);
+
+  const currentUser = (await store.list("user")).find((user) => user.email === "admin@hackclub.com");
+  await store.put("project", "cq_public_explore", {
+    id: "cq_public_explore", userId: currentUser.id, title: "Portable packet beacon", description: "A compact packet-radio beacon with documented firmware and a simple portable enclosure.",
+    track: "hardware", tags: ["APRS", "packet"], thumbnailUrl: "https://example.com/beacon.jpg", demoUrl: "https://example.com/demo", repoUrl: "https://github.com/example/beacon",
+    radioRelevance: "It transmits position packets on amateur-radio APRS frequencies for portable field operation.", status: "approved", visibility: "public", approvedAt: "2026-01-02T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z",
+  });
+  await store.put("project", "cq_private_explore", {
+    id: "cq_private_explore", userId: currentUser.id, title: "Private receiver experiment", description: "A private receiver experiment that must never appear in the public project directory.",
+    track: "hardware", tags: [], thumbnailUrl: "https://example.com/private.jpg", demoUrl: "", repoUrl: "https://github.com/example/private", radioRelevance: "It explores amateur-radio receiver front-end filtering for local testing.", status: "approved", visibility: "private", updatedAt: "2026-01-03T00:00:00.000Z",
+  });
+  const explore = await agent.get("/app");
+  assert.equal(explore.status, 200);
+  assert.match(explore.text, /Portable packet beacon/);
+  assert.doesNotMatch(explore.text, /Private receiver experiment/);
+  assert.doesNotMatch(explore.text, /admin@hackclub.com/);
+  const exploreDetail = await agent.get("/app/explore/cq_public_explore");
+  assert.equal(exploreDetail.status, 200);
+  assert.match(exploreDetail.text, /Source code/);
+  assert.equal((await agent.get("/app/explore/cq_private_explore")).status, 404);
 
   const profile = await agent.get("/app/profile");
   assert.equal(profile.status, 200);

@@ -20,6 +20,7 @@
           <div><dt>Evidence</dt><dd><%= project.evidence.join(', ') %></dd></div>
           <div><dt>Demo</dt><dd><% if (project.demoUrl) { %><a href="<%= project.demoUrl %>" target="_blank" rel="noreferrer">Open demo ↗</a><% } else { %>Not supplied<% } %></dd></div>
           <div><dt>AI statement</dt><dd><%= project.aiStatement || 'None supplied' %></dd></div>
+          <div><dt>Explore visibility</dt><dd><%= statusLabel(project.visibility || 'unlisted') %></dd></div>
         </dl>
       </section>
 
@@ -41,6 +42,8 @@
       <% if (country) { %><section class="panel compact-panel"><p class="eyebrow">Fulfilment</p><strong><%= statusLabel(country.fulfilmentMode) %></strong><p><%= country.fulfilmentNote %></p></section><% } %>
       <% if (submissions[0]) { %><a class="button button-primary" href="/admin/reviews/<%= submissions[0].id %>">Open latest review</a><% } %>
       <% if (project.status === 'rejected') { %><form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="building"><p class="eyebrow">Reopen project</p><p>Return this project to the maker so they can make changes and ship a new review.</p><button class="button button-primary" type="submit">Reopen for changes</button></form><% } %>
+      <% if (['approved','funding_approved','funding_issued'].includes(project.status) && hasPermission(user, 'users.manage')) { %><form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack" data-confirm="Remove this approval and return the project to building?"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="unapprove" value="1"><p class="eyebrow">Admin control</p><button class="button button-danger" type="submit">Unapprove project</button></form><% } %>
+      <% if (hasPermission(user, 'users.manage')) { %><form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label>Explore visibility<select name="visibility"><option value="unlisted" <%= (project.visibility || 'unlisted') === 'unlisted' ? 'selected' : '' %>>Unlisted</option><option value="public" <%= project.visibility === 'public' ? 'selected' : '' %>>Public</option><option value="private" <%= project.visibility === 'private' ? 'selected' : '' %>>Private</option></select></label><small>Only approved public projects appear in Explore.</small><button class="button button-ghost" type="submit">Save visibility</button></form><% } %>
       <form method="post" action="/admin/projects/<%= project.id %>" class="panel form-stack"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="status" value="<%= project.status === 'archived' ? 'building' : 'archived' %>"><button class="button button-ghost" type="submit"><%= project.status === 'archived' ? 'Restore project' : 'Archive project' %></button><small>Approval, changes, and denial decisions are made through the review queue.</small></form>
     </aside>
   </div>
