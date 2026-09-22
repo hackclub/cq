@@ -1150,6 +1150,18 @@ img {
   color: var(--dim)
 }
 
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px
+}
+
+.inline-actions form {
+  margin: 0
+}
+
 .devlog-composer {
   border: 1px solid var(--line2);
   margin-bottom: 14px
