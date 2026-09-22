@@ -85,9 +85,10 @@ export function validateFundingRequest(input) {
   const errors = [];
   if (input.track !== "hardware") errors.push("Only hardware projects can request build funding.");
   if (input.buildPlan.length < 40) errors.push("Add a build plan with at least 40 characters.");
-  if (input.bomItems?.length) {
-    if (!input.bomItems.some((item) => item.name && item.quantity > 0 && item.link && isHttpUrl(item.link))) errors.push("Add at least one BOM part with a quantity and supplier link.");
-  } else if (input.bom.length < 20) errors.push("Add a bill of materials with parts, quantities, and supplier links.");
+  if (!input.bomItems?.length) errors.push("Add the parts as a structured BOM with quantities, prices, and supplier links.");
+  else if (input.bomItems.some((item) => !item.name || !item.purpose || item.quantity <= 0 || item.unitCost < 0 || !isHttpUrl(item.link))) {
+    errors.push("Complete every BOM row with a part, purpose, quantity, price, and supplier link.");
+  }
   if (!isHttpUrl(input.designUrl)) errors.push("Add a public link to your schematic, CAD, PCB, or other design work.");
   if (input.testPlan.length < 30) errors.push("Add a short plan for how you will test the finished build.");
   return errors;
@@ -100,7 +101,6 @@ export function validateProject(input, { forSubmission = false, journalMinutes =
   if (!(input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl))) {
     errors.push(input.track === "hardware" ? "Add a public Git repository URL (GitHub, GitLab, Codeberg, or another provider)." : "Add a public GitHub repository URL.");
   }
-  if (!input.projectType) errors.push("Choose the kind of ham-radio project you are making.");
   if (input.radioRelevance.length < 40) {
     errors.push("Explain in at least 40 characters how the project directly relates to ham radio.");
   }
