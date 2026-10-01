@@ -6,6 +6,7 @@ const tokenEndpoint = `${baseUrl}/oauth/token`;
 const revokeEndpoint = `${baseUrl}/oauth/revoke`;
 const meEndpoint = `${baseUrl}/api/v1/authenticated/me`;
 const projectsEndpoint = `${baseUrl}/api/v1/authenticated/projects`;
+const statsEndpoint = `${baseUrl}/api/v1/users/my/stats`;
 const cacheLifetimeMs = 5 * 60_000;
 
 export function hackatimeConfigured(config) {
@@ -144,6 +145,23 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     }
   }
 
+  async function activityTotal(userId, projectNames, { startDate, endDate } = {}) {
+    const names = [...new Set(projectNames.map((name) => String(name).trim()).filter(Boolean))];
+    if (!names.length) return { totalSeconds: 0, trustLevel: null };
+    const token = await store.get("hackatime_token", userId);
+    if (!token?.accessToken) throw new Error("Connect Hackatime before calculating project activity.");
+    const url = new URL(statsEndpoint);
+    url.searchParams.set("features", "projects");
+    url.searchParams.set("filter_by_project", names.join(","));
+    if (startDate) url.searchParams.set("start_date", String(startDate));
+    if (endDate) url.searchParams.set("end_date", String(endDate));
+    const body = await authenticatedGet(url, token.accessToken);
+    return {
+      totalSeconds: Math.max(0, Number(body.data?.total_seconds) || 0),
+      trustLevel: String(body.trust_factor?.trust_level || token.account?.trustLevel || "blue").toLowerCase(),
+    };
+  }
+
   async function projects(userId, { force = false } = {}) {
     const status = await connection(userId);
     if (!status.configured || !status.connected) return { ...status, projects: [], fetchedAt: null };
@@ -200,6 +218,7 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     startConnection,
     finishConnection,
     projects,
+    activityTotal,
     disconnect,
     trustFactor,
   };
