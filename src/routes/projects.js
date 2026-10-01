@@ -54,17 +54,9 @@ function formValues(project) {
   };
 }
 
-function hackatimeTotals(projectNames, availableProjects) {
-  const selected = new Set(projectNames);
-  return Object.fromEntries(availableProjects
-    .filter((project) => selected.has(project.name))
-    .map((project) => [project.name, Math.max(0, Number(project.totalSeconds) || 0)]));
-}
-
-function toProjectRecord(id, userId, input, existing = {}, availableHackatimeProjects = []) {
+function toProjectRecord(id, userId, input, existing = {}, hackatimeBaselineSeconds = 0) {
   const timestamp = nowIso();
-  const currentTotals = hackatimeTotals(input.hackatimeProjects, availableHackatimeProjects);
-  const existingBaseline = existing.hackatimeBaseline || {};
+  const sameHackatimeSelection = JSON.stringify(input.hackatimeProjects) === JSON.stringify(existing.hackatimeProjects || []);
   return {
     id,
     userId,
@@ -74,10 +66,9 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     demoUrl: input.demoUrl,
     thumbnailUrl: input.thumbnailUrl,
     hackatimeProjects: input.hackatimeProjects,
-    hackatimeBaseline: Object.fromEntries(input.hackatimeProjects.map((name) => [
-      name,
-      Number.isFinite(existingBaseline[name]) ? existingBaseline[name] : (currentTotals[name] ?? 0),
-    ])),
+    hackatimeBaselineSeconds: sameHackatimeSelection && Number.isFinite(existing.hackatimeBaselineSeconds)
+      ? existing.hackatimeBaselineSeconds
+      : Math.max(0, Number(hackatimeBaselineSeconds) || 0),
     evidence: input.evidence.length ? input.evidence : ["commits", "elapsed", "devlog"],
     track: input.track,
     status: existing.status ?? "building",
@@ -129,7 +120,7 @@ async function submittedJournal(store, journalId) {
   });
 }
 
-function hackatimeActivity(project, journals, hackatime) {
+function hackatimeActivity(project, journals, hackatime, combinedActivity) {
   if (!project.hackatimeProjects.length) {
     return { ready: false, reason: "Link at least one Hackatime project before posting a devlog.", seconds: 0, minutes: 0, currentTotals: {} };
   }
@@ -139,22 +130,30 @@ function hackatimeActivity(project, journals, hackatime) {
   if (hackatime.error === "unavailable") {
     return { ready: false, reason: "CQ could not refresh your Hackatime activity. Try again in a moment.", seconds: 0, minutes: 0, currentTotals: {} };
   }
-  const currentTotals = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
-  const missing = project.hackatimeProjects.filter((name) => currentTotals[name] === undefined);
+  const availableNames = new Set(hackatime.projects.map((item) => item.name));
+  const missing = project.hackatimeProjects.filter((name) => !availableNames.has(name));
   if (missing.length) {
-    return { ready: false, reason: `Hackatime no longer returned: ${missing.join(", ")}. Refresh or update the linked projects.`, seconds: 0, minutes: 0, currentTotals };
+    return { ready: false, reason: `Hackatime no longer returned: ${missing.join(", ")}. Refresh or update the linked projects.`, seconds: 0, minutes: 0, currentTotalSeconds: 0 };
   }
-  const previous = journals[0]?.hackatimeSnapshot || project.hackatimeBaseline || {};
-  const seconds = project.hackatimeProjects.reduce(
-    (sum, name) => sum + Math.max(0, currentTotals[name] - Math.max(0, Number(previous[name]) || 0)),
-    0,
-  );
+  if (!combinedActivity) {
+    return { ready: false, reason: "CQ could not calculate combined Hackatime activity. Try again in a moment.", seconds: 0, minutes: 0, currentTotalSeconds: 0 };
+  }
+  const currentTotalSeconds = Math.max(0, Number(combinedActivity.totalSeconds) || 0);
+  const previous = journals[0]?.hackatimeCombinedTotalSeconds ?? project.hackatimeBaselineSeconds ?? currentTotalSeconds;
+  const seconds = Math.max(0, currentTotalSeconds - Math.max(0, Number(previous) || 0));
   return {
     ready: seconds >= 60,
     reason: seconds >= 60 ? "" : "No new Hackatime activity has appeared on the linked projects since your last devlog.",
     seconds,
     minutes: Math.round((seconds / 60) * 100) / 100,
-    currentTotals,
+    currentTotalSeconds,
+  };
+}
+
+function activityDateRange(project) {
+  return {
+    startDate: String(project.createdAt || nowIso()).slice(0, 10),
+    endDate: nowIso().slice(0, 10),
   };
 }
 
@@ -311,7 +310,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       });
     }
     const id = randomId("cq_");
-    const project = toProjectRecord(id, req.user.id, input, {}, context.hackatime.projects);
+    const today = nowIso().slice(0, 10);
+    const combined = input.hackatimeProjects.length
+      ? await hackatimeClient.activityTotal(req.user.id, input.hackatimeProjects, { startDate: today, endDate: today })
+      : { totalSeconds: 0 };
+    const project = toProjectRecord(id, req.user.id, input, {}, combined.totalSeconds);
     await store.put("project", id, project);
     setFlash(res, "success", "Project created. Your path to the air is ready.");
     res.redirect(`/app/projects/${id}`);
@@ -321,14 +324,17 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
     req.app.locals.logger.info(`${req.user.id} opened project ${project.id}`);
-    const [projectDetails, country, hackatime, fundingRequests] = await Promise.all([
+    const [projectDetails, country, hackatime, fundingRequests, combinedActivity] = await Promise.all([
       details(store, project.id),
       store.get("country", project.countryCode),
       project.track === "software" ? hackatimeClient.projects(req.user.id) : Promise.resolve({ connected: false, projects: [], fetchedAt: null }),
       project.track === "hardware" ? store.list("funding_request") : Promise.resolve([]),
+      project.hackatimeProjects.length
+        ? hackatimeClient.activityTotal(req.user.id, project.hackatimeProjects, activityDateRange(project)).catch(() => null)
+        : Promise.resolve({ totalSeconds: 0 }),
     ]);
-    if (project.hackatimeProjects.length && !project.hackatimeBaseline) {
-      project.hackatimeBaseline = hackatimeTotals(project.hackatimeProjects, hackatime.projects);
+    if (project.hackatimeProjects.length && !Number.isFinite(project.hackatimeBaselineSeconds) && combinedActivity) {
+      project.hackatimeBaselineSeconds = combinedActivity.totalSeconds;
       project.updatedAt = nowIso();
       await store.put("project", project.id, project);
     }
@@ -349,7 +355,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         return locksEvidence ? item.journalIds || [] : [];
       }))],
       country,
-      hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
+      hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime, combinedActivity),
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
       fundingRequests: fundingRequests.filter((item) => item.projectId === project.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     });
@@ -387,7 +393,12 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...context,
       });
     }
-    await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project, context.hackatime.projects));
+    const selectionChanged = JSON.stringify(input.hackatimeProjects) !== JSON.stringify(project.hackatimeProjects || []);
+    const needsBaseline = selectionChanged || !Number.isFinite(project.hackatimeBaselineSeconds);
+    const combined = needsBaseline && input.hackatimeProjects.length
+      ? await hackatimeClient.activityTotal(req.user.id, input.hackatimeProjects, activityDateRange(project))
+      : { totalSeconds: project.hackatimeBaselineSeconds || 0 };
+    await store.put("project", project.id, toProjectRecord(project.id, req.user.id, input, project, combined.totalSeconds));
     setFlash(res, "success", "Project details saved.");
     res.redirect(`/app/projects/${project.id}`);
   });
@@ -411,11 +422,12 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
           await store.put("project", project.id, { ...project, updatedAt: timestamp });
           return;
         }
-        const [freshDetails, hackatime] = await Promise.all([
+        const [freshDetails, hackatime, combinedActivity] = await Promise.all([
           details(store, project.id),
           hackatimeClient.projects(req.user.id, { force: true }),
+          hackatimeClient.activityTotal(req.user.id, project.hackatimeProjects, activityDateRange(project)),
         ]);
-        const activity = hackatimeActivity(project, freshDetails.journals, hackatime);
+        const activity = hackatimeActivity(project, freshDetails.journals, hackatime, combinedActivity);
         if (!activity.ready) throw new Error(activity.reason);
         const timestamp = nowIso();
         const journal = {
@@ -425,7 +437,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
           entryDate: timestamp.slice(0, 10),
           minutes: activity.minutes,
           hackatimeSeconds: activity.seconds,
-          hackatimeSnapshot: activity.currentTotals,
+          hackatimeCombinedTotalSeconds: activity.currentTotalSeconds,
           hackatimeProjects: [...project.hackatimeProjects],
           createdAt: timestamp,
           updatedAt: timestamp,
