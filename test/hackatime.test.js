@@ -38,6 +38,23 @@ test("Hackatime OAuth uses the configured store and discovers selectable project
         { name: "old-project", total_seconds: 9000, archived: true },
       ] });
     }
+    if (String(url).includes("/api/v1/users/my/stats")) {
+      const parsed = new URL(url);
+      assert.equal(parsed.searchParams.get("features"), "projects");
+      assert.equal(parsed.searchParams.get("filter_by_project"), "cq-firmware,shared-library");
+      assert.equal(parsed.searchParams.get("start_date"), "2026-08-01");
+      assert.equal(parsed.searchParams.get("end_date"), "2026-08-31");
+      return jsonResponse({
+        data: {
+          total_seconds: 9000,
+          projects: [
+            { name: "cq-firmware", total_seconds: 7200 },
+            { name: "shared-library", total_seconds: 3600 },
+          ],
+        },
+        trust_factor: { trust_level: "blue" },
+      });
+    }
     throw new Error(`Unexpected request: ${url}`);
   };
   const client = createHackatimeClient(config, store, fakeFetch);
@@ -55,9 +72,15 @@ test("Hackatime OAuth uses the configured store and discovers selectable project
   const selection = await client.projects("user_1");
   assert.deepEqual(selection.projects.map((project) => project.name), ["cq-firmware"]);
   assert.equal(selection.projects[0].hours, 2);
+  const activity = await client.activityTotal("user_1", ["cq-firmware", "shared-library"], {
+    startDate: "2026-08-01",
+    endDate: "2026-08-31",
+  });
+  assert.equal(activity.totalSeconds, 9000);
+  assert.equal(activity.trustLevel, "blue");
 
   const rawTokenRecord = store.records.get("hackatime_token:user_1");
   assert.ok(rawTokenRecord);
   assert.doesNotMatch(rawTokenRecord.payload, /very-secret-token|radio-maker/);
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
 });
