@@ -36,6 +36,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
       projects: [{ name: "iss-station", totalSeconds: hackatimeSeconds, hours: hackatimeSeconds / 3600, mostRecentHeartbeat: null, languages: ["C++"], archived: false }],
       fetchedAt: new Date().toISOString(),
     }),
+    activityTotal: async () => ({ totalSeconds: hackatimeSeconds, trustLevel: "blue" }),
     startConnection: async () => "https://hackatime.hackclub.com/oauth/authorize",
     finishConnection: async () => ({ returnTo: "/app/profile" }),
     disconnect: async () => {},
