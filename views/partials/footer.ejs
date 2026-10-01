@@ -18,6 +18,12 @@
           <% if (typeof launchGate === 'undefined' || !launchGate || !launchGate.enabled) { %><a href="/auth/login"><b>F6</b>SIGN IN</a><% } else { %><a href="/#how"><b>F6</b>INFO</a><% } %>
         <% } %>
       </nav>
+      <nav class="required-links" aria-label="Hack Club program links">
+        <a href="https://hackclub.com">Hack Club</a>
+        <a href="https://hackclub.com/privacy-and-terms">Terms &amp; Privacy</a>
+        <a href="https://forms.hackclub.com/bounty">Fulfillment bounty</a>
+        <a href="https://security.hackclub.com">Security</a>
+      </nav>
       <footer class="status" aria-hidden="true">
         <span><i class="led"></i>PWR</span><span>RX <b><%= footerChannel[0] %></b> MHz</span><span><%= footerChannel[1] %></span><span>MODE <b>FM</b></span><span>S ▂▃▄▅▆▇</span>
       </footer>

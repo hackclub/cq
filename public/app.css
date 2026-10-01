@@ -246,6 +246,30 @@ img {
   color: #666b67
 }
 
+.required-links {
+  min-height: 26px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font-size: 8px;
+  letter-spacing: .04em;
+  text-transform: uppercase
+}
+
+.required-links a {
+  color: #9da29d;
+  text-decoration: none
+}
+
+.required-links a:hover, .required-links a:focus-visible {
+  color: #e1e3df;
+  text-decoration: underline
+}
+
 .display {
   min-height: 0;
   position: relative;
