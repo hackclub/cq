@@ -91,6 +91,17 @@ test("projects ship into local review when Ari is not configured", async () => {
 
   await store.put("submission", submission.id, { ...submission, phase: "reviewed", decision: "changes", event: "review.changes" });
   await store.put("project", "cq_local", { ...(await store.get("project", "cq_local")), status: "needs_changes", isUpdate: false, updateMessage: "" });
+  const openReviews = await agent.get("/admin/reviews");
+  assert.doesNotMatch(openReviews.text, /Digital receiver/);
+  assert.match(openReviews.text, /REVIEWED \/ 1/);
+  const reviewedReviews = await agent.get("/admin/reviews?view=reviewed");
+  assert.equal(reviewedReviews.status, 200);
+  assert.match(reviewedReviews.text, /Digital receiver/);
+  assert.match(reviewedReviews.text, /View review/);
+  const allReviews = await agent.get("/admin/reviews?view=all&q=digital&assignment=unassigned");
+  assert.match(allReviews.text, /Digital receiver/);
+  const noMatches = await agent.get("/admin/reviews?view=all&q=not-a-real-project");
+  assert.match(noMatches.text, /No submissions match these filters/);
   await store.put("journal", "log_resubmit", {
     id: "log_resubmit", projectId: "cq_local", title: "Addressed review feedback",
     text: "Completed another decoding pass and documented the requested changes.",
