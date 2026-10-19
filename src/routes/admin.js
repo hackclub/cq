@@ -516,9 +516,10 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const [submissions, projects, deliveries, users, journals] = await Promise.all([
       store.list("submission"), store.list("project"), store.list("delivery"), store.list("user"), store.list("journal"),
     ]);
-    const rows = sortNewest(submissions)
-      .filter((submission) => !submission.decision && !["withdrawn", "error"].includes(submission.phase))
-      .map((submission) => {
+    const view = ["open", "reviewed", "all"].includes(req.query.view) ? req.query.view : "open";
+    const assignment = ["all", "mine", "unassigned"].includes(req.query.assignment) ? req.query.assignment : "all";
+    const query = String(req.query.q || "").trim().slice(0, 100);
+    const allRows = sortNewest(submissions).map((submission) => {
       const currentProject = projects.find((item) => item.id === submission.projectId);
       const project = currentProject ? projectForReview(submission, currentProject) : null;
       const submissionJournals = journalsForReview(submission, journals);
@@ -529,10 +530,27 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
         devlogCount: submissionJournals.length,
         claimedMinutes: reviewMinutes(submissionJournals),
       };
-      });
+    });
+    const counts = {
+      open: allRows.filter((item) => !item.decision && !["withdrawn", "error"].includes(item.phase)).length,
+      reviewed: allRows.filter((item) => Boolean(item.decision)).length,
+      all: allRows.length,
+    };
+    const normalizedQuery = query.toLowerCase();
+    const rows = allRows
+      .filter((item) => view === "all"
+        || (view === "reviewed" ? Boolean(item.decision) : !item.decision && !["withdrawn", "error"].includes(item.phase)))
+      .filter((item) => assignment === "all"
+        || (assignment === "mine" ? item.assignedReviewerId === req.user.id : !item.assignedReviewerId))
+      .filter((item) => !normalizedQuery || [
+        item.id, item.projectId, item.project?.title, item.maker?.name, item.maker?.email,
+        item.decision, item.phase,
+      ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery)));
     res.render("admin/reviews", {
       title: "Project review queue",
       submissions: rows,
+      counts,
+      filters: { view, assignment, query },
       deliveries: sortNewest(deliveries),
       reviewMode: ariClient.configured() ? "Ari sync + local review" : "Local review",
     });

@@ -1,12 +1,24 @@
 <%- include('../partials/head') %>
 <section id="main" class="screen-page app-screen admin-screen">
-  <header class="apphead"><div><span class="eyebrow">ORGANIZER / REVIEW QUEUE</span><h1>Project reviews</h1></div><div class="headright"><div class="readout"><span>SUBMISSIONS</span><b><%= submissions.length %></b></div><span class="tag"><%= reviewMode %> active</span></div></header>
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / REVIEW QUEUE</span><h1>Project reviews</h1></div><div class="headright"><div class="readout"><span>SHOWING / ALL</span><b><%= submissions.length %> / <%= counts.all %></b></div><span class="tag"><%= reviewMode %> active</span></div></header>
   <div class="appbody admin-body">
   <%- include('nav') %>
   <section class="panel review-queue-list">
-    <div class="panel-heading"><div><p class="eyebrow">Queue</p><h2>Submissions to review</h2></div><strong><%= submissions.length %> open</strong></div>
-    <% if (!submissions.length) { %><p class="empty-inline">Nothing is waiting for review right now.</p><% } %>
-    <div class="compact-list"><% submissions.forEach((item) => { %><article class="review-queue-item"><div><strong><%= item.project?.title || item.projectId %></strong><small><%= item.maker?.name || 'Unknown maker' %> · <%= Math.round((item.claimedMinutes / 60) * 100) / 100 %> hours claimed · <%= item.devlogCount %> devlog<%= item.devlogCount === 1 ? '' : 's' %></small><small>First pass: <%= item.firstPass?.reviewer_name || item.reviewer?.name || 'Unclaimed' %> · Updated <%= formatDateTime(item.updatedAt) %></small></div><div class="review-queue-actions"><span class="status-pill status-<%= item.decision || item.phase %>"><%= item.decision ? statusLabel(item.decision) : statusLabel(item.phase) %></span><a class="button button-small" href="/admin/reviews/<%= item.id %>"><%= item.decision ? 'View review' : item.phase === 'second_pass' ? 'Second pass' : 'Start review' %></a></div></article><% }) %></div>
+    <div class="panel-heading"><div><p class="eyebrow"><%= filters.view === 'open' ? 'Queue' : 'History' %></p><h2><%= filters.view === 'open' ? 'Submissions to review' : filters.view === 'reviewed' ? 'Reviewed submissions' : 'All submissions' %></h2></div><strong><%= submissions.length %> result<%= submissions.length === 1 ? '' : 's' %></strong></div>
+    <nav class="review-scope-filters" aria-label="Review status">
+      <a class="filter <%= filters.view === 'open' ? 'active' : '' %>" href="/admin/reviews?view=open">OPEN / <%= counts.open %></a>
+      <a class="filter <%= filters.view === 'reviewed' ? 'active' : '' %>" href="/admin/reviews?view=reviewed">REVIEWED / <%= counts.reviewed %></a>
+      <a class="filter <%= filters.view === 'all' ? 'active' : '' %>" href="/admin/reviews?view=all">ALL / <%= counts.all %></a>
+    </nav>
+    <form class="review-filter-form" method="get" action="/admin/reviews">
+      <input type="hidden" name="view" value="<%= filters.view %>">
+      <label><span>Project or maker</span><input type="search" name="q" value="<%= filters.query %>" placeholder="Search title, maker, email, or ID"></label>
+      <label><span>Assignment</span><select name="assignment"><option value="all" <%= filters.assignment === 'all' ? 'selected' : '' %>>Anyone</option><option value="mine" <%= filters.assignment === 'mine' ? 'selected' : '' %>>Assigned to me</option><option value="unassigned" <%= filters.assignment === 'unassigned' ? 'selected' : '' %>>Unassigned</option></select></label>
+      <button class="button button-small" type="submit">Apply filters</button>
+      <% if (filters.query || filters.assignment !== 'all') { %><a class="button button-small button-ghost" href="/admin/reviews?view=<%= filters.view %>">Clear</a><% } %>
+    </form>
+    <% if (!submissions.length) { %><p class="empty-inline"><%= filters.query || filters.assignment !== 'all' ? 'No submissions match these filters.' : filters.view === 'open' ? 'Nothing is waiting for review right now.' : filters.view === 'reviewed' ? 'No reviews have been completed yet.' : 'No submissions have been received yet.' %></p><% } %>
+    <div class="compact-list"><% submissions.forEach((item) => { %><article class="review-queue-item"><div><strong><%= item.project?.title || item.projectId %></strong><small><%= item.maker?.name || 'Unknown maker' %> · <%= Math.round((item.claimedMinutes / 60) * 100) / 100 %> hours claimed · <%= item.devlogCount %> devlog<%= item.devlogCount === 1 ? '' : 's' %></small><small>Reviewer: <%= item.firstPass?.reviewer_name || item.reviewer?.name || 'Unclaimed' %> · Updated <%= formatDateTime(item.updatedAt) %></small></div><div class="review-queue-actions"><span class="status-pill status-<%= item.decision || item.phase %>"><%= item.decision ? statusLabel(item.decision) : statusLabel(item.phase) %></span><a class="button button-small" href="/admin/reviews/<%= item.id %>"><%= item.decision ? 'View review' : item.phase === 'second_pass' ? 'Second pass' : 'Start review' %></a></div></article><% }) %></div>
   </section>
   <% if (hasPermission(user, 'users.manage')) { %><section class="panel table-wrap">
     <div class="panel-heading"><h2>Webhook deliveries</h2></div>
