@@ -113,6 +113,19 @@ export async function createApp({
   app.use(sessionMiddleware(dataStore, config));
   app.use(async (req, res, next) => {
     try {
+      if (req.user && req.method === "GET") {
+        try {
+          const day = new Date().toISOString().slice(0, 10);
+          const id = `${day}:${req.user.id}`;
+          const existing = await dataStore.get("activity", id);
+          if (!existing || Date.now() - new Date(existing.lastSeenAt).getTime() >= 10 * 60_000) {
+            const timestamp = new Date().toISOString();
+            await dataStore.put("activity", id, { id, userId: req.user.id, day, createdAt: existing?.createdAt || timestamp, lastSeenAt: timestamp });
+          }
+        } catch (error) {
+          logger.error("Visitor activity tracking is unavailable", { message: error.message });
+        }
+      }
       res.locals.currentPath = req.path;
       res.locals.flash = readFlash(req, res);
       const verifiedAt = new Date(req.session?.organizerVerifiedAt || 0).getTime();
