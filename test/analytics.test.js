@@ -36,7 +36,7 @@ test("analytics aggregates CQ activity, reviews, Hertz, and orders", () => {
   assert.equal(result.inventory.lowStock, 1);
 });
 
-test("analytics page is admin-only, validates ranges, and records signed-in visitors", async () => {
+test("analytics rejects participants, validates ranges, and records signed-in visitors", async () => {
   const config = getConfig({
     nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true,
     dataEncryptionKey: Buffer.alloc(32, 4).toString("base64"), adminEmails: "admin@example.com",
@@ -60,4 +60,30 @@ test("analytics page is admin-only, validates ranges, and records signed-in visi
   const invalid = await admin.get("/admin/analytics?days=999");
   assert.equal(invalid.status, 200);
   assert.match(invalid.text, /class="active" href="\?days=30"/);
+});
+
+test("activity tracking failures are visible to administrators", async () => {
+  const config = getConfig({
+    nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true,
+    dataEncryptionKey: Buffer.alloc(32, 5).toString("base64"), adminEmails: "admin@example.com",
+  });
+  class FailingActivityStore extends LocalEncryptedStore {
+    async get(type, id) {
+      if (type === "activity") throw new Error("CQ Activity is not writable");
+      return super.get(type, id);
+    }
+    async list(type) {
+      if (type === "activity") throw new Error("CQ Activity is not readable");
+      return super.list(type);
+    }
+  }
+  const store = new FailingActivityStore(config, { memory: true });
+  const app = await createApp({ config, store, logger: { info() {}, error() {} } });
+  const agent = request.agent(app);
+  await agent.post("/auth/dev-login").type("form").send({ name: "Admin", email: "admin@example.com", return_to: "/admin/analytics" });
+  const page = await agent.get("/admin/analytics");
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Analytics/);
+  assert.match(page.text, /Visitor tracking is unavailable/);
+  assert.match(page.text, /CQ Activity is not readable/);
 });

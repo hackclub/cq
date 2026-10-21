@@ -180,13 +180,20 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
   router.get("/analytics", requirePermission("users.manage"), async (req, res) => {
     const requestedDays = Number(req.query.days);
     const days = ANALYTICS_RANGES.includes(requestedDays) ? requestedDays : 30;
-    const [users, projects, journals, submissions, orders, products, ledgers, activities, fundingRequests] = await Promise.all([
+    const [users, projects, journals, submissions, orders, products, ledgers, activityResult, fundingRequests] = await Promise.all([
       store.list("user"), store.list("project"), store.list("journal"), store.list("submission"), store.list("order"),
-      store.list("product"), store.list("ledger"), store.list("activity").catch(() => []), store.list("funding_request"),
+      store.list("product"), store.list("ledger"),
+      store.list("activity").then((records) => ({ records, error: null })).catch((error) => ({ records: [], error: error.message })),
+      store.list("funding_request"),
     ]);
     res.render("admin/analytics", {
       title: "Program analytics", days, ranges: ANALYTICS_RANGES,
-      analytics: buildAnalytics({ users, projects, journals, submissions, orders, products, ledgers, activities, fundingRequests }, days),
+      analytics: buildAnalytics({ users, projects, journals, submissions, orders, products, ledgers, activities: activityResult.records, fundingRequests }, days),
+      activityTracking: {
+        ...req.app.locals.activityTracking,
+        tablePrefix: config.airtableTablePrefix,
+        readError: activityResult.error,
+      },
     });
   });
 
