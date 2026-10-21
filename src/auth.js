@@ -72,7 +72,7 @@ export function authConfigured(config) {
   return Boolean(config.hackClubClientId && config.hackClubClientSecret && config.hackClubRedirectUri);
 }
 
-export async function startOAuth(store, config, returnTo = "/app/profile", { forceReauth = false } = {}) {
+export async function startOAuth(store, config, returnTo = "/app/profile", { forceReauth = false, scopes = null, purpose = "sign_in" } = {}) {
   const state = randomId("state_");
   const codeVerifier = crypto.randomBytes(48).toString("base64url");
   const oauthState = {
@@ -80,6 +80,7 @@ export async function startOAuth(store, config, returnTo = "/app/profile", { for
     codeVerifier,
     nonce: randomId("nonce_"),
     returnTo: safeReturnTo(returnTo),
+    purpose,
     expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     createdAt: nowIso(),
   };
@@ -88,7 +89,7 @@ export async function startOAuth(store, config, returnTo = "/app/profile", { for
   url.searchParams.set("client_id", config.hackClubClientId);
   url.searchParams.set("redirect_uri", config.hackClubRedirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid email name profile phone birthdate address verification_status slack_id basic_info");
+  url.searchParams.set("scope", (scopes || ["openid", "email", "name", "profile", "phone", "birthdate", "address", "verification_status", "slack_id", "basic_info"]).join(" "));
   url.searchParams.set("state", state);
   url.searchParams.set("nonce", oauthState.nonce);
   url.searchParams.set("code_challenge", crypto.createHash("sha256").update(codeVerifier).digest("base64url"));
@@ -110,7 +111,7 @@ async function jsonResponse(response) {
   try { return text ? JSON.parse(text) : {}; } catch { return { message: text }; }
 }
 
-export async function exchangeHackClubCode(config, code, oauthState, fetchImpl = fetch) {
+export async function exchangeHackClubCode(config, code, oauthState, fetchImpl = fetch, { requireEmail = true } = {}) {
   const tokenResponse = await fetchImpl(tokenEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -138,7 +139,7 @@ export async function exchangeHackClubCode(config, code, oauthState, fetchImpl =
   const userinfo = await jsonResponse(userinfoResponse);
   if (!userinfoResponse.ok) throw new Error(userinfo.message || "Could not load your Hack Club profile.");
   const profile = { ...claims, ...userinfo };
-  if (!profile.sub || !profile.email) throw new Error("Hack Club Auth did not return a user ID and email.");
+  if (!profile.sub || (requireEmail && !profile.email)) throw new Error(`Hack Club Auth did not return a user ID${requireEmail ? " and email" : ""}.`);
   return profile;
 }
 

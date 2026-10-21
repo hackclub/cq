@@ -35,13 +35,16 @@ export function authRoutes({ store, config }) {
   });
 
   router.get("/callback", rateLimit, async (req, res) => {
+    const oauthState = await consumeOAuthState(store, req.query.state);
+    if (req.query.error && oauthState?.purpose === "cq_nps") {
+      return res.status(400).type("text/plain").send("Hack Club sign-in was cancelled.");
+    }
     if (req.query.error) {
       return res.status(400).render("error", {
         title: "Sign in cancelled",
         message: String(req.query.error_description || req.query.error),
       });
     }
-    const oauthState = await consumeOAuthState(store, req.query.state);
     if (!oauthState || !req.query.code) {
       return res.status(400).render("error", {
         title: "Sign in expired",
@@ -49,7 +52,14 @@ export function authRoutes({ store, config }) {
       });
     }
     try {
-      const profile = await exchangeHackClubCode(config, String(req.query.code), oauthState);
+      const profile = await exchangeHackClubCode(config, String(req.query.code), oauthState, fetch, { requireEmail: oauthState.purpose !== "cq_nps" });
+      if (oauthState.purpose === "cq_nps") {
+        const slackId = String(profile.slack_id || "").trim();
+        if (!/^U[A-Z0-9]+$/i.test(slackId)) return res.status(422).type("text/plain").send("Your Hack Club Auth account does not have a Slack ID.");
+        const destination = new URL("https://forms.hackclub.com/ysws-cq-nps");
+        destination.searchParams.set("slackid", slackId);
+        return res.redirect(destination.toString());
+      }
       const user = await upsertUser(store, config, profile);
       await createSession(store, config, res, user.id);
       setFlash(res, "success", `Welcome to CQ, ${user.name}.`);
@@ -58,6 +68,7 @@ export function authRoutes({ store, config }) {
       res.redirect(safeReturnTo(oauthState.return_to));
     } catch (error) {
       req.app.locals.logger.error("Hack Club Auth callback failed", error);
+      if (oauthState.purpose === "cq_nps") return res.status(502).type("text/plain").send("Hack Club Auth did not complete successfully. Please try again.");
       res.status(502).render("error", {
         title: "Could not sign you in",
         message: "Hack Club Auth did not complete successfully. Please try again.",
