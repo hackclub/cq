@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">CQ</title>
+  <desc id="desc">CQ in Space Mono over stepped radio-frequency bands.</desc>
+  <rect width="512" height="512" fill="#292b2a"/>
+  <path d="M0 96h104v22h96v22h112v-22h96V96h104v64H408v22h-96v22H200v-22h-96v-22H0z" fill="#4b4e4c"/>
+  <path d="M0 224h80v18h96v18h160v-18h96v-18h80v64h-80v-18h-96v-18H176v18H80v18H0z" fill="#a77c78"/>
+  <path d="M0 352h104v-22h96v-22h112v22h96v22h104v64H408v-22h-96v-22H200v22h-96v22H0z" fill="#4b4e4c"/>
+  <path d="M308-14Q188-14 118 59.5T48 272v156q0 135 70 210.5T308 714q125 0 190.5-70T564 454v-18H432v18q0 33-11 65t-38 54q-27 21-75 21-44 0-72.5-21.5T193.5 515Q180 480 180 438V262q0-68 29-112t99-44q51 0 78 20t36.5 52Q432 210 432 246v18h132v-18q0-124-65.5-192T308-14Z" fill="#dddeda" transform="translate(54 385) scale(.32 -.32)"/>
+  <path d="M338-174q-40 0-67.5 28T243-78v70Q151 9 99.5 80.5T48 272v156q0 135 69 210.5T306 714q120 0 189-75.5T564 428V272q0-120-51.5-191.5T369-8v-18q0-28 25-28h62v-120ZM306 106q72 0 99 45t27 115v168q0 44-13 80.5T378.5 572Q351 594 306 594t-73-21.5T192.5 514Q180 478 180 434V266q0-70 27-115t99-45Z" fill="#96aca2" transform="translate(250 385) scale(.32 -.32)"/>
+  <rect x="32" y="32" width="76" height="12" fill="#96aca2"/>
+  <rect x="404" y="468" width="76" height="12" fill="#a77c78"/>
+</svg>
