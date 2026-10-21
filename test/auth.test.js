@@ -113,3 +113,18 @@ test("forced Hack Club authentication requests a fresh login", async () => {
   assert.match(url.searchParams.get("scope"), /address/);
   assert.equal(states[0].value.returnTo, "/app/profile");
 });
+
+test("purpose-specific OAuth requests only Slack identity access", async () => {
+  const states = [];
+  const store = { put: async (type, id, value) => states.push({ type, id, value }) };
+  const config = getConfig({
+    hackClubClientId: "client", hackClubClientSecret: "secret",
+    hackClubRedirectUri: "https://cq.example/auth/callback",
+  });
+  const url = new URL(await startOAuth(store, config, "/api/cq-nps", {
+    scopes: ["openid", "slack_id"], purpose: "cq_nps",
+  }));
+  assert.equal(url.searchParams.get("scope"), "openid slack_id");
+  assert.equal(states[0].value.purpose, "cq_nps");
+  assert.equal(states[0].value.returnTo, "/api/cq-nps");
+});
