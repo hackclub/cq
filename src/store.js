@@ -147,6 +147,7 @@ export const airtableEntityTables = Object.freeze({
   setting: "Settings",
   program_funding: "Program Funding",
   review_environment: "Review Environments",
+  activity: "Activity",
 });
 
 export function airtableTableName(prefix, type) {
@@ -178,6 +179,7 @@ function airtableSummary(type, value = {}) {
     hackatime_token: [value.account?.username || value.id, "Connected", value.userId || value.id],
     hackatime_cache: [value.id, value.fetchedAt || "Cached", value.userId || value.id],
     mcp_token: [value.id, value.revokedAt ? "Revoked" : "Active", value.userId],
+    activity: [value.day || value.id, value.lastSeenAt || "Seen", value.userId],
   };
   const [name, status, owner] = summaries[type] || [value.name || value.id, value.status, value.userId];
   return { Name: text(name), Status: text(status), Owner: text(owner) };
@@ -352,10 +354,13 @@ export async function createStore(config, options = {}) {
   if (config.isProduction && (!config.airtablePat || !config.airtableBaseId)) {
     throw new Error("Production requires AIRTABLE_PAT and AIRTABLE_BASE_ID.");
   }
-  const store =
-    config.airtablePat && config.airtableBaseId
-      ? new AirtableStore(config, options.fetchImpl)
-      : new LocalEncryptedStore(config, { memory: options.memory });
+  if (config.airtablePat && config.airtableBaseId) {
+    const { ensureAirtableSchema } = await import("./airtable-schema.js");
+    await ensureAirtableSchema(config, options.fetchImpl);
+  }
+  const store = config.airtablePat && config.airtableBaseId
+    ? new AirtableStore(config, options.fetchImpl)
+    : new LocalEncryptedStore(config, { memory: options.memory });
   await store.ready();
   return store;
 }

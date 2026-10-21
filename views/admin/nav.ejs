@@ -1,6 +1,7 @@
 <nav class="admin-tabs" aria-label="Admin sections">
   <a class="<%= currentPath === '/admin' ? 'active' : '' %>" href="/admin">Overview</a>
   <% if (hasPermission(user, 'users.manage')) { %><a class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>" href="/admin/users">Users</a><% } %>
+  <% if (hasPermission(user, 'users.manage')) { %><a class="<%= currentPath.startsWith('/admin/analytics') ? 'active' : '' %>" href="/admin/analytics">Analytics</a><% } %>
   <% if (hasPermission(user, 'projects.review')) { %><a class="<%= currentPath.startsWith('/admin/projects') ? 'active' : '' %>" href="/admin/projects">Projects</a><% } %>
   <% if (hasPermission(user, 'reviews.read')) { %><a class="<%= currentPath.startsWith('/admin/reviews') ? 'active' : '' %>" href="/admin/reviews">Review queue</a><% } %>
   <% if (hasPermission(user, 'projects.review')) { %><a class="<%= currentPath.startsWith('/admin/funding') ? 'active' : '' %>" href="/admin/funding">Funding</a><% } %>

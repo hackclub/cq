@@ -4,6 +4,7 @@ import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDe
 import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
 import { finalizeUnifiedFields } from "../unified.js";
+import { ANALYTICS_RANGES, buildAnalytics } from "../analytics.js";
 
 const ACTIVE_REVIEW_ENVIRONMENT_STATUSES = new Set(["provisioning", "ready", "open", "stopping", "stopped", "restarting"]);
 
@@ -174,6 +175,19 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     const launchGate = await store.get("setting", "launch_gate") || { enabled: false, message: "Coming soon", until: "" };
     const program = await store.get("setting", "program") || {};
     res.render("admin/settings", { title: "Organizer settings", launchGate, program });
+  });
+
+  router.get("/analytics", requirePermission("users.manage"), async (req, res) => {
+    const requestedDays = Number(req.query.days);
+    const days = ANALYTICS_RANGES.includes(requestedDays) ? requestedDays : 30;
+    const [users, projects, journals, submissions, orders, products, ledgers, activities, fundingRequests] = await Promise.all([
+      store.list("user"), store.list("project"), store.list("journal"), store.list("submission"), store.list("order"),
+      store.list("product"), store.list("ledger"), store.list("activity").catch(() => []), store.list("funding_request"),
+    ]);
+    res.render("admin/analytics", {
+      title: "Program analytics", days, ranges: ANALYTICS_RANGES,
+      analytics: buildAnalytics({ users, projects, journals, submissions, orders, products, ledgers, activities, fundingRequests }, days),
+    });
   });
 
   router.post("/settings", requirePermission("users.manage"), requireCsrf, async (req, res) => {
