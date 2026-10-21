@@ -1528,6 +1528,8 @@ th {
 .analytics-ranking { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line2); }
 .analytics-ranking li { display: flex; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid var(--line2); font-size: 9px; }
 .analytics-ranking b { color: var(--dim); font-weight: 400; font-variant-numeric: tabular-nums; text-align: right; }
+.analytics-warning { display: flex; justify-content: space-between; gap: 18px; padding: 12px 20px; border-bottom: 1px solid #765d35; background: #2b261c; color: #e6d09a; font-size: 8px; line-height: 1.6; }
+.analytics-warning strong { color: #fff0c5; font-weight: 400; text-transform: uppercase; letter-spacing: .06em; }
 
 @media (max-width: 760px) {
   .analytics-screen .apphead { align-items: start; }

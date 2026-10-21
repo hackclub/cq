@@ -66,6 +66,7 @@ export async function createApp({
   app.locals.isOrganizer = isOrganizer;
   app.locals.roleDefinitions = roleDefinitions;
   app.locals.userRoles = userRoles;
+  app.locals.activityTracking = { lastSuccessAt: null, lastErrorAt: null, error: null };
   app.locals.reviewEnvironments = reviewEnvironments;
 
   app.set("view engine", "ejs");
@@ -121,9 +122,14 @@ export async function createApp({
           if (!existing || Date.now() - new Date(existing.lastSeenAt).getTime() >= 10 * 60_000) {
             const timestamp = new Date().toISOString();
             await dataStore.put("activity", id, { id, userId: req.user.id, day, createdAt: existing?.createdAt || timestamp, lastSeenAt: timestamp });
+            app.locals.activityTracking.lastSuccessAt = timestamp;
           }
+          app.locals.activityTracking.error = null;
         } catch (error) {
-          logger.error("Visitor activity tracking is unavailable", { message: error.message });
+          const timestamp = new Date().toISOString();
+          app.locals.activityTracking.lastErrorAt = timestamp;
+          app.locals.activityTracking.error = error.message;
+          logger.error("Visitor activity tracking is unavailable", { message: error.message, tablePrefix: config.airtableTablePrefix });
         }
       }
       res.locals.currentPath = req.path;
