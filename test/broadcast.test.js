@@ -32,6 +32,8 @@ test("administrators can broadcast Block Kit to a selected participant group", a
   const page = await agent.get("/admin/notifications");
   assert.equal(page.status, 200);
   assert.match(page.text, /Signed up without a project \(1\)/);
+  assert.match(page.text, /Administrators only \(1\)/);
+  assert.match(page.text, /Specific people/);
   assert.match(page.text, /Slack Block Kit payload/);
   const payload = { blocks: [{ type: "section", text: { type: "mrkdwn", text: "Please share feedback" } }] };
   const send = await agent.post("/admin/notifications/broadcast").type("form").send({
@@ -40,5 +42,10 @@ test("administrators can broadcast Block Kit to a selected participant group", a
   assert.equal(send.status, 302);
   assert.deepEqual(delivered[0].users.map((user) => user.id), ["no_project"]);
   assert.deepEqual(delivered[0].message.blocks, payload.blocks);
+  const specific = await agent.post("/admin/notifications/broadcast").type("form").send({
+    _csrf: csrf(page.text), audience: "specific", recipient_ids: "builder", payload: JSON.stringify(payload),
+  });
+  assert.equal(specific.status, 302);
+  assert.deepEqual(delivered[1].users.map((user) => user.id), ["builder"]);
   assert.equal((await store.list("audit")).some((item) => item.action === "notifications.broadcast"), true);
 });
