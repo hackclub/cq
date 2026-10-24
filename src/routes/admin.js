@@ -601,6 +601,42 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     });
   });
 
+  router.post("/projects/:id/time-adjustments", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const project = await store.get("project", req.params.id);
+    if (!project) return res.sendStatus(404);
+    const journal = await store.get("journal", String(req.body.journal_id || ""));
+    if (!journal || journal.projectId !== project.id) return res.sendStatus(404);
+    const minutes = Number(req.body.minutes);
+    const reason = String(req.body.reason || "").trim().slice(0, 2000);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+      setFlash(res, "error", "Enter between 1 and 1,440 whole minutes.");
+      return res.redirect(`/admin/projects/${project.id}`);
+    }
+    if (!reason) {
+      setFlash(res, "error", "Explain why this time needs to be added.");
+      return res.redirect(`/admin/projects/${project.id}`);
+    }
+    const before = structuredClone(journal);
+    const timestamp = nowIso();
+    const adjustment = {
+      id: randomId("time_"), minutes, reason,
+      addedByUserId: req.user.id, addedByName: req.user.name, createdAt: timestamp,
+    };
+    journal.minutes = Math.max(0, Number(journal.minutes) || 0) + minutes;
+    journal.manualAdjustmentMinutes = Math.max(0, Number(journal.manualAdjustmentMinutes) || 0) + minutes;
+    journal.manualTimeAdjustments = [...(journal.manualTimeAdjustments || []), adjustment];
+    journal.updatedAt = timestamp;
+    await store.put("journal", journal.id, journal);
+    await writeAudit(store, req.user, {
+      action: "project.time_adjusted", entityType: "journal", entityId: journal.id,
+      summary: `Added ${minutes} minutes to ${project.title}.`, before, after: journal,
+      metadata: { projectId: project.id, minutes, reason },
+    });
+    res.locals.securityAlertDescription = `Added ${minutes} minutes to ${project.title}: ${reason}`;
+    setFlash(res, "success", `${minutes} minutes added to “${journal.title || "Project update"}”.`);
+    return res.redirect(`/admin/projects/${project.id}`);
+  });
+
   router.post("/projects/:id", requirePermission("projects.review"), requireCsrf, async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);

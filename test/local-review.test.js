@@ -81,6 +81,21 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.match(adminProject.text, /Hackatime diagnostics/);
   assert.match(adminProject.text, /Link baseline/);
   assert.match(adminProject.text, /Unavailable/);
+  assert.match(adminProject.text, /Add missing time/);
+  const adjustTime = await agent.post("/admin/projects/cq_local/time-adjustments").type("form").send({
+    _csrf: csrf(adminProject.text), journal_id: "log_local", minutes: "60",
+    reason: "Hackatime was connected after the first hour of verified work.",
+  });
+  assert.equal(adjustTime.status, 302);
+  assert.equal(adjustTime.headers.location, "/admin/projects/cq_local");
+  const adjustedJournal = await store.get("journal", "log_local");
+  assert.equal(adjustedJournal.minutes, 150);
+  assert.equal(adjustedJournal.manualAdjustmentMinutes, 60);
+  assert.equal(adjustedJournal.manualTimeAdjustments[0].addedByUserId, user.id);
+  assert.equal((await store.list("audit")).some((item) => item.action === "project.time_adjusted"), true);
+  const adjustedProject = await agent.get("/admin/projects/cq_local");
+  assert.match(adjustedProject.text, /60 min manually added/);
+  assert.match(adjustedProject.text, /Hackatime was connected after the first hour/);
 
   const projectPage = await agent.get("/app/projects/cq_local");
   assert.doesNotMatch(projectPage.text, /connect the project review service/i);
