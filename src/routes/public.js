@@ -30,6 +30,13 @@ export function publicRoutes({ store, config }) {
     return res.redirect("/");
   });
 
+  router.get("/api/nps-optin", async (req, res) => {
+    if (!req.user) return res.redirect("/auth/login?return_to=%2Fapi%2Fnps-optin");
+    await store.put("user", req.user.id, { ...req.user, optionalCommunicationsOptOutAt: null, updatedAt: nowIso() });
+    setFlash(res, "success", "You have resubscribed to optional communications.");
+    return res.redirect("/");
+  });
+
   router.get("/", async (req, res) => {
     const launchGate = await store.get("setting", "launch_gate");
     res.render("landing", {
