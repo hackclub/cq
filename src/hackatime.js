@@ -114,6 +114,7 @@ export function createHackatimeClient(config, store, fetchImpl = fetch) {
     const timestamp = nowIso();
     const account = {
       id: profile.id ?? profile.user?.id ?? null,
+      email: profile.email ?? profile.user?.email ?? null,
       username: profile.username ?? profile.user?.username ?? profile.github_username ?? null,
       slackId: profile.slack_id ?? profile.user?.slack_id ?? null,
       trustLevel: String(profile.trust_factor?.trust_level ?? profile.user?.trust_factor?.trust_level ?? "blue").toLowerCase(),

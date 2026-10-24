@@ -1,0 +1,30 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">FRAUD REVIEW / <%= project.id %> / <%= statusLabel(project.status) %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/fraud-review">Shipped projects</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
+  <div class="appbody admin-body"><%- include('nav') %>
+    <div class="fraud-review-body">
+      <section class="panel">
+        <div class="panel-heading"><h2>Hackatime identity</h2><span class="status-pill status-<%= hackatimeDiagnostics.status %>"><%= statusLabel(hackatimeDiagnostics.status) %></span></div>
+        <dl class="admin-detail-list">
+          <div><dt>Participant</dt><dd><%= maker?.name || 'Unknown' %> · <%= maker?.email || 'No CQ email' %></dd></div>
+          <div><dt>Hackatime username</dt><dd><%= hackatimeDiagnostics.account?.username || 'Not available' %></dd></div>
+          <div><dt>Hackatime ID</dt><dd><%= hackatimeDiagnostics.account?.id || 'Not available' %></dd></div>
+          <div><dt>Hackatime email</dt><dd><%= hackatimeDiagnostics.account?.email || 'Not available' %></dd></div>
+          <div><dt>Linked projects</dt><dd><%= project.hackatimeProjects?.join(', ') || 'None linked' %></dd></div>
+          <div><dt>Repository</dt><dd><a href="<%= project.repoUrl %>" target="_blank" rel="noreferrer"><%= project.repoUrl %> ↗</a></dd></div>
+        </dl>
+      </section>
+
+      <% if (project.track === 'software' && hackatimeDiagnostics.projects.length) { %><section class="panel table-wrap diagnostic-table"><div class="panel-heading"><h2>Hackatime totals</h2><strong><%= hackatimeDiagnostics.unloggedLabel %> unlogged</strong></div><table><thead><tr><th>Project</th><th>Link baseline</th><th>Last claimed</th><th>Current total</th><th>Latest heartbeat</th></tr></thead><tbody><% hackatimeDiagnostics.projects.forEach((item) => { %><tr><td><strong><%= item.name %></strong><small><%= item.languages.join(', ') %></small></td><td><%= item.baselineLabel %></td><td><%= item.comparisonLabel %></td><td><%= item.currentLabel %></td><td><%= item.mostRecentHeartbeat ? formatDateTime(item.mostRecentHeartbeat) : 'Not available' %></td></tr><% }) %></tbody></table></section><% } %>
+
+      <section class="panel">
+        <div class="panel-heading"><h2>Devlogs</h2><strong><%= Math.round(journals.reduce((sum, item) => sum + item.minutes, 0) / 6) / 10 %> hours</strong></div>
+        <% if (!journals.length) { %><p class="empty-inline">No devlogs were included with this project.</p><% } %>
+        <div class="journal-list"><% journals.forEach((journal) => { const images = (journal.imageUrls?.length ? journal.imageUrls : (journal.imageUrl ? [journal.imageUrl] : [])).filter((url) => String(url || '').match(/^https?:\/\//i)); %><article><header><div><h3><%= journal.title || 'Project update' %></h3></div><div class="devlog-meta"><time><%= formatDate(journal.entryDate) %></time><strong><%= journal.minutes %> min</strong></div></header><div class="devlog-body markdown-body"><%- renderMarkdown(journal.text) %></div><% if (images.length) { %><div class="devlog-gallery <%= images.length === 1 ? 'single' : '' %>"><% images.forEach((imageUrl) => { %><a class="journal-image" href="<%= imageUrl %>" target="_blank" rel="noreferrer"><img src="<%= imageUrl %>" alt="Progress evidence" loading="lazy" referrerpolicy="no-referrer"></a><% }) %></div><% } %></article><% }) %></div>
+      </section>
+
+      <section class="panel table-wrap"><div class="panel-heading"><h2>Submission history</h2></div><table><thead><tr><th>ID</th><th>Phase</th><th>Decision</th><th>Shipped</th></tr></thead><tbody><% submissions.forEach((item) => { %><tr><td><%= item.ariId || item.id %></td><td><%= statusLabel(item.phase) %></td><td><%= item.decision ? statusLabel(item.decision) : 'Pending' %></td><td><%= formatDateTime(item.createdAt || item.updatedAt) %></td></tr><% }) %></tbody></table></section>
+    </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

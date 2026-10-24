@@ -4,6 +4,12 @@ import { hasPermission, isOrganizer, startOAuth, upsertUser, userRoles } from ".
 import { getConfig } from "../src/config.js";
 
 test("organizer roles grant only their declared permissions", () => {
+  const fraudReviewer = { roles: ["participant", "fraud_reviewer"] };
+  assert.equal(isOrganizer(fraudReviewer), true);
+  assert.equal(hasPermission(fraudReviewer, "fraud.review"), true);
+  assert.equal(hasPermission(fraudReviewer, "projects.review"), false);
+  assert.equal(hasPermission(fraudReviewer, "reviews.read"), false);
+
   const reviewer = { roles: ["participant", "reviewer"] };
   assert.equal(isOrganizer(reviewer), true);
   assert.equal(hasPermission(reviewer, "projects.review"), true);

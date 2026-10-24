@@ -15,10 +15,15 @@ test("every organizer role can open only its assigned admin sections", async () 
   const store = new LocalEncryptedStore(config, { memory: true });
   const app = await createApp({ config, store, logger: { info() {}, error() {} } });
   const timestamp = "2026-08-30T00:00:00.000Z";
-  await store.put("project", "cq_sensitive", { id: "cq_sensitive", userId: "maker", title: "REVIEW PROJECT ONLY", status: "submitted", createdAt: timestamp, updatedAt: timestamp });
+  await store.put("user", "maker", { id: "maker", name: "Maker", email: "maker@example.com", roles: ["participant"], createdAt: timestamp, updatedAt: timestamp });
+  await store.put("project", "cq_sensitive", { id: "cq_sensitive", userId: "maker", title: "REVIEW PROJECT ONLY", repoUrl: "https://github.com/example/shipped", hackatimeProjects: ["shipped-code"], hackatimeBaseline: { "shipped-code": 1200 }, track: "software", status: "submitted", createdAt: timestamp, updatedAt: timestamp });
+  await store.put("project", "cq_unshipped", { id: "cq_unshipped", userId: "maker", title: "UNSHIPPED PROJECT", repoUrl: "https://github.com/example/unshipped", hackatimeProjects: ["secret-draft"], track: "software", status: "building", createdAt: timestamp, updatedAt: timestamp });
+  await store.put("submission", "sub_sensitive", { id: "sub_sensitive", projectId: "cq_sensitive", userId: "maker", phase: "review", createdAt: timestamp, updatedAt: timestamp });
+  await store.put("hackatime_token", "maker", { id: "maker", userId: "maker", accessToken: "secret-token", account: { id: "ht_42", username: "radio-maker", email: "maker@hackclub.com" }, connectedAt: timestamp, updatedAt: timestamp });
   await store.put("order", "order_sensitive", { id: "ORDER FULFILMENT ONLY", userId: "maker", status: "received", total: 20, items: [], shipping: { shippingName: "Maker", addressLine1: "1 Test Road", addressLine2: "", city: "Hobart", region: "Tasmania", postalCode: "7000", countryCode: "AU", country: "Australia", notes: "" }, createdAt: timestamp, updatedAt: timestamp });
   await store.put("product", "product_sensitive", { id: "product_sensitive", name: "SHOP INVENTORY ONLY", stock: 1, category: "gear", sortOrder: 1, active: true, createdAt: timestamp, updatedAt: timestamp });
   const cases = [
+    ["fraud_reviewer", "/admin/fraud-review", "/admin/reviews"],
     ["reviewer", "/admin/reviews", "/admin/shop"],
     ["shop_editor", "/admin/shop", "/admin/orders"],
     ["fulfilment_manager", "/admin/orders", "/admin/countries"],
@@ -46,6 +51,21 @@ test("every organizer role can open only its assigned admin sections", async () 
     assert.equal(overview.text.includes("REVIEW PROJECT ONLY"), ["reviewer", "admin"].includes(role), `${role} project overview isolation`);
     assert.equal(overview.text.includes("ORDER FULFILMENT ONLY"), ["fulfilment_manager", "admin"].includes(role), `${role} order overview isolation`);
     assert.equal(overview.text.includes("SHOP INVENTORY ONLY"), ["shop_editor", "admin"].includes(role), `${role} shop overview isolation`);
+    if (role === "fraud_reviewer") {
+      const fraudList = await agent.get("/admin/fraud-review");
+      assert.match(fraudList.text, /REVIEW PROJECT ONLY/);
+      assert.match(fraudList.text, /radio-maker/);
+      assert.match(fraudList.text, /shipped-code/);
+      assert.doesNotMatch(fraudList.text, /UNSHIPPED PROJECT|secret-draft/);
+      const detail = await agent.get("/admin/fraud-review/cq_sensitive");
+      assert.equal(detail.status, 200);
+      assert.match(detail.text, /ht_42/);
+      assert.match(detail.text, /maker@hackclub\.com/);
+      assert.match(detail.text, /shipped-code/);
+      assert.doesNotMatch(detail.text, /Archive project|Open latest review/);
+      assert.equal((await agent.get("/admin/fraud-review/cq_unshipped")).status, 404);
+      assert.equal((await agent.post("/admin/projects/cq_sensitive").type("form").send({ status: "archived" })).status, 403);
+    }
   }
 
   const participant = request.agent(app);

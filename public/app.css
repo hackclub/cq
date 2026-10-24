@@ -1668,6 +1668,15 @@ body.is-loading .nav-loading { opacity: 1; }
   overflow-wrap: anywhere;
 }
 
+.fraud-review-body {
+  padding: 18px 22px;
+  overflow: auto;
+}
+
+.fraud-review-body>.panel {
+  margin-bottom: 18px;
+}
+
 .hackatime-diagnostics .panel-heading p {
   margin: 4px 0 0;
   color: var(--dim);

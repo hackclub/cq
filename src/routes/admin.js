@@ -8,6 +8,10 @@ function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
+function shippedSubmissions(submissions, projectId) {
+  return sortNewest(submissions.filter((item) => item.projectId === projectId && !["withdrawn", "error"].includes(item.phase)));
+}
+
 function sessionIsActive(session) {
   return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
 }
@@ -425,6 +429,43 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       latestSubmission: sortNewest(submissions.filter((item) => item.projectId === project.id))[0],
     }));
     res.render("admin/projects", { title: "Manage projects", projects: rows });
+  });
+
+  router.get("/fraud-review", requirePermission("fraud.review"), async (req, res) => {
+    const [projects, users, submissions] = await Promise.all([
+      store.list("project"), store.list("user"), store.list("submission"),
+    ]);
+    const shipped = sortNewest(projects).map((project) => ({ project, submissions: shippedSubmissions(submissions, project.id) }))
+      .filter((item) => item.submissions.length);
+    const connections = new Map(await Promise.all([...new Set(shipped.map((item) => item.project.userId))]
+      .map(async (userId) => [userId, await hackatimeClient.connection(userId)])));
+    const rows = shipped.map(({ project, submissions: projectSubmissions }) => ({
+      ...project,
+      maker: users.find((user) => user.id === project.userId),
+      latestSubmission: projectSubmissions[0],
+      hackatimeAccount: connections.get(project.userId)?.account || null,
+    }));
+    res.render("admin/fraud-projects", { title: "Fraud review", projects: rows });
+  });
+
+  router.get("/fraud-review/:id", requirePermission("fraud.review"), async (req, res) => {
+    const project = await store.get("project", req.params.id);
+    if (!project) return res.sendStatus(404);
+    const [maker, journals, submissions, hackatime] = await Promise.all([
+      store.get("user", project.userId), store.list("journal"), store.list("submission"), hackatimeClient.projects(project.userId),
+    ]);
+    const projectSubmissions = shippedSubmissions(submissions, project.id);
+    if (!projectSubmissions.length) return res.sendStatus(404);
+    const projectJournals = journals.filter((item) => item.projectId === project.id && !item.deletedAt).sort((a, b) =>
+      String(b.entryDate || "").localeCompare(String(a.entryDate || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    res.render("admin/fraud-project-detail", {
+      title: project.title,
+      project,
+      maker,
+      journals: projectJournals,
+      submissions: projectSubmissions,
+      hackatimeDiagnostics: buildHackatimeDiagnostics(project, projectJournals, hackatime),
+    });
   });
 
   router.get("/projects/:id", requirePermission("projects.review"), async (req, res) => {
