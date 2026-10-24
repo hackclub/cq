@@ -3,6 +3,7 @@ import multer from "multer";
 import { hasPermission, requireOrganizer, requirePermission, requireCsrf, roleDefinitions, userRoles } from "../auth.js";
 import { writeAudit } from "../audit.js";
 import { nowIso, randomId, setFlash } from "../utils.js";
+import { ANALYTICS_RANGES, buildAnalytics } from "../analytics.js";
 
 function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
@@ -201,6 +202,26 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const launchGate = await store.get("setting", "launch_gate") || { enabled: false, message: "Coming soon", until: "" };
     const program = await store.get("setting", "program") || {};
     res.render("admin/settings", { title: "Organizer settings", launchGate, program });
+  });
+
+  router.get("/analytics", requirePermission("users.manage"), async (req, res) => {
+    const requestedDays = Number(req.query.days);
+    const days = ANALYTICS_RANGES.includes(requestedDays) ? requestedDays : 30;
+    const [users, projects, journals, submissions, orders, products, ledgers, activityResult, fundingRequests] = await Promise.all([
+      store.list("user"), store.list("project"), store.list("journal"), store.list("submission"), store.list("order"),
+      store.list("product"), store.list("ledger"),
+      store.list("activity").then((records) => ({ records, error: null })).catch((error) => ({ records: [], error: error.message })),
+      store.list("funding_request"),
+    ]);
+    res.render("admin/analytics", {
+      title: "Program analytics", days, ranges: ANALYTICS_RANGES,
+      analytics: buildAnalytics({ users, projects, journals, submissions, orders, products, ledgers, activities: activityResult.records, fundingRequests }, days),
+      activityTracking: {
+        ...req.app.locals.activityTracking,
+        tablePrefix: config.airtableTablePrefix,
+        readError: activityResult.error,
+      },
+    });
   });
 
   router.post("/settings", requirePermission("users.manage"), requireCsrf, async (req, res) => {
