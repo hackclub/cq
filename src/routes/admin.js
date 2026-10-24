@@ -22,9 +22,10 @@ const DEFAULT_FEEDBACK_BLOCKS = {
 };
 
 function buildMessageAudiences(users, projects, journals, submissions) {
-  const eligibleUsers = users.filter((user) => {
+  const slackUsers = users.filter((user) => !user.mergedIntoUserId && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")));
+  const eligibleUsers = slackUsers.filter((user) => {
     const roles = Array.isArray(user.roles) ? user.roles : [user.role || "participant"];
-    return !user.mergedIntoUserId && roles.every((role) => role === "participant") && /^U[A-Z0-9]+$/i.test(String(user.slackId || ""));
+    return roles.every((role) => role === "participant");
   });
   const projectUserIds = new Set(projects.map((project) => project.userId));
   const projectById = new Map(projects.map((project) => [project.id, project]));
@@ -36,7 +37,14 @@ function buildMessageAudiences(users, projects, journals, submissions) {
     devlog_not_submitted: { label: "Posted a devlog without submitting", users: eligibleUsers.filter((user) => devlogUserIds.has(user.id) && !submittedUserIds.has(user.id)) },
     submitted: { label: "Submitted a project", users: eligibleUsers.filter((user) => submittedUserIds.has(user.id)) },
     all: { label: "All signed-up Slack users", users: eligibleUsers },
+    admins: { label: "Administrators only", users: slackUsers.filter((user) => userRoles(user).includes("admin")) },
   };
+}
+
+function messageRecipients(users) {
+  return users
+    .filter((user) => !user.mergedIntoUserId && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")))
+    .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
 }
 
 function sessionIsActive(session) {
@@ -948,6 +956,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       notifications: sortNewest(notifications),
       slackConfigured: notifier.configured(),
       audiences: Object.entries(audiences).map(([id, audience]) => ({ id, label: audience.label, count: audience.users.length })),
+      messageRecipients: messageRecipients(users),
       defaultPayload: JSON.stringify(DEFAULT_FEEDBACK_BLOCKS, null, 2),
     });
   });
@@ -967,7 +976,17 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const [users, projects, journals, submissions] = await Promise.all([
       store.list("user"), store.list("project"), store.list("journal"), store.list("submission"),
     ]);
-    const audience = buildMessageAudiences(users, projects, journals, submissions)[audienceId];
+    const audiences = buildMessageAudiences(users, projects, journals, submissions);
+    let audience = audiences[audienceId];
+    if (audienceId === "specific") {
+      const selected = Array.isArray(req.body.recipient_ids) ? req.body.recipient_ids : [req.body.recipient_ids].filter(Boolean);
+      const selectedIds = new Set(selected.map(String));
+      audience = { label: "selected people", users: messageRecipients(users).filter((user) => selectedIds.has(user.id)) };
+      if (!audience.users.length) {
+        setFlash(res, "error", "Choose at least one Slack-connected person.");
+        return res.redirect("/admin/notifications");
+      }
+    }
     if (!audience) {
       setFlash(res, "error", "Choose a valid recipient group.");
       return res.redirect("/admin/notifications");
