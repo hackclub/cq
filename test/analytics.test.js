@@ -54,6 +54,7 @@ test("analytics rejects participants, validates ranges, and records signed-in vi
   assert.match(page.text, /Participation and access/);
   assert.match(page.text, /Hertz economy and shop/);
   assert.match(page.text, /Funding and inventory/);
+  assert.match(page.text, /app\.css\?v=20261024-analytics/);
   assert.match(page.text, /href="\?days=7" class="active"|class="active" href="\?days=7"/);
   assert.ok((await store.list("activity")).some((activity) => activity.userId));
 
