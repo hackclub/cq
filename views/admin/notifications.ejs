@@ -3,6 +3,17 @@
   <header class="apphead"><div><span class="eyebrow">ORGANIZER / MESSAGING</span><h1>Slack notifications</h1></div><span class="tag headright"><%= slackConfigured ? 'Bot connected' : 'Bot not configured' %></span></header>
   <div class="appbody admin-body">
   <%- include('nav') %>
+  <% if (hasPermission(user, 'notifications.send')) { %>
+    <form method="post" action="/admin/notifications/broadcast" class="panel form-stack broadcast-form">
+      <div class="panel-heading"><div><p class="eyebrow">Direct message broadcast</p><h2>Message a participant group</h2></div><span class="status-pill status-<%= slackConfigured ? 'sent' : 'failed' %>"><%= slackConfigured ? 'Ready' : 'Bot unavailable' %></span></div>
+      <div class="broadcast-form-grid">
+        <label>Recipient group<select name="audience" required><option value="">Choose a group…</option><% audiences.forEach((audience) => { %><option value="<%= audience.id %>"><%= audience.label %> (<%= audience.count %>)</option><% }) %></select><small>Counts include only accounts with a valid Slack user ID.</small></label>
+        <label>Slack Block Kit payload<textarea name="payload" rows="18" maxlength="50000" spellcheck="false" required><%= defaultPayload %></textarea><small>Each recipient receives an individual DM. Slack delivery results are recorded below.</small></label>
+      </div>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="button button-primary" type="submit" <%= slackConfigured ? '' : 'disabled' %>>Send individual DMs</button>
+    </form>
+  <% } %>
   <% if (!notifications.length) { %>
     <section class="panel empty-state"><h2>No messages yet</h2><p>Submission, review, order, and fulfilment events will appear here.</p></section>
   <% } else { %>
