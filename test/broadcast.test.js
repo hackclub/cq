@@ -26,6 +26,7 @@ test("administrators can broadcast Block Kit to a selected participant group", a
   const now = "2026-10-24T00:00:00.000Z";
   await store.put("user", "no_project", { id: "no_project", name: "No project", slackId: "UNOProject", roles: ["participant"], createdAt: now });
   await store.put("user", "builder", { id: "builder", name: "Builder", slackId: "UBUILDER", roles: ["participant"], createdAt: now });
+  await store.put("user", "opted_out", { id: "opted_out", name: "Opted out", slackId: "UOPTOUT", roles: ["participant"], optionalCommunicationsOptOutAt: now, createdAt: now });
   await store.put("project", "project_1", { id: "project_1", userId: "builder", title: "Radio", status: "building", createdAt: now });
   const agent = request.agent(app);
   await agent.post("/auth/dev-login").type("form").send({ name: "Admin", email: "admin@example.com", return_to: "/admin/notifications" });
@@ -34,6 +35,9 @@ test("administrators can broadcast Block Kit to a selected participant group", a
   assert.match(page.text, /Signed up without a project \(1\)/);
   assert.match(page.text, /Administrators only \(1\)/);
   assert.match(page.text, /Specific people/);
+  assert.match(page.text, /Start your first project/);
+  assert.match(page.text, /data-specific-recipients hidden/);
+  assert.doesNotMatch(page.text, /UOPTOUT/);
   assert.match(page.text, /Slack Block Kit payload/);
   const payload = { blocks: [{ type: "section", text: { type: "mrkdwn", text: "Please share feedback" } }] };
   const send = await agent.post("/admin/notifications/broadcast").type("form").send({

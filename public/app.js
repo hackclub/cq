@@ -3,6 +3,22 @@ const navigation = document.querySelector(".site-nav");
 
 window.addEventListener("beforeunload", () => document.body.classList.add("is-loading"));
 
+const broadcastAudience = document.querySelector("[data-broadcast-audience]");
+const specificRecipients = document.querySelector("[data-specific-recipients]");
+const broadcastPreset = document.querySelector("[data-broadcast-preset]");
+const broadcastPayload = document.querySelector("[data-broadcast-payload]");
+if (broadcastAudience && specificRecipients) {
+  const syncRecipients = () => { specificRecipients.hidden = broadcastAudience.value !== "specific"; };
+  broadcastAudience.addEventListener("change", syncRecipients);
+  syncRecipients();
+}
+if (broadcastPreset && broadcastPayload) {
+  broadcastPreset.addEventListener("change", () => {
+    const payload = broadcastPreset.selectedOptions[0]?.dataset.payload;
+    if (payload) broadcastPayload.value = payload;
+  });
+}
+
 const utcClock = document.querySelector("[data-utc-clock]");
 if (utcClock) {
   const updateClock = () => {

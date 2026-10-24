@@ -22,6 +22,30 @@ test("signed-in CQ users go directly to the NPS form with their Slack ID", async
   assert.equal(response.text.includes("CQ"), false);
 });
 
+test("signed-in users can opt out of optional communications", async () => {
+  const config = getConfig(baseConfig);
+  const store = new LocalEncryptedStore(config, { memory: true });
+  const app = await createApp({ config, store, logger: { info() {}, error() {} } });
+  const agent = request.agent(app);
+  await agent.post("/auth/dev-login").type("form").send({ name: "Maker", email: "maker@example.com", return_to: "/app" });
+  const response = await agent.get("/api/nps-optout");
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.location, "/");
+  const user = (await store.list("user"))[0];
+  assert.ok(user.optionalCommunicationsOptOutAt);
+  const homepage = await agent.get("/");
+  assert.match(homepage.text, /You have unsubscribed from optional communications/);
+});
+
+test("signed-out opt-out links authenticate and return to the endpoint", async () => {
+  const config = getConfig(baseConfig);
+  const store = new LocalEncryptedStore(config, { memory: true });
+  const app = await createApp({ config, store, logger: { info() {}, error() {} } });
+  const response = await request(app).get("/api/nps-optout");
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.location, "/auth/login?return_to=%2Fapi%2Fnps-optout");
+});
+
 test("signed-out visitors request only openid and slack_id", async () => {
   const config = getConfig({
     ...baseConfig, hackClubClientId: "client", hackClubClientSecret: "secret",
