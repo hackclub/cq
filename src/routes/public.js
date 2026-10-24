@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authConfigured, startOAuth } from "../auth.js";
+import { nowIso, setFlash } from "../utils.js";
 
 const CQ_NPS_FORM = "https://forms.hackclub.com/ysws-cq-nps";
 
@@ -20,6 +21,13 @@ export function publicRoutes({ store, config }) {
       purpose: "cq_nps",
     });
     return res.redirect(authUrl);
+  });
+
+  router.get("/api/nps-optout", async (req, res) => {
+    if (!req.user) return res.redirect("/auth/login?return_to=%2Fapi%2Fnps-optout");
+    await store.put("user", req.user.id, { ...req.user, optionalCommunicationsOptOutAt: nowIso(), updatedAt: nowIso() });
+    setFlash(res, "success", "You have unsubscribed from optional communications.");
+    return res.redirect("/");
   });
 
   router.get("/", async (req, res) => {

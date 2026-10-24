@@ -7,27 +7,27 @@
     <form method="post" action="/admin/notifications/broadcast" class="panel form-stack broadcast-form">
       <div class="panel-heading"><div><p class="eyebrow">Direct message broadcast</p><h2>Message a participant group</h2></div><span class="status-pill status-<%= slackConfigured ? 'sent' : 'failed' %>"><%= slackConfigured ? 'Ready' : 'Bot unavailable' %></span></div>
       <div class="broadcast-form-grid">
-        <div class="form-stack"><label>Recipient group<select name="audience" required><option value="">Choose a group…</option><% audiences.forEach((audience) => { %><option value="<%= audience.id %>"><%= audience.label %> (<%= audience.count %>)</option><% }) %><option value="specific">Specific people</option></select><small>Counts include only accounts with a valid Slack user ID.</small></label><label>Specific people<select name="recipient_ids" multiple size="8"><% messageRecipients.forEach((recipient) => { %><option value="<%= recipient.id %>"><%= recipient.name || recipient.email || recipient.id %><%= recipient.email && recipient.name ? ` · ${recipient.email}` : '' %></option><% }) %></select><small>Used only when “Specific people” is selected. Hold Command or Control to select more than one.</small></label></div>
-        <label>Slack Block Kit payload<textarea name="payload" rows="18" maxlength="50000" spellcheck="false" required><%= defaultPayload %></textarea><small>Each recipient receives an individual DM. Slack delivery results are recorded below.</small></label>
+        <div class="form-stack"><label>Message template<select data-broadcast-preset><% messagePresets.forEach((preset) => { %><option value="<%= preset.id %>" data-payload="<%= preset.payload %>"><%= preset.label %></option><% }) %></select></label><label>Recipient group<select name="audience" data-broadcast-audience required><option value="">Choose a group…</option><% audiences.forEach((audience) => { %><option value="<%= audience.id %>"><%= audience.label %> (<%= audience.count %>)</option><% }) %><option value="specific">Specific people</option></select><small>Opted-out accounts and accounts without a Slack ID are excluded.</small></label><label data-specific-recipients hidden>Specific people<select name="recipient_ids" multiple size="8"><% messageRecipients.forEach((recipient) => { %><option value="<%= recipient.id %>"><%= recipient.name || recipient.email || recipient.id %><%= recipient.email && recipient.name ? ` · ${recipient.email}` : '' %></option><% }) %></select><small>Hold Command or Control to select more than one.</small></label></div>
+        <label>Slack Block Kit payload<textarea name="payload" data-broadcast-payload rows="18" maxlength="50000" spellcheck="false" required><%= defaultPayload %></textarea><small>Each recipient receives an individual optional DM. Delivery results are summarized below.</small></label>
       </div>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button class="button button-primary" type="submit" <%= slackConfigured ? '' : 'disabled' %>>Send individual DMs</button>
     </form>
   <% } %>
-  <% if (!notifications.length) { %>
-    <section class="panel empty-state"><h2>No messages yet</h2><p>Submission, review, order, and fulfilment events will appear here.</p></section>
+  <% if (!broadcasts.length) { %>
+    <section class="panel empty-state"><h2>No broadcasts yet</h2><p>Optional group messages sent from this page will appear here.</p></section>
   <% } else { %>
     <section class="panel table-wrap">
+      <div class="panel-heading"><div><p class="eyebrow">Optional communications</p><h2>Broadcast history</h2></div><strong><%= broadcasts.length %> broadcast<%= broadcasts.length === 1 ? '' : 's' %></strong></div>
       <table>
-        <thead><tr><th>Event</th><th>Recipient</th><th>Status</th><th>Message</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Message</th><th>Recipients</th><th>Delivery</th><th>Updated</th></tr></thead>
         <tbody>
-          <% notifications.forEach((notice) => { %>
+          <% broadcasts.forEach((broadcast) => { %>
             <tr>
-              <td><strong><%= statusLabel(notice.kind) %></strong><small><%= notice.entityId || '' %></small></td>
-              <td><%= notice.channel || 'Not available' %></td>
-              <td><span class="status-pill status-<%= notice.status %>"><%= statusLabel(notice.status) %></span><% if (notice.error) { %><small><%= notice.error %></small><% } %></td>
-              <td><%= notice.text %></td>
-              <td><%= formatDateTime(notice.updatedAt) %></td>
+              <td><%= broadcast.text %><small><%= broadcast.id %></small></td>
+              <td><%= broadcast.recipients %></td>
+              <td><span class="status-pill status-<%= broadcast.failed ? 'failed' : 'sent' %>"><%= broadcast.sent %> sent</span><% if (broadcast.failed) { %><small><%= broadcast.failed %> failed</small><% } %><% if (broadcast.skipped) { %><small><%= broadcast.skipped %> skipped</small><% } %></td>
+              <td><%= formatDateTime(broadcast.updatedAt) %></td>
             </tr>
           <% }) %>
         </tbody>

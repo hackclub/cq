@@ -17,12 +17,35 @@ const DEFAULT_FEEDBACK_BLOCKS = {
   blocks: [
     { type: "section", text: { type: "mrkdwn", text: "hello! if you have a minute, could you please share some feedback about cq? less than 10% of people who signed up have started a project, and i'd like to know why, and what i need to improve. thanks!" } },
     { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "share feedback", emoji: true }, style: "primary", url: "https://cq.hackclub.com/api/cq-nps", action_id: "cq_feedback" }] },
-    { type: "context", elements: [{ type: "mrkdwn", text: "your feedback will be used to help improve the platform and program." }] },
+    { type: "context", elements: [{ type: "mrkdwn", text: "your feedback will be used to help improve the platform and program. <https://cq.hackclub.com/api/nps-optout|opt out of optional messages>" }] },
   ],
 };
 
+const MESSAGE_PRESETS = [
+  { id: "feedback", label: "CQ feedback request", payload: DEFAULT_FEEDBACK_BLOCKS },
+  { id: "start_project", label: "Start your first project", payload: { blocks: [
+    { type: "section", text: { type: "mrkdwn", text: "hello! you signed up for cq but haven't started a project yet. if anything is getting in the way, we'd love to help you get building." } },
+    { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "start a project", emoji: true }, style: "primary", url: "https://cq.hackclub.com/app/projects/new", action_id: "cq_start_project" }] },
+    { type: "context", elements: [{ type: "mrkdwn", text: "<https://cq.hackclub.com/api/nps-optout|opt out of optional messages>" }] },
+  ] } },
+  { id: "post_devlog", label: "Post a project update", payload: { blocks: [
+    { type: "section", text: { type: "mrkdwn", text: "how's your cq project going? post a devlog with what you've built so far and your Hackatime progress." } },
+    { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "open my projects", emoji: true }, style: "primary", url: "https://cq.hackclub.com/app/projects", action_id: "cq_post_devlog" }] },
+    { type: "context", elements: [{ type: "mrkdwn", text: "<https://cq.hackclub.com/api/nps-optout|opt out of optional messages>" }] },
+  ] } },
+  { id: "ship_project", label: "Ship your project", payload: { blocks: [
+    { type: "section", text: { type: "mrkdwn", text: "your cq project has progress but hasn't been shipped yet. when the demo, source, and devlogs are ready, submit it for review." } },
+    { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "open my projects", emoji: true }, style: "primary", url: "https://cq.hackclub.com/app/projects", action_id: "cq_ship_project" }] },
+    { type: "context", elements: [{ type: "mrkdwn", text: "<https://cq.hackclub.com/api/nps-optout|opt out of optional messages>" }] },
+  ] } },
+  { id: "announcement", label: "Blank announcement", payload: { blocks: [
+    { type: "section", text: { type: "mrkdwn", text: "write your announcement here" } },
+    { type: "context", elements: [{ type: "mrkdwn", text: "<https://cq.hackclub.com/api/nps-optout|opt out of optional messages>" }] },
+  ] } },
+];
+
 function buildMessageAudiences(users, projects, journals, submissions) {
-  const slackUsers = users.filter((user) => !user.mergedIntoUserId && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")));
+  const slackUsers = users.filter((user) => !user.mergedIntoUserId && !user.optionalCommunicationsOptOutAt && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")));
   const eligibleUsers = slackUsers.filter((user) => {
     const roles = Array.isArray(user.roles) ? user.roles : [user.role || "participant"];
     return roles.every((role) => role === "participant");
@@ -43,7 +66,7 @@ function buildMessageAudiences(users, projects, journals, submissions) {
 
 function messageRecipients(users) {
   return users
-    .filter((user) => !user.mergedIntoUserId && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")))
+    .filter((user) => !user.mergedIntoUserId && !user.optionalCommunicationsOptOutAt && /^U[A-Z0-9]+$/i.test(String(user.slackId || "")))
     .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
 }
 
@@ -951,13 +974,24 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       store.list("notification"), store.list("user"), store.list("project"), store.list("journal"), store.list("submission"),
     ]);
     const audiences = buildMessageAudiences(users, projects, journals, submissions);
+    const broadcastNotices = notifications.filter((notice) => notice.kind === "admin.broadcast");
+    const broadcasts = [...broadcastNotices.reduce((groups, notice) => {
+      const id = notice.entityId || notice.id;
+      const group = groups.get(id) || { id, text: notice.text, sent: 0, failed: 0, skipped: 0, recipients: 0, updatedAt: notice.updatedAt };
+      group.recipients += 1;
+      group[notice.status] = (group[notice.status] || 0) + 1;
+      if (String(notice.updatedAt) > String(group.updatedAt)) group.updatedAt = notice.updatedAt;
+      groups.set(id, group);
+      return groups;
+    }, new Map()).values()].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     res.render("admin/notifications", {
       title: "Slack notifications",
-      notifications: sortNewest(notifications),
+      broadcasts,
       slackConfigured: notifier.configured(),
       audiences: Object.entries(audiences).map(([id, audience]) => ({ id, label: audience.label, count: audience.users.length })),
       messageRecipients: messageRecipients(users),
       defaultPayload: JSON.stringify(DEFAULT_FEEDBACK_BLOCKS, null, 2),
+      messagePresets: MESSAGE_PRESETS.map((preset) => ({ ...preset, payload: JSON.stringify(preset.payload, null, 2) })),
     });
   });
 
