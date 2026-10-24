@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AirtableEncryptedStore, LocalEncryptedStore, airtableEntityTables, decryptRecord, encryptRecord } from "../src/store.js";
+import { AirtableEncryptedStore, LocalEncryptedStore, airtableEntityTables, createStore, decryptRecord, encryptRecord } from "../src/store.js";
 import { setupAirtable } from "../scripts/setup-airtable.js";
 
 const keyBase64 = Buffer.alloc(32, 7).toString("base64");
@@ -138,4 +138,30 @@ test("Airtable setup creates separate tables and safely migrates legacy cipherte
   assert.match(migratedBody, /Legacy Maker/);
   assert.doesNotMatch(migratedBody, /v1\./);
   assert.equal(requests.some((request) => request.options.method === "DELETE"), false);
+});
+
+test("Airtable-backed startup creates missing tables and fields", async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url: String(url), options });
+    if (!options.method) {
+      return new Response(JSON.stringify({ tables: [{
+        id: "tbl_users", name: "CQ Users",
+        fields: [{ name: "ID" }, { name: "Name" }, { name: "Status" }, { name: "Owner" }, { name: "Data" }],
+      }] }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ id: "created" }), { status: 200 });
+  };
+  const store = await createStore({
+    ...config,
+    airtablePat: "pat_test", airtableBaseId: "app_test", airtableTablePrefix: "CQ",
+    airtableRequestIntervalMs: 0,
+  }, { fetchImpl });
+  assert.ok(store instanceof AirtableEncryptedStore);
+  assert.equal(requests.some(({ options }) => options.method === "POST"), true);
+  assert.equal(requests.some(({ url, options }) => url.includes("tbl_users/fields") && options.method === "POST"), true);
+  const createdNames = requests
+    .filter(({ url, options }) => url.endsWith("/tables") && options.method === "POST")
+    .map(({ options }) => JSON.parse(options.body).name);
+  assert.ok(createdNames.includes("CQ Activity"));
 });

@@ -72,6 +72,10 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.match(review.text, /Ship receiver/);
   assert.match(review.text, /90 minutes/);
   assert.match(review.text, /Finished decoding/);
+  assert.match(review.text, /Open demo/);
+  assert.match(review.text, /https:\/\/example\.com\/demo/);
+  assert.match(review.text, /https:\/\/example\.com\/receiver\.jpg/);
+  assert.match(review.text, /Thumbnail for Digital receiver/);
   const adminProject = await agent.get("/admin/projects/cq_local");
   assert.equal(adminProject.status, 200);
   assert.match(adminProject.text, /Hackatime diagnostics/);

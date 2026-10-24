@@ -12,12 +12,6 @@ function integer(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function keyValue(directValue, base64Value) {
-  if (directValue) return String(directValue).replace(/\\n/g, "\n");
-  if (!base64Value) return "";
-  try { return Buffer.from(String(base64Value), "base64").toString("utf8"); } catch { return ""; }
-}
-
 export function getConfig(overrides = {}) {
   const nodeEnv = overrides.nodeEnv ?? process.env.NODE_ENV ?? "development";
   const baseUrl = (overrides.baseUrl ?? process.env.BASE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
@@ -46,10 +40,6 @@ export function getConfig(overrides = {}) {
     slackBotToken: overrides.slackBotToken ?? process.env.SLACK_BOT_TOKEN ?? "",
     slackAdminChannelId: overrides.slackAdminChannelId ?? process.env.SLACK_ADMIN_CHANNEL_ID ?? "",
     slackSecurityUserId: overrides.slackSecurityUserId ?? process.env.SLACK_SECURITY_USER_ID ?? "",
-    internalFrequencyKey: keyValue(
-      overrides.internalFrequencyKey ?? process.env.INTERNAL_FREQUENCY_KEY ?? "",
-      overrides.internalFrequencyKeyB64 ?? process.env.INTERNAL_FREQUENCY_KEY_B64 ?? "",
-    ),
     r2Endpoint: overrides.r2Endpoint ?? process.env.R2_ENDPOINT ?? "",
     r2AccessKeyId: overrides.r2AccessKeyId ?? process.env.R2_ACCESS_KEY_ID ?? "",
     r2SecretAccessKey: overrides.r2SecretAccessKey ?? process.env.R2_SECRET_ACCESS_KEY ?? "",

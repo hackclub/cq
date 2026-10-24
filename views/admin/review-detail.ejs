@@ -1,12 +1,13 @@
 <%- include('../partials/head') %>
 <section id="main" class="screen-page app-screen admin-screen">
   <% const reviewData = submission.firstPass || submission.review || {}; const awaitingSecondPass = submission.phase === 'second_pass' && !submission.decision; const canSecondPass = hasPermission(user, 'reviews.second_pass'); %>
-  <header class="apphead"><div><span class="eyebrow">REVIEW / <%= submission.id %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
+  <header class="apphead review-header"><div><span class="eyebrow">REVIEW / <%= submission.id %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/reviews">Back to queue</a><% if (project.demoUrl) { %><a class="button button-primary" href="<%= project.demoUrl %>" target="_blank" rel="noreferrer">Open demo ↗</a><% } %><a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
   <div class="appbody admin-body"><%- include('nav') %>
   <div class="review-workspace">
     <div class="project-main-column">
       <section class="panel">
         <div class="panel-heading"><div><p class="eyebrow">Submission</p><h2>What to verify</h2></div><span class="status-pill status-<%= submission.decision || submission.phase %>"><%= statusLabel(submission.decision || submission.phase) %></span></div>
+        <% if (project.thumbnailUrl) { %><a class="review-project-thumbnail" href="<%= project.thumbnailUrl %>" target="_blank" rel="noreferrer"><img src="<%= project.thumbnailUrl %>" alt="Thumbnail for <%= project.title %>" loading="lazy" referrerpolicy="no-referrer"><span>Open full-size thumbnail ↗</span></a><% } %>
         <dl class="admin-detail-list">
           <div><dt>Maker</dt><dd><%= maker?.name || 'Unknown' %> · <%= maker?.email || '' %></dd></div>
           <div><dt>Type</dt><dd><%= statusLabel(project.track) %> · <%= statusLabel(project.projectType) %></dd></div>
