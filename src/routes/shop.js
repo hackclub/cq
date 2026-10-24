@@ -93,6 +93,9 @@ export function shopRoutes({ store, notifier }) {
     if (!currentCart.items.length) errors.push("Your cart is empty.");
     if (currentCart.total > req.user.hertz) errors.push("You do not have enough hertz for this order.");
     currentCart.items.forEach((item) => {
+      if (item.quantity > item.stock) {
+        errors.push(`${item.name} only has ${item.stock} available.`);
+      }
     });
     if (errors.length) {
       return res.status(422).render("shop/cart", {
@@ -133,10 +136,13 @@ export function shopRoutes({ store, notifier }) {
         const freshProducts = await Promise.all(freshCart.items.map((item) => store.get("product", item.id)));
         freshCart.items.forEach((item, index) => {
           if (!freshProducts[index]?.active) throw new Error(`${item.name} is no longer available.`);
+          if (item.quantity > freshProducts[index].stock) throw new Error(`${item.name} only has ${freshProducts[index].stock} available.`);
         });
         for (let index = 0; index < freshCart.items.length; index += 1) {
           const item = freshCart.items[index];
           const product = freshProducts[index];
+          product.stock -= item.quantity;
+          await store.put("product", product.id, product);
         }
         user.hertz = Math.max(0, Math.round((Number(user.hertz) - freshCart.total) * 100) / 100);
         user.updatedAt = timestamp;
