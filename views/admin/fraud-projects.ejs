@@ -5,7 +5,7 @@
   <%- include('nav') %>
   <div class="panel table-wrap">
     <table>
-      <thead><tr><th>Project</th><th>Participant</th><th>Hackatime account</th><th>Hackatime projects</th><th>Shipped</th><th>Action</th></tr></thead>
+      <thead><tr><th>Project</th><th>Participant</th><th>Hackatime account</th><th>Hackatime projects</th><th>Shipped</th><th>Fraud check</th><th>Action</th></tr></thead>
       <tbody>
         <% projects.forEach((item) => { %><tr>
           <td><a href="/admin/fraud-review/<%= item.id %>"><strong><%= item.title %></strong></a><small><%= statusLabel(item.status) %></small></td>
@@ -13,6 +13,7 @@
           <td><%= item.hackatimeAccount?.username || item.hackatimeAccount?.email || item.hackatimeAccount?.id || 'Not connected' %><small><% if (item.hackatimeAccount?.id) { %>ID: <%= item.hackatimeAccount.id %><% } %><% if (item.hackatimeAccount?.id && item.hackatimeAccount?.email) { %> · <% } %><%= item.hackatimeAccount?.email || '' %></small></td>
           <td><%= item.hackatimeProjects?.join(', ') || 'None linked' %></td>
           <td><%= formatDateTime(item.latestSubmission.createdAt || item.latestSubmission.updatedAt) %></td>
+          <td><span class="status-pill status-<%= item.latestSubmission.fraudReview?.decision === 'approved' ? 'approved' : 'review' %>"><%= item.latestSubmission.fraudReview?.decision === 'approved' ? 'Approved' : 'Pending' %></span></td>
           <td><a class="button button-small" href="/admin/fraud-review/<%= item.id %>">Inspect evidence</a></td>
         </tr><% }) %>
       </tbody>

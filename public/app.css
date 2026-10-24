@@ -1513,12 +1513,18 @@ th {
 .analytics-warning { display: flex; justify-content: space-between; gap: 18px; padding: 12px 20px; border-bottom: 1px solid #765d35; background: #2b261c; color: #e6d09a; font-size: 8px; line-height: 1.6; }
 .analytics-warning strong { color: #fff0c5; font-weight: 400; text-transform: uppercase; letter-spacing: .06em; }
 
+.broadcast-form { border-bottom: 1px solid var(--line2); }
+.broadcast-form-grid { display: grid; grid-template-columns: minmax(220px, .55fr) minmax(0, 1.45fr); gap: 18px; }
+.broadcast-form textarea { min-height: 290px; font-family: inherit; font-size: 9px; line-height: 1.55; tab-size: 2; }
+.broadcast-form > .button { justify-self: start; }
+
 @media (max-width: 760px) {
   .analytics-screen .apphead { align-items: start; }
   .analytics-ranges { justify-content: flex-start; margin-top: 14px; }
   .analytics-heading, .analytics-chart-grid { grid-template-columns: 1fr; gap: 9px; }
   .analytics-section { padding-inline: 14px; }
   .h-bars>div { grid-template-columns: 90px 1fr 54px; }
+  .broadcast-form-grid { grid-template-columns: 1fr; }
 }
 
 /* Organizer workspace */

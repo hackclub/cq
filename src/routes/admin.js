@@ -13,6 +13,32 @@ function shippedSubmissions(submissions, projectId) {
   return sortNewest(submissions.filter((item) => item.projectId === projectId && !["withdrawn", "error"].includes(item.phase)));
 }
 
+const DEFAULT_FEEDBACK_BLOCKS = {
+  blocks: [
+    { type: "section", text: { type: "mrkdwn", text: "hello! if you have a minute, could you please share some feedback about cq? less than 10% of people who signed up have started a project, and i'd like to know why, and what i need to improve. thanks!" } },
+    { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "share feedback", emoji: true }, style: "primary", url: "https://cq.hackclub.com/api/cq-nps", action_id: "cq_feedback" }] },
+    { type: "context", elements: [{ type: "mrkdwn", text: "your feedback will be used to help improve the platform and program." }] },
+  ],
+};
+
+function buildMessageAudiences(users, projects, journals, submissions) {
+  const eligibleUsers = users.filter((user) => {
+    const roles = Array.isArray(user.roles) ? user.roles : [user.role || "participant"];
+    return !user.mergedIntoUserId && roles.every((role) => role === "participant") && /^U[A-Z0-9]+$/i.test(String(user.slackId || ""));
+  });
+  const projectUserIds = new Set(projects.map((project) => project.userId));
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const devlogUserIds = new Set(journals.map((journal) => projectById.get(journal.projectId)?.userId).filter(Boolean));
+  const submittedUserIds = new Set(submissions.filter((submission) => !["withdrawn", "error"].includes(submission.phase)).map((submission) => projectById.get(submission.projectId)?.userId || submission.userId).filter(Boolean));
+  return {
+    no_project: { label: "Signed up without a project", users: eligibleUsers.filter((user) => !projectUserIds.has(user.id)) },
+    project_no_devlog: { label: "Started a project without a devlog", users: eligibleUsers.filter((user) => projectUserIds.has(user.id) && !devlogUserIds.has(user.id)) },
+    devlog_not_submitted: { label: "Posted a devlog without submitting", users: eligibleUsers.filter((user) => devlogUserIds.has(user.id) && !submittedUserIds.has(user.id)) },
+    submitted: { label: "Submitted a project", users: eligibleUsers.filter((user) => submittedUserIds.has(user.id)) },
+    all: { label: "All signed-up Slack users", users: eligibleUsers },
+  };
+}
+
 function sessionIsActive(session) {
   return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
 }
@@ -485,8 +511,40 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       maker,
       journals: projectJournals,
       submissions: projectSubmissions,
+      latestSubmission: projectSubmissions[0],
       hackatimeDiagnostics: buildHackatimeDiagnostics(project, projectJournals, hackatime),
     });
+  });
+
+  router.post("/fraud-review/:id/approve", requirePermission("fraud.review"), requireCsrf, async (req, res) => {
+    const project = await store.get("project", req.params.id);
+    if (!project) return res.sendStatus(404);
+    const submissions = shippedSubmissions(await store.list("submission"), project.id);
+    const submission = submissions[0];
+    if (!submission) return res.sendStatus(404);
+    if (submission.fraudReview?.decision === "approved") {
+      setFlash(res, "success", "This submission has already passed fraud review.");
+      return res.redirect(`/admin/fraud-review/${project.id}`);
+    }
+    const before = structuredClone(submission);
+    const reviewedAt = nowIso();
+    submission.fraudReview = {
+      decision: "approved",
+      reviewerId: req.user.id,
+      reviewerName: req.user.name,
+      reviewedAt,
+    };
+    submission.updatedAt = reviewedAt;
+    await store.put("submission", submission.id, submission);
+    await addReviewAction(store, submission, req.user, "fraud_approved", { decision: "approved" });
+    await writeAudit(store, req.user, {
+      action: "review.fraud_approved", entityType: "submission", entityId: submission.id,
+      summary: `Approved the fraud check for ${project.title}.`, before, after: submission,
+      metadata: { projectId: project.id },
+    });
+    res.locals.securityAlertDescription = `Approved the fraud check for ${project.title}`;
+    setFlash(res, "success", "Fraud review approved.");
+    return res.redirect(`/admin/fraud-review/${project.id}`);
   });
 
   router.get("/projects/:id", requirePermission("projects.review"), async (req, res) => {
@@ -881,12 +939,53 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
   });
 
   router.get("/notifications", requirePermission("notifications.read"), async (req, res) => {
-    const notifications = sortNewest(await store.list("notification"));
+    const [notifications, users, projects, journals, submissions] = await Promise.all([
+      store.list("notification"), store.list("user"), store.list("project"), store.list("journal"), store.list("submission"),
+    ]);
+    const audiences = buildMessageAudiences(users, projects, journals, submissions);
     res.render("admin/notifications", {
       title: "Slack notifications",
-      notifications,
+      notifications: sortNewest(notifications),
       slackConfigured: notifier.configured(),
+      audiences: Object.entries(audiences).map(([id, audience]) => ({ id, label: audience.label, count: audience.users.length })),
+      defaultPayload: JSON.stringify(DEFAULT_FEEDBACK_BLOCKS, null, 2),
     });
+  });
+
+  router.post("/notifications/broadcast", requirePermission("notifications.send"), requireCsrf, async (req, res) => {
+    const audienceId = String(req.body.audience || "");
+    const rawPayload = String(req.body.payload || "");
+    let payload;
+    try { payload = JSON.parse(rawPayload); } catch {
+      setFlash(res, "error", "The Block Kit payload is not valid JSON.");
+      return res.redirect("/admin/notifications");
+    }
+    if (!Array.isArray(payload?.blocks) || !payload.blocks.length || rawPayload.length > 50_000) {
+      setFlash(res, "error", "Provide a Block Kit payload with a non-empty blocks array under 50 KB.");
+      return res.redirect("/admin/notifications");
+    }
+    const [users, projects, journals, submissions] = await Promise.all([
+      store.list("user"), store.list("project"), store.list("journal"), store.list("submission"),
+    ]);
+    const audience = buildMessageAudiences(users, projects, journals, submissions)[audienceId];
+    if (!audience) {
+      setFlash(res, "error", "Choose a valid recipient group.");
+      return res.redirect("/admin/notifications");
+    }
+    const broadcastId = randomId("broadcast_");
+    const fallbackText = String(payload.text || payload.blocks.find((block) => block.type === "section")?.text?.text || "Message from CQ organizers").slice(0, 4000);
+    const results = await notifier.broadcastMessage(audience.users, { text: fallbackText, blocks: payload.blocks, entityId: broadcastId });
+    const sent = results.filter((result) => result.status === "sent").length;
+    const failed = results.filter((result) => result.status === "failed").length;
+    const skipped = results.length - sent - failed;
+    await writeAudit(store, req.user, {
+      action: "notifications.broadcast", entityType: "broadcast", entityId: broadcastId,
+      summary: `Sent a Slack broadcast to ${audience.label}.`,
+      metadata: { audience: audienceId, recipients: results.length, sent, failed, skipped },
+    });
+    res.locals.securityAlertDescription = `Sent a Slack broadcast to ${audience.label} (${results.length} recipients)`;
+    setFlash(res, failed ? "error" : "success", `Broadcast finished: ${sent} sent, ${failed} failed, ${skipped} skipped.`);
+    return res.redirect("/admin/notifications");
   });
 
   router.get("/audit", requirePermission("audit.read"), async (req, res) => {

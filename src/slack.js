@@ -25,24 +25,26 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
     return result.channel.id;
   }
 
-  async function post(channel, text) {
+  async function post(channel, text, blocks = null) {
     if (!configured() || !channel) return { skipped: true };
     const directChannel = await directMessageChannel(channel);
     return slackRequest("chat.postMessage", {
       channel: directChannel,
       text,
+      ...(Array.isArray(blocks) ? { blocks } : {}),
       unfurl_links: false,
       unfurl_media: false,
     });
   }
 
-  async function deliver({ userId = null, channel, kind, text, entityId = null }) {
+  async function deliver({ userId = null, channel, kind, text, blocks = null, entityId = null }) {
     const notification = {
       id: randomId("notice_"),
       userId,
       channel,
       kind,
       text,
+      blocks,
       entityId,
       status: "pending",
       error: null,
@@ -50,7 +52,7 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
       updatedAt: nowIso(),
     };
     try {
-      const result = await post(channel, text);
+      const result = await post(channel, text, blocks);
       notification.status = result.skipped ? "skipped" : "sent";
       notification.slackTimestamp = result.ts ?? null;
       if (!result.skipped) console.info("slack_notification", { kind, entityId, status: notification.status });
@@ -87,6 +89,23 @@ export function createSlackNotifier(config, store, fetchImpl = fetch) {
 
   return {
     configured,
+    async broadcastMessage(users, { text, blocks, entityId }) {
+      const recipients = users.filter((user) => user?.slackId);
+      const results = new Array(recipients.length);
+      let cursor = 0;
+      const workers = Array.from({ length: Math.min(5, recipients.length) }, async () => {
+        while (cursor < recipients.length) {
+          const index = cursor;
+          cursor += 1;
+          const user = recipients[index];
+          results[index] = await deliver({
+            userId: user.id, channel: user.slackId, kind: "admin.broadcast", text, blocks, entityId,
+          });
+        }
+      });
+      await Promise.all(workers);
+      return results;
+    },
     async securityAlert(actor, { method, path, status, description = null }) {
       const recipients = await securityRecipients();
       if (!recipients.length) return { skipped: true };

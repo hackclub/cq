@@ -5,6 +5,8 @@ import { createApp } from "../src/app.js";
 import { getConfig } from "../src/config.js";
 import { LocalEncryptedStore } from "../src/store.js";
 
+function csrf(html) { return html.match(/name="_csrf" value="([^"]+)"/)?.[1]; }
+
 test("every organizer role can open only its assigned admin sections", async () => {
   const config = getConfig({
     nodeEnv: "development",
@@ -62,7 +64,20 @@ test("every organizer role can open only its assigned admin sections", async () 
       assert.match(detail.text, /ht_42/);
       assert.match(detail.text, /maker@hackclub\.com/);
       assert.match(detail.text, /shipped-code/);
-      assert.doesNotMatch(detail.text, /Archive project|Open latest review/);
+      assert.doesNotMatch(detail.text, /Archive project/);
+      assert.match(detail.text, /Approve fraud check/);
+      const decision = await agent.post("/admin/fraud-review/cq_sensitive/approve").type("form").send({ _csrf: csrf(detail.text) });
+      assert.equal(decision.status, 302);
+      const reviewedSubmission = await store.get("submission", "sub_sensitive");
+      assert.equal(reviewedSubmission.phase, "review");
+      assert.equal(reviewedSubmission.decision, undefined);
+      assert.equal(reviewedSubmission.fraudReview.decision, "approved");
+      assert.equal(reviewedSubmission.fraudReview.reviewerId, id);
+      assert.equal((await store.list("review_action")).some((item) => item.submissionId === "sub_sensitive" && item.action === "fraud_approved"), true);
+      assert.equal((await store.list("audit")).some((item) => item.entityId === "sub_sensitive" && item.action === "review.fraud_approved"), true);
+      const approvedDetail = await agent.get("/admin/fraud-review/cq_sensitive");
+      assert.match(approvedDetail.text, /Fraud approved/);
+      assert.doesNotMatch(approvedDetail.text, /Approve fraud check/);
       assert.equal((await agent.get("/admin/fraud-review/cq_unshipped")).status, 404);
       assert.equal((await agent.post("/admin/projects/cq_sensitive").type("form").send({ status: "archived" })).status, 403);
     }

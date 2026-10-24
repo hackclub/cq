@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <section id="main" class="screen-page app-screen admin-screen">
-  <header class="apphead"><div><span class="eyebrow">FRAUD REVIEW / <%= project.id %> / <%= statusLabel(project.status) %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/fraud-review">Shipped projects</a><a class="button button-primary" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
+  <header class="apphead"><div><span class="eyebrow">FRAUD REVIEW / <%= project.id %> / <%= statusLabel(project.status) %></span><h1><%= project.title %></h1></div><div class="headright"><a class="button button-ghost" href="/admin/fraud-review">Shipped projects</a><% if (latestSubmission?.fraudReview?.decision === 'approved') { %><span class="status-pill status-approved">Fraud approved</span><% } else { %><form method="post" action="/admin/fraud-review/<%= project.id %>/approve"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-primary" type="submit">Approve fraud check</button></form><% } %><a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a></div></header>
   <div class="appbody admin-body"><%- include('nav') %>
     <div class="fraud-review-body">
       <section class="panel">
