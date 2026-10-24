@@ -1668,6 +1668,124 @@ body.is-loading .nav-loading { opacity: 1; }
   overflow-wrap: anywhere;
 }
 
+.fraud-review-body {
+  padding: 18px 22px;
+  overflow: auto;
+}
+
+.fraud-review-body>.panel {
+  margin-bottom: 18px;
+}
+
+.hackatime-diagnostics .panel-heading p {
+  margin: 4px 0 0;
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.diagnostic-state {
+  border: 1px solid var(--line2);
+  padding: 5px 8px;
+  color: var(--dim);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.diagnostic-state.current {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.diagnostic-state.stale,
+.diagnostic-state.reconnect,
+.diagnostic-state.unavailable {
+  border-color: #b99554;
+  color: #d3ad68;
+}
+
+.diagnostic-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-bottom: 1px solid var(--line2);
+}
+
+.diagnostic-summary>div {
+  min-width: 0;
+  padding: 12px;
+  border-right: 1px solid var(--line2);
+}
+
+.diagnostic-summary>div:last-child {
+  border-right: 0;
+}
+
+.diagnostic-summary dt {
+  margin-bottom: 5px;
+  color: var(--dim);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.diagnostic-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostic-table {
+  margin: 0;
+  border: 0;
+}
+
+.diagnostic-table table {
+  margin: 0;
+}
+
+.diagnostic-table td,
+.diagnostic-table th {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostic-table td:first-child,
+.diagnostic-table td:last-child {
+  white-space: normal;
+}
+
+.diagnostic-table td small,
+.snapshot-value {
+  display: block;
+  margin-top: 3px;
+  color: var(--dim);
+  font-size: 7px;
+}
+
+.diagnostic-source {
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line2);
+  color: var(--dim);
+  font-size: 8px;
+}
+
+.diagnostic-history {
+  border-top: 1px solid var(--line2);
+}
+
+.diagnostic-history summary {
+  cursor: pointer;
+  padding: 11px 12px;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.diagnostic-history summary span {
+  float: right;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
 .inventory-form {
   display: grid;
   grid-template-columns: 1.4fr 1fr .65fr .65fr 1.5fr .55fr auto auto;
@@ -2170,6 +2288,18 @@ body.is-loading .nav-loading { opacity: 1; }
   .admin-detail-list>div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .diagnostic-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diagnostic-summary>div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .diagnostic-summary>div:nth-child(-n+2) {
+    border-bottom: 1px solid var(--line2);
   }
 }
 

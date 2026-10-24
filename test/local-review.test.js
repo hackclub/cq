@@ -4,6 +4,7 @@ import request from "supertest";
 import { createApp } from "../src/app.js";
 import { getConfig } from "../src/config.js";
 import { LocalEncryptedStore } from "../src/store.js";
+import { buildHackatimeDiagnostics } from "../src/routes/admin.js";
 
 function csrf(html) {
   return html.match(/name="_csrf" value="([^"]+)"/)?.[1];
@@ -71,6 +72,11 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.match(review.text, /Ship receiver/);
   assert.match(review.text, /90 minutes/);
   assert.match(review.text, /Finished decoding/);
+  const adminProject = await agent.get("/admin/projects/cq_local");
+  assert.equal(adminProject.status, 200);
+  assert.match(adminProject.text, /Hackatime diagnostics/);
+  assert.match(adminProject.text, /Link baseline/);
+  assert.match(adminProject.text, /Unavailable/);
 
   const projectPage = await agent.get("/app/projects/cq_local");
   assert.doesNotMatch(projectPage.text, /connect the project review service/i);
@@ -115,6 +121,29 @@ test("projects ship into local review when Ari is not configured", async () => {
   assert.equal(resubmit.status, 302);
   assert.equal((await store.list("submission")).length, 2);
   assert.equal((await store.get("project", "cq_local")).status, "submitted");
+});
+
+test("organizer Hackatime diagnostics explain the stored baseline and unlogged delta", () => {
+  const diagnostics = buildHackatimeDiagnostics({
+    hackatimeProjects: ["morse-trainer"],
+    hackatimeBaseline: { "morse-trainer": 4200 },
+    hackatimeSelectionUpdatedAt: "2026-10-23T11:00:00.000Z",
+  }, [{
+    id: "log_1", title: "First update", entryDate: "2026-10-23", minutes: 3.33,
+    hackatimeSnapshot: { "morse-trainer": 4400 },
+  }], {
+    configured: true, connected: true, connectedAt: "2026-10-23T10:00:00.000Z",
+    fetchedAt: "2026-10-23T11:05:00.000Z", account: { username: "maker" },
+    projects: [{ name: "morse-trainer", totalSeconds: 8006, mostRecentHeartbeat: "2026-10-23T11:04:00.000Z", languages: ["Python"] }],
+  });
+
+  assert.equal(diagnostics.status, "current");
+  assert.equal(diagnostics.projects[0].baselineLabel, "1 hr 10 min");
+  assert.equal(diagnostics.projects[0].comparisonLabel, "1 hr 13 min");
+  assert.equal(diagnostics.projects[0].currentLabel, "2 hr 13 min");
+  assert.equal(diagnostics.projects[0].unloggedLabel, "1 hr");
+  assert.equal(diagnostics.unloggedLabel, "1 hr");
+  assert.equal(diagnostics.snapshots[0].values[0].label, "1 hr 13 min");
 });
 
 test("hardware funding is approved and issued before a final ship can enter review", async () => {

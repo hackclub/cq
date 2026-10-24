@@ -1,0 +1,24 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen admin-screen">
+  <header class="apphead"><div><span class="eyebrow">ORGANIZER / SHIPPED PROJECTS</span><h1>Fraud review</h1></div><div class="readout headright"><span>SHIPPED</span><b><%= projects.length %></b></div></header>
+  <div class="appbody admin-body">
+  <%- include('nav') %>
+  <div class="panel table-wrap">
+    <table>
+      <thead><tr><th>Project</th><th>Participant</th><th>Hackatime account</th><th>Hackatime projects</th><th>Shipped</th><th>Action</th></tr></thead>
+      <tbody>
+        <% projects.forEach((item) => { %><tr>
+          <td><a href="/admin/fraud-review/<%= item.id %>"><strong><%= item.title %></strong></a><small><%= statusLabel(item.status) %></small></td>
+          <td><%= item.maker?.name || 'Unknown' %><small><%= item.maker?.email || 'No CQ email' %></small></td>
+          <td><%= item.hackatimeAccount?.username || item.hackatimeAccount?.email || item.hackatimeAccount?.id || 'Not connected' %><small><% if (item.hackatimeAccount?.id) { %>ID: <%= item.hackatimeAccount.id %><% } %><% if (item.hackatimeAccount?.id && item.hackatimeAccount?.email) { %> · <% } %><%= item.hackatimeAccount?.email || '' %></small></td>
+          <td><%= item.hackatimeProjects?.join(', ') || 'None linked' %></td>
+          <td><%= formatDateTime(item.latestSubmission.createdAt || item.latestSubmission.updatedAt) %></td>
+          <td><a class="button button-small" href="/admin/fraud-review/<%= item.id %>">Inspect evidence</a></td>
+        </tr><% }) %>
+      </tbody>
+    </table>
+    <% if (!projects.length) { %><p class="empty-inline">No shipped projects are available for fraud review.</p><% } %>
+  </div>
+  </div>
+</section>
+<%- include('../partials/footer') %>

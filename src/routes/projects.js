@@ -64,6 +64,7 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
   const timestamp = nowIso();
   const currentTotals = hackatimeTotals(input.hackatimeProjects, availableHackatimeProjects);
   const existingBaseline = existing.hackatimeBaseline || {};
+  const selectionChanged = JSON.stringify(existing.hackatimeProjects || []) !== JSON.stringify(input.hackatimeProjects);
   return {
     id,
     userId,
@@ -73,6 +74,9 @@ function toProjectRecord(id, userId, input, existing = {}, availableHackatimePro
     demoUrl: input.demoUrl,
     thumbnailUrl: input.thumbnailUrl,
     hackatimeProjects: input.hackatimeProjects,
+    hackatimeSelectionUpdatedAt: selectionChanged
+      ? (input.hackatimeProjects.length ? timestamp : null)
+      : (existing.hackatimeSelectionUpdatedAt || null),
     hackatimeBaseline: Object.fromEntries(input.hackatimeProjects.map((name) => [
       name,
       Number.isFinite(existingBaseline[name]) ? existingBaseline[name] : (currentTotals[name] ?? 0),

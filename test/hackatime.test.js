@@ -29,7 +29,7 @@ test("Hackatime OAuth uses the configured store and discovers selectable project
     }
     if (String(url).endsWith("/api/v1/authenticated/me")) {
       assert.equal(options.headers.Authorization, "Bearer very-secret-token");
-      return jsonResponse({ id: 42, username: "radio-maker" });
+      return jsonResponse({ id: 42, username: "radio-maker", email: "maker@hackclub.com" });
     }
     if (String(url).includes("/api/v1/authenticated/projects")) {
       assert.equal(options.headers.Authorization, "Bearer very-secret-token");
@@ -52,6 +52,7 @@ test("Hackatime OAuth uses the configured store and discovers selectable project
   const connected = await client.finishConnection({ userId: "user_1", state, code: "oauth-code" });
   assert.equal(connected.returnTo, "/app/projects/new");
   assert.equal((await client.connection("user_1")).account.username, "radio-maker");
+  assert.equal((await client.connection("user_1")).account.email, "maker@hackclub.com");
   const selection = await client.projects("user_1");
   assert.deepEqual(selection.projects.map((project) => project.name), ["cq-firmware"]);
   assert.equal(selection.projects[0].hours, 2);

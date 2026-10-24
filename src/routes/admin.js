@@ -8,6 +8,10 @@ function sortNewest(items) {
   return [...items].sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
+function shippedSubmissions(submissions, projectId) {
+  return sortNewest(submissions.filter((item) => item.projectId === projectId && !["withdrawn", "error"].includes(item.phase)));
+}
+
 function sessionIsActive(session) {
   return !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now();
 }
@@ -43,6 +47,68 @@ function reviewMinutes(journals) {
   return Math.round(journals.reduce((sum, item) => sum + Math.max(0, Number(item.minutes) || 0), 0));
 }
 
+function trackedTime(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  if (value < 60) return `${Math.round(value)} sec`;
+  const minutes = Math.round((value / 60) * 100) / 100;
+  if (minutes < 60) return `${minutes} min`;
+  const roundedMinutes = Math.round(value / 60);
+  const hours = Math.floor(roundedMinutes / 60);
+  const remainder = roundedMinutes % 60;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
+}
+
+export function buildHackatimeDiagnostics(project, journals, hackatime) {
+  const linkedNames = Array.isArray(project.hackatimeProjects) ? project.hackatimeProjects : [];
+  const baseline = project.hackatimeBaseline || {};
+  const snapshotJournal = journals.find((journal) => journal.hackatimeSnapshot && Object.keys(journal.hackatimeSnapshot).length);
+  const comparison = snapshotJournal?.hackatimeSnapshot || baseline;
+  const available = new Map((hackatime.projects || []).map((item) => [item.name, item]));
+  const projects = linkedNames.map((name) => {
+    const current = available.get(name);
+    const baselineSeconds = Math.max(0, Number(baseline[name]) || 0);
+    const comparisonSeconds = Math.max(0, Number(comparison[name]) || 0);
+    const currentSeconds = current ? Math.max(0, Number(current.totalSeconds) || 0) : null;
+    const unloggedSeconds = currentSeconds === null ? null : Math.max(0, currentSeconds - comparisonSeconds);
+    return {
+      name,
+      baselineLabel: trackedTime(baselineSeconds),
+      comparisonLabel: trackedTime(comparisonSeconds),
+      currentLabel: currentSeconds === null ? "Unavailable" : trackedTime(currentSeconds),
+      unloggedSeconds,
+      unloggedLabel: unloggedSeconds === null ? "Unavailable" : trackedTime(unloggedSeconds),
+      mostRecentHeartbeat: current?.mostRecentHeartbeat || null,
+      languages: current?.languages || [],
+    };
+  });
+  const snapshots = journals
+    .filter((journal) => journal.hackatimeSnapshot && Object.keys(journal.hackatimeSnapshot).length)
+    .map((journal) => ({
+      id: journal.id,
+      title: journal.title || "Project update",
+      entryDate: journal.entryDate,
+      minutes: Math.max(0, Number(journal.minutes) || 0),
+      values: linkedNames.map((name) => ({ name, label: trackedTime(journal.hackatimeSnapshot[name]) })),
+    }));
+  const status = !linkedNames.length ? "not-linked"
+    : !hackatime.configured ? "unavailable"
+      : !hackatime.connected ? "disconnected"
+        : hackatime.error || "current";
+  const totalsAvailable = projects.every((item) => item.unloggedSeconds !== null);
+  const unloggedSeconds = totalsAvailable ? projects.reduce((sum, item) => sum + item.unloggedSeconds, 0) : null;
+  return {
+    status,
+    account: hackatime.account || null,
+    connectedAt: hackatime.connectedAt || null,
+    fetchedAt: hackatime.fetchedAt || null,
+    selectionUpdatedAt: project.hackatimeSelectionUpdatedAt || null,
+    comparisonJournal: snapshotJournal || null,
+    projects,
+    snapshots,
+    unloggedLabel: unloggedSeconds === null ? "Unavailable" : trackedTime(unloggedSeconds),
+  };
+}
+
 function projectForReview(submission, currentProject) {
   if (submission.projectSnapshot) return structuredClone(submission.projectSnapshot);
   const payload = submission.payload || {};
@@ -61,7 +127,7 @@ function projectForReview(submission, currentProject) {
   };
 }
 
-export function adminRoutes({ store, config, ariClient, githubClient, cdnClient, notifier }) {
+export function adminRoutes({ store, config, ariClient, hackatimeClient, githubClient, cdnClient, notifier }) {
   const router = Router();
   router.use(requireOrganizer);
   router.post("/session/verify", requireCsrf, async (req, res) => {
@@ -365,22 +431,63 @@ export function adminRoutes({ store, config, ariClient, githubClient, cdnClient,
     res.render("admin/projects", { title: "Manage projects", projects: rows });
   });
 
+  router.get("/fraud-review", requirePermission("fraud.review"), async (req, res) => {
+    const [projects, users, submissions] = await Promise.all([
+      store.list("project"), store.list("user"), store.list("submission"),
+    ]);
+    const shipped = sortNewest(projects).map((project) => ({ project, submissions: shippedSubmissions(submissions, project.id) }))
+      .filter((item) => item.submissions.length);
+    const connections = new Map(await Promise.all([...new Set(shipped.map((item) => item.project.userId))]
+      .map(async (userId) => [userId, await hackatimeClient.connection(userId)])));
+    const rows = shipped.map(({ project, submissions: projectSubmissions }) => ({
+      ...project,
+      maker: users.find((user) => user.id === project.userId),
+      latestSubmission: projectSubmissions[0],
+      hackatimeAccount: connections.get(project.userId)?.account || null,
+    }));
+    res.render("admin/fraud-projects", { title: "Fraud review", projects: rows });
+  });
+
+  router.get("/fraud-review/:id", requirePermission("fraud.review"), async (req, res) => {
+    const project = await store.get("project", req.params.id);
+    if (!project) return res.sendStatus(404);
+    const [maker, journals, submissions, hackatime] = await Promise.all([
+      store.get("user", project.userId), store.list("journal"), store.list("submission"), hackatimeClient.projects(project.userId),
+    ]);
+    const projectSubmissions = shippedSubmissions(submissions, project.id);
+    if (!projectSubmissions.length) return res.sendStatus(404);
+    const projectJournals = journals.filter((item) => item.projectId === project.id && !item.deletedAt).sort((a, b) =>
+      String(b.entryDate || "").localeCompare(String(a.entryDate || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    res.render("admin/fraud-project-detail", {
+      title: project.title,
+      project,
+      maker,
+      journals: projectJournals,
+      submissions: projectSubmissions,
+      hackatimeDiagnostics: buildHackatimeDiagnostics(project, projectJournals, hackatime),
+    });
+  });
+
   router.get("/projects/:id", requirePermission("projects.review"), async (req, res) => {
     const project = await store.get("project", req.params.id);
     if (!project) return res.sendStatus(404);
-    const [maker, country, journals, submissions] = await Promise.all([
+    const [maker, country, journals, submissions, hackatime] = await Promise.all([
       store.get("user", project.userId),
       store.get("country", project.countryCode),
       store.list("journal"),
       store.list("submission"),
+      hackatimeClient.projects(project.userId),
     ]);
+    const projectJournals = journals.filter((item) => item.projectId === project.id).sort((a, b) =>
+      String(b.entryDate || "").localeCompare(String(a.entryDate || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     res.render("admin/project-detail", {
       title: project.title,
       project,
       maker,
       country,
-      journals: journals.filter((item) => item.projectId === project.id).sort((a, b) => b.entryDate.localeCompare(a.entryDate)),
+      journals: projectJournals,
       submissions: sortNewest(submissions.filter((item) => item.projectId === project.id)),
+      hackatimeDiagnostics: buildHackatimeDiagnostics(project, projectJournals, hackatime),
     });
   });
 

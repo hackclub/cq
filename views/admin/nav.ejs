@@ -2,6 +2,7 @@
   <a class="<%= currentPath === '/admin' ? 'active' : '' %>" href="/admin">Overview</a>
   <% if (hasPermission(user, 'users.manage')) { %><a class="<%= currentPath.startsWith('/admin/users') ? 'active' : '' %>" href="/admin/users">Users</a><% } %>
   <% if (hasPermission(user, 'projects.review')) { %><a class="<%= currentPath.startsWith('/admin/projects') ? 'active' : '' %>" href="/admin/projects">Projects</a><% } %>
+  <% if (hasPermission(user, 'fraud.review')) { %><a class="<%= currentPath.startsWith('/admin/fraud-review') ? 'active' : '' %>" href="/admin/fraud-review">Fraud review</a><% } %>
   <% if (hasPermission(user, 'reviews.read')) { %><a class="<%= currentPath.startsWith('/admin/reviews') ? 'active' : '' %>" href="/admin/reviews">Review queue</a><% } %>
   <% if (hasPermission(user, 'projects.review')) { %><a class="<%= currentPath.startsWith('/admin/funding') ? 'active' : '' %>" href="/admin/funding">Funding</a><% } %>
   <% if (hasPermission(user, 'orders.manage')) { %><a class="<%= currentPath.startsWith('/admin/orders') ? 'active' : '' %>" href="/admin/orders">Orders</a><% } %>

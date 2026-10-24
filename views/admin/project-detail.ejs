@@ -23,6 +23,27 @@
         </dl>
       </section>
 
+      <% if (project.track === 'software') { const diagnosticStatus = { current: 'Current', stale: 'Stale cache', reconnect: 'Reconnect needed', unavailable: 'Unavailable', disconnected: 'Disconnected', 'not-linked': 'Not linked' }[hackatimeDiagnostics.status] || statusLabel(hackatimeDiagnostics.status); %>
+      <section class="panel hackatime-diagnostics">
+        <div class="panel-heading"><div><h2>Hackatime diagnostics</h2><p>How CQ derives the next devlog duration.</p></div><span class="diagnostic-state <%= hackatimeDiagnostics.status %>"><%= diagnosticStatus %></span></div>
+        <dl class="diagnostic-summary">
+          <div><dt>Account</dt><dd><%= hackatimeDiagnostics.account?.username || 'Not available' %></dd></div>
+          <div><dt>Cache fetched</dt><dd><%= hackatimeDiagnostics.fetchedAt ? formatDateTime(hackatimeDiagnostics.fetchedAt) : 'Never' %></dd></div>
+          <div><dt>Selection changed</dt><dd><%= hackatimeDiagnostics.selectionUpdatedAt ? formatDateTime(hackatimeDiagnostics.selectionUpdatedAt) : 'Not recorded' %></dd></div>
+          <div><dt>CQ-calculated unlogged</dt><dd><strong><%= hackatimeDiagnostics.unloggedLabel %></strong></dd></div>
+        </dl>
+        <% if (hackatimeDiagnostics.projects.length) { %>
+        <div class="table-wrap diagnostic-table"><table><thead><tr><th>Linked project</th><th>Link baseline</th><th>Last claimed snapshot</th><th>Hackatime total</th><th>Unlogged delta</th><th>Latest heartbeat</th></tr></thead><tbody>
+          <% hackatimeDiagnostics.projects.forEach((item) => { %><tr><td><strong><%= item.name %></strong><% if (item.languages.length) { %><small><%= item.languages.join(', ') %></small><% } %></td><td><%= item.baselineLabel %></td><td><%= item.comparisonLabel %></td><td><%= item.currentLabel %></td><td><strong><%= item.unloggedLabel %></strong></td><td><%= item.mostRecentHeartbeat ? formatDateTime(item.mostRecentHeartbeat) : 'Not available' %></td></tr><% }) %>
+        </tbody></table></div>
+        <p class="diagnostic-source">The comparison starts at <%= hackatimeDiagnostics.comparisonJournal ? `the saved snapshot from “${hackatimeDiagnostics.comparisonJournal.title || 'Project update'}”` : 'the baseline captured when the project was linked' %>.</p>
+        <% } else { %><p class="empty-inline">No Hackatime projects are linked to this CQ project.</p><% } %>
+        <details class="diagnostic-history"><summary>Saved devlog snapshots <span><%= hackatimeDiagnostics.snapshots.length %></span></summary>
+          <% if (hackatimeDiagnostics.snapshots.length) { %><div class="table-wrap diagnostic-table"><table><thead><tr><th>Devlog</th><th>Date</th><th>Claimed</th><th>Saved totals</th></tr></thead><tbody><% hackatimeDiagnostics.snapshots.forEach((snapshot) => { %><tr><td><%= snapshot.title %></td><td><%= formatDate(snapshot.entryDate) %></td><td><%= snapshot.minutes %> min</td><td><% snapshot.values.forEach((value) => { %><span class="snapshot-value"><%= value.name %>: <strong><%= value.label %></strong></span><% }) %></td></tr><% }) %></tbody></table></div><% } else { %><p class="empty-inline">No Hackatime snapshots have been saved in a devlog yet.</p><% } %>
+        </details>
+      </section>
+      <% } %>
+
       <section class="panel">
         <div class="panel-heading"><h2>Devlog</h2><strong><%= Math.round(journals.reduce((sum, item) => sum + item.minutes, 0) / 6) / 10 %> hours</strong></div>
         <% if (!journals.length) { %><p class="empty-inline">No devlogs.</p><% } %>

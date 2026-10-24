@@ -9,6 +9,11 @@ const userinfoEndpoint = `${issuer}/oauth/userinfo`;
 const jwks = createRemoteJWKSet(new URL(`${issuer}/oauth/discovery/keys`));
 
 export const roleDefinitions = {
+  fraud_reviewer: {
+    label: "Fraud reviewer",
+    description: "Inspect shipped projects, devlogs, and Hackatime identifiers without changing reviews or program data.",
+    permissions: ["fraud.review"],
+  },
   reviewer: {
     label: "Reviewer",
     description: "Review projects, inspect submissions, and update project decisions.",
