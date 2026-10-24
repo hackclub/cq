@@ -20,7 +20,6 @@ import { seedStore } from "./seed.js";
 import { createSlackNotifier } from "./slack.js";
 import { createStore } from "./store.js";
 import { formatDate, formatDateTime, jsonArray, participantStatusLabel, readFlash, statusLabel } from "./utils.js";
-import { createInternalFrequency } from "./internal-frequency.js";
 
 const consoleLogger = {
   info: (...args) => console.info(...args),
@@ -62,6 +61,7 @@ export async function createApp({
   app.locals.isOrganizer = isOrganizer;
   app.locals.roleDefinitions = roleDefinitions;
   app.locals.userRoles = userRoles;
+  app.locals.activityTracking = { lastSuccessAt: null, lastErrorAt: null, error: null };
 
   app.set("view engine", "ejs");
   app.set("views", path.join(config.projectRoot, "views"));
@@ -91,6 +91,24 @@ export async function createApp({
   app.use(sessionMiddleware(dataStore, config));
   app.use(async (req, res, next) => {
     try {
+      if (req.user && req.method === "GET") {
+        try {
+          const day = new Date().toISOString().slice(0, 10);
+          const id = `${day}:${req.user.id}`;
+          const existing = await dataStore.get("activity", id);
+          if (!existing || Date.now() - new Date(existing.lastSeenAt).getTime() >= 10 * 60_000) {
+            const timestamp = new Date().toISOString();
+            await dataStore.put("activity", id, { id, userId: req.user.id, day, createdAt: existing?.createdAt || timestamp, lastSeenAt: timestamp });
+            app.locals.activityTracking.lastSuccessAt = timestamp;
+          }
+          app.locals.activityTracking.error = null;
+        } catch (error) {
+          const timestamp = new Date().toISOString();
+          app.locals.activityTracking.lastErrorAt = timestamp;
+          app.locals.activityTracking.error = error.message;
+          logger.error("Visitor activity tracking is unavailable", { message: error.message, tablePrefix: config.airtableTablePrefix });
+        }
+      }
       res.locals.currentPath = req.path;
       res.locals.flash = readFlash(req, res);
       const verifiedAt = new Date(req.session?.organizerVerifiedAt || 0).getTime();
@@ -98,7 +116,6 @@ export async function createApp({
       res.locals.organizerWarningRequired = Boolean(
         req.path.startsWith("/admin") && req.user && isOrganizer(req.user) && (!Number.isFinite(verifiedAt) || verifiedAt + verificationWindow <= Date.now()),
       );
-      res.locals.internalFrequency = createInternalFrequency(config, req.user, req.session, req.path);
       res.locals.cartCount = req.user
         ? (await dataStore.list("cart")).filter((item) => item.userId === req.user.id).reduce((sum, item) => sum + item.quantity, 0)
         : 0;
