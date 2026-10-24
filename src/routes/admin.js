@@ -392,6 +392,8 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const beforeRoles = new Set(userRoles(before));
     const afterRoles = new Set(userRoles(user));
     const addedRoles = [...afterRoles].filter((role) => !beforeRoles.has(role));
+    if (addedRoles.includes("reviewer") || addedRoles.includes("second_pass_reviewer")) user.reviewerTraining = { required: true, status: "pending", assignedAt: nowIso() };
+    if (user.reviewerTraining?.status === "pending") await store.put("user", user.id, user);
     const removedRoles = [...beforeRoles].filter((role) => !afterRoles.has(role));
     const changes = [
       ...addedRoles.map((role) => `added permission: ${role}`),
@@ -423,7 +425,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const [projects, users, submissions] = await Promise.all([
       store.list("project"), store.list("user"), store.list("submission"),
     ]);
-    const rows = sortNewest(projects).map((project) => ({
+    const rows = sortNewest(projects.filter((project) => project.id !== "cq_reviewer_training")).map((project) => ({
       ...project,
       maker: users.find((user) => user.id === project.userId),
       latestSubmission: sortNewest(submissions.filter((item) => item.projectId === project.id))[0],
@@ -496,6 +498,16 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     if (!project) return res.sendStatus(404);
     const before = structuredClone(project);
     const previousStatus = project.status;
+    if (req.body.unapprove === "1") {
+      if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
+      project.status = "building";
+      project.unapprovedAt = nowIso();
+      project.unapprovedById = req.user.id;
+    }
+    if (req.body.visibility) {
+      if (!hasPermission(req.user, "users.manage")) return res.sendStatus(403);
+      project.visibility = ["private", "unlisted", "public"].includes(req.body.visibility) ? req.body.visibility : (project.visibility || "unlisted");
+    }
     if (["building", "submitted", "archived"].includes(req.body.status)) {
       project.status = req.body.status;
     }
@@ -507,7 +519,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     await store.put("project", project.id, project);
     await writeAudit(store, req.user, {
       action: "project.status_updated", entityType: "project", entityId: project.id,
-      summary: `Changed ${project.title} from ${previousStatus} to ${project.status}.`, before, after: project,
+      summary: req.body.visibility ? `Changed Explore visibility for ${project.title} to ${project.visibility}.` : `Changed ${project.title} from ${previousStatus} to ${project.status}.`, before, after: project,
     });
     if (previousStatus !== project.status) {
       const user = await store.get("user", project.userId);
@@ -722,6 +734,10 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       setFlash(res, "error", "This review already has a final decision. Reopen the project before it can be shipped again.");
       return res.redirect(`/admin/reviews/${submission.id}`);
     }
+    if (submission.phase === "withdrawn") {
+      setFlash(res, "error", "This submission was withdrawn and cannot be reviewed. Wait for the maker to submit a new review.");
+      return res.redirect(`/admin/reviews/${submission.id}`);
+    }
     if (secondPass && (submission.phase !== "second_pass" || !submission.firstPass)) {
       setFlash(res, "error", "This review is not waiting for second pass.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -813,6 +829,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       await store.put("submission", submission.id, submission);
       project.status = { approved: "approved", changes: "needs_changes", rejected: "rejected" }[decision];
       project.updatedAt = timestamp;
+      if (decision === "approved") project.approvedAt = timestamp;
       await store.put("project", project.id, project);
 
       const existingLedger = await store.get("ledger", submission.id);

@@ -1,9 +1,9 @@
       </div>
-      <% const footerChannel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' ? ['005.000', 'MEM 02 / STATION'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
+      <% const footerChannel = currentPath === '/' ? ['145.990.000', 'VFO A / PUBLIC'] : currentPath === '/app' || currentPath.startsWith('/app/explore') ? ['005.000', 'MEM 02 / EXPLORE'] : currentPath === '/app/dashboard' ? ['005.050', 'MEM 03 / MY CQ'] : currentPath.startsWith('/app/projects') ? ['005.100', 'MEM 03 / PROJECTS'] : currentPath.startsWith('/app/shop/orders') ? ['437.802.000', 'MEM 05 / ORDERS'] : currentPath.startsWith('/app/shop') ? ['437.800.000', 'MEM 04 / SHOP'] : currentPath.startsWith('/app/profile') ? ['144.390.000', 'MEM 06 / PROFILE'] : currentPath.startsWith('/admin') ? ['001.100', 'CONTROL / ORGANIZER'] : ['145.990.000', 'CQ / INFO']; %>
       <nav class="softkeys" aria-label="Main navigation">
         <% if (user) { %>
-          <a class="<%= currentPath === '/' ? 'active' : '' %>" href="/"><b>F1</b>HOME</a>
-          <a class="<%= currentPath === '/app' ? 'active' : '' %>" href="/app"><b>F2</b>STATION</a>
+          <a class="<%= currentPath === '/app' || currentPath.startsWith('/app/explore') ? 'active' : '' %>" href="/app"><b>F1</b>EXPLORE</a>
+          <a class="<%= currentPath === '/app/dashboard' ? 'active' : '' %>" href="/app/dashboard"><b>F2</b>MY CQ</a>
           <a class="<%= currentPath.startsWith('/app/projects') ? 'active' : '' %>" href="/app/projects"><b>F3</b>PROJECTS</a>
           <a class="<%= currentPath.startsWith('/app/shop') && !currentPath.startsWith('/app/shop/orders') ? 'active' : '' %>" href="/app/shop"><b>F4</b>SHOP<%= cartCount ? ` / ${cartCount}` : '' %></a>
           <a class="<%= currentPath.startsWith('/app/shop/orders') ? 'active' : '' %>" href="/app/shop/orders"><b>F5</b>ORDERS</a>
