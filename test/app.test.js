@@ -109,7 +109,9 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.equal(create.status, 302);
   assert.match(create.headers.location, /^\/app\/projects\/cq_/);
   const projectPath = create.headers.location;
-  assert.deepEqual((await store.get("project", projectPath.split("/").pop())).evidence, ["commits", "elapsed", "devlog"]);
+  const createdProject = await store.get("project", projectPath.split("/").pop());
+  assert.deepEqual(createdProject.evidence, ["commits", "elapsed", "devlog"]);
+  assert.ok(createdProject.hackatimeSelectionUpdatedAt);
 
   const projectPage = await agent.get(projectPath);
   assert.equal(projectPage.status, 200);
