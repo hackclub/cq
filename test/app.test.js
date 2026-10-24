@@ -274,6 +274,7 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   const orders = await store.list("order");
   assert.equal(orders.length, 1);
   assert.equal(orders[0].shipping.addressLine1, "1 Radio Road");
+  assert.equal((await store.get("product", "yagi-kit")).stock, 59);
 
   const admin = await agent.get("/admin");
   assert.equal(admin.status, 200);
