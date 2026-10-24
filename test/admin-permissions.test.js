@@ -20,6 +20,7 @@ test("every organizer role can open only its assigned admin sections", async () 
   await store.put("product", "product_sensitive", { id: "product_sensitive", name: "SHOP INVENTORY ONLY", stock: 1, category: "gear", sortOrder: 1, active: true, createdAt: timestamp, updatedAt: timestamp });
   const cases = [
     ["reviewer", "/admin/reviews", "/admin/shop"],
+    ["grant_issuer", "/admin/funding", "/admin/reviews"],
     ["shop_editor", "/admin/shop", "/admin/orders"],
     ["fulfilment_manager", "/admin/orders", "/admin/countries"],
     ["country_editor", "/admin/countries", "/admin/notifications"],

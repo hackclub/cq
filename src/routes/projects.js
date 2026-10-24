@@ -122,11 +122,15 @@ async function details(store, projectId) {
 }
 
 async function submittedJournal(store, journalId) {
-  return (await store.list("submission")).some((item) => {
+  const submitted = (await store.list("submission")).some((item) => {
     if (!(item.journalIds || []).includes(journalId)) return false;
     if (!Array.isArray(item.journalSnapshots)) return true;
     return !item.decision && !["withdrawn", "error"].includes(item.phase);
   });
+  if (submitted) return true;
+  return (await store.list("funding_request")).some((request) =>
+    ["submitted", "under_review", "second_pass", "approved", "issued"].includes(request.status) &&
+    (request.designJournalIds || []).includes(journalId));
 }
 
 function hackatimeActivity(project, journals, hackatime) {
@@ -158,8 +162,8 @@ function hackatimeActivity(project, journals, hackatime) {
   };
 }
 
-function submissionJournals(journals, submissions) {
-  const usedIds = new Set(submissions.flatMap((item) => item.journalIds || []));
+function submissionJournals(journals, submissions, excludedIds = []) {
+  const usedIds = new Set([...submissions.flatMap((item) => item.journalIds || []), ...excludedIds]);
   if (usedIds.size) return journals.filter((journal) => !usedIds.has(journal.id));
   if (submissions.length) {
     const latestCreatedAt = submissions[0].createdAt;
@@ -289,6 +293,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const context = await formContext(store, hackatimeClient, req.user.id);
     res.render("projects/form", {
       title: "Start a radio project", errors: [], values: {}, editing: false,
+      trackLocked: false,
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
       ...context,
     });
@@ -306,6 +311,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: "Start a radio project", errors, values: req.body, editing: false,
+        trackLocked: false,
         imageUploadsConfigured: Boolean(cdnClient?.configured()),
         ...context,
       });
@@ -341,13 +347,13 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
         ...journal,
         imageUrls: journalImages(journal),
       })),
-      readiness: readiness(project, submissionJournals(projectDetails.journals, projectDetails.submissions), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
+      readiness: readiness(project, submissionJournals(project.track === "hardware" ? projectDetails.journals.filter((journal) => journal.phase === "build" || !journal.phase) : projectDetails.journals, projectDetails.submissions, project.track === "hardware" ? (project.fundedDesignJournalIds || []) : []), req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") }),
       ariConfigured: ariClient.configured(),
       projectLocked: project.status === "submitted",
-      lockedJournalIds: [...new Set(projectDetails.submissions.flatMap((item) => {
+      lockedJournalIds: [...new Set([...projectDetails.submissions.flatMap((item) => {
         const locksEvidence = !Array.isArray(item.journalSnapshots) || (!item.decision && !["withdrawn", "error"].includes(item.phase));
         return locksEvidence ? item.journalIds || [] : [];
-      }))],
+      }), ...fundingRequests.filter((request) => ["submitted", "under_review", "second_pass", "approved", "issued"].includes(request.status)).flatMap((request) => request.designJournalIds || [])])],
       country,
       hackatimeActivity: hackatimeActivity(project, projectDetails.journals, hackatime),
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
@@ -362,9 +368,14 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", "This shipped version is locked while it is being reviewed.");
       return res.redirect(`/app/projects/${project.id}`);
     }
-    const context = await formContext(store, hackatimeClient, req.user.id);
+    const [context, fundingRequests] = await Promise.all([
+      formContext(store, hackatimeClient, req.user.id),
+      project.track === "hardware" ? store.list("funding_request") : Promise.resolve([]),
+    ]);
+    const trackLocked = fundingRequests.some((request) => request.projectId === project.id);
     res.render("projects/form", {
       title: `Edit ${project.title}`, errors: [], values: formValues(project), editing: true, project,
+      trackLocked,
       imageUploadsConfigured: Boolean(cdnClient?.configured()),
       ...context,
     });
@@ -378,11 +389,17 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}`);
     }
     const input = projectInput(req.body);
+    const existingFunding = project.track === "hardware" ? (await store.list("funding_request")).some((request) => request.projectId === project.id) : false;
+    if (existingFunding && input.track !== project.track) {
+      setFlash(res, "error", "The project track cannot be changed after a hardware funding request has been created.");
+      return res.redirect(`/app/projects/${project.id}/edit`);
+    }
     const context = await formContext(store, hackatimeClient, req.user.id);
     const errors = [...validateProject(input), ...validateHackatimeSelection(input, context.hackatime)];
     if (errors.length) {
       return res.status(422).render("projects/form", {
         title: `Edit ${project.title}`, errors, values: req.body, editing: true, project,
+        trackLocked: existingFunding,
         imageUploadsConfigured: Boolean(cdnClient?.configured()),
         ...context,
       });
@@ -404,9 +421,12 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     try {
       await store.withLock(`devlog:${project.id}`, async () => {
         if (project.track === "hardware") {
+          if (["funding_submitted", "funding_approved"].includes(project.status)) {
+            throw new Error("Wait for the funding review and grant issuance before logging more hardware work.");
+          }
           const timestamp = nowIso();
           if (input.minutes < 1) throw new Error("Enter the whole number of minutes spent on this hardware update.");
-          const journal = { id: randomId("log_"), projectId: project.id, ...input, entryDate: timestamp.slice(0, 10), hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
+          const journal = { id: randomId("log_"), projectId: project.id, ...input, phase: ["funding_issued", "approved", "needs_changes"].includes(project.status) ? "build" : "design", entryDate: timestamp.slice(0, 10), hackatimeSeconds: 0, hackatimeSnapshot: {}, hackatimeProjects: [], createdAt: timestamp, updatedAt: timestamp };
           await store.put("journal", journal.id, journal);
           await store.put("project", project.id, { ...project, updatedAt: timestamp });
           return;
@@ -515,7 +535,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", program.hardwareMessage || "Hardware projects are temporarily unavailable.");
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
-    if (["funding_submitted", "funding_approved", "funding_issued"].includes(project.status)) {
+    if (["funding_submitted", "funding_approved", "funding_issued", "funding_rejected"].includes(project.status)) {
       setFlash(res, "error", "This project already has a funding request in progress or issued.");
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
@@ -526,8 +546,9 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const timestamp = nowIso();
-    const designJournals = await store.list("journal");
-    const designMinutes = designJournals.filter((journal) => journal.projectId === project.id).reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
+    const [designJournals, fundingRequests] = await Promise.all([store.list("journal"), store.list("funding_request")]);
+    const fundingJournals = designJournals.filter((journal) => journal.projectId === project.id && !journal.deletedAt && journal.phase !== "build");
+    const designMinutes = fundingJournals.reduce((sum, journal) => sum + (Number(journal.minutes) || 0), 0);
     const fundingMinutes = Math.round(designMinutes);
     if (fundingMinutes <= 0) {
       setFlash(res, "error", "Add at least one timed design devlog before requesting hardware funding.");
@@ -548,16 +569,23 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
     const fundingTier = bomTotal <= 20 ? 1 : bomTotal <= 50 ? 2 : bomTotal <= 100 ? 3 : 4;
+    const existingRequest = fundingRequests.filter((request) => request.projectId === project.id).sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))[0];
+    const revising = project.status === "funding_changes" && existingRequest?.status === "changes_requested";
     const request = {
-      id: randomId("fund_"), projectId: project.id, userId: req.user.id,
+      ...(revising ? existingRequest : {}),
+      id: revising ? existingRequest.id : randomId("fund_"), projectId: project.id, userId: req.user.id,
       status: "submitted",
       requestedUsd: bomTotal,
       bomTotal, fundingTier, fundingCapUsd,
       designMinutes: fundingMinutes,
+      designJournalIds: fundingJournals.map((journal) => journal.id),
+      designJournalSnapshots: structuredClone(fundingJournals),
       buildPlan: input.buildPlan, bom: input.bom, bomItems: input.bomItems, designUrl: input.designUrl, firmwareUrl: input.firmwareUrl, testPlan: input.testPlan,
       projectSnapshot: structuredClone({ ...project, ...toProjectRecord(project.id, project.userId, input, project) }),
-      reviewerId: null, reviewerName: null, review: null, issuedAt: null, issuedById: null,
-      createdAt: timestamp, updatedAt: timestamp,
+      reviewerId: null, reviewerName: null, firstPass: null, review: null, secondPass: null, issuedAt: null, issuedById: null,
+      revision: revising ? Number(existingRequest.revision || 1) + 1 : 1,
+      reviewHistory: revising ? [...(existingRequest.reviewHistory || []), { revision: existingRequest.revision || 1, firstPass: existingRequest.firstPass, review: existingRequest.review, recordedAt: timestamp }] : [],
+      createdAt: existingRequest?.createdAt || timestamp, updatedAt: timestamp,
     };
     await store.withLock(`funding:${project.id}`, async () => {
       await store.put("funding_request", request.id, request);
@@ -598,7 +626,9 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
       setFlash(res, "error", "Send your design and funding request first. You can ship the finished hardware project after funding is issued.");
       return res.redirect(`/app/projects/${project.id}#funding`);
     }
-    const journalsForSubmission = submissionJournals(projectDetails.journals, projectDetails.submissions);
+    const fundedDesignJournalIds = project.track === "hardware" ? (project.fundedDesignJournalIds || []) : [];
+    const hardwareBuildJournals = project.track === "hardware" ? projectDetails.journals.filter((journal) => journal.phase === "build" || !journal.phase) : projectDetails.journals;
+    const journalsForSubmission = submissionJournals(hardwareBuildJournals, projectDetails.submissions, fundedDesignJournalIds);
     const state = readiness(project, journalsForSubmission, req.user, { hasPriorSubmission: projectDetails.submissions.some((item) => item.decision === "approved") });
     if (state.errors.length) {
       setFlash(res, "error", state.errors[0]);
@@ -607,7 +637,7 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const country = await store.get("country", project.countryCode);
     const payload = buildAriPayload({ project, user: req.user, journals: journalsForSubmission, config, country });
     const timestamp = nowIso();
-    const usingAri = ariClient.configured();
+    const usingAri = ariClient.configured() && project.track !== "hardware";
     const submission = {
       id: randomId("ship_"),
       projectId: project.id,
@@ -735,15 +765,16 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
     const project = await ownedProject(store, req.params.id, req.user.id);
     if (!project) return res.sendStatus(404);
     try {
-      if (ariClient.configured()) {
+      const submissions = await store.list("submission");
+      const openSubmissions = submissions.filter((item) => item.projectId === project.id && !item.decision && !["withdrawn", "error"].includes(item.phase));
+      const ariSubmission = openSubmissions.find((item) => item.ariId);
+      if (ariClient.configured() && ariSubmission) {
         const result = await ariClient.withdraw(project.id);
         if (!result.ok) throw new Error(result.body?.message || result.body?.error || `The review service returned ${result.status}`);
       }
-      const submissions = await store.list("submission");
-      await Promise.all(submissions
-        .filter((item) => item.projectId === project.id && !item.decision)
+      await Promise.all(openSubmissions
         .map((item) => store.put("submission", item.id, { ...item, phase: "withdrawn", updatedAt: nowIso() })));
-      project.status = "building";
+      project.status = project.track === "hardware" && project.fundedDesignJournalIds?.length ? "funding_issued" : "building";
       project.updatedAt = nowIso();
       await store.put("project", project.id, project);
       await writeAudit(store, req.user, {
