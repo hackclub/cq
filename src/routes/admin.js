@@ -130,6 +130,8 @@ export function buildHackatimeDiagnostics(project, journals, hackatime) {
     const unloggedSeconds = currentSeconds === null ? null : Math.max(0, currentSeconds - comparisonSeconds);
     return {
       name,
+      baselineSeconds,
+      baselineMinutes: Math.round((baselineSeconds / 60) * 100) / 100,
       baselineLabel: trackedTime(baselineSeconds),
       comparisonLabel: trackedTime(comparisonSeconds),
       currentLabel: currentSeconds === null ? "Unavailable" : trackedTime(currentSeconds),
@@ -599,6 +601,64 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       submissions: sortNewest(submissions.filter((item) => item.projectId === project.id)),
       hackatimeDiagnostics: buildHackatimeDiagnostics(project, projectJournals, hackatime),
     });
+  });
+
+  router.post("/projects/:id/hackatime-start", requirePermission("projects.review"), requireCsrf, async (req, res) => {
+    const project = await store.get("project", req.params.id);
+    if (!project) return res.sendStatus(404);
+    const projectName = String(req.body.project_name || "");
+    if (!(project.hackatimeProjects || []).includes(projectName)) return res.sendStatus(404);
+    const baselineMinutes = Number(req.body.baseline_minutes);
+    const reason = String(req.body.reason || "").trim().slice(0, 2000);
+    if (!Number.isFinite(baselineMinutes) || baselineMinutes < 0 || baselineMinutes > 100_000) {
+      setFlash(res, "error", "Enter a valid non-negative starting total in minutes.");
+      return res.redirect(`/admin/projects/${project.id}`);
+    }
+    if (!reason) {
+      setFlash(res, "error", "Explain why the Hackatime tracking start needs to change.");
+      return res.redirect(`/admin/projects/${project.id}`);
+    }
+    const oldBaselineSeconds = Math.max(0, Number(project.hackatimeBaseline?.[projectName]) || 0);
+    const newBaselineSeconds = Math.round(baselineMinutes * 60);
+    const projectBefore = structuredClone(project);
+    const journals = (await store.list("journal"))
+      .filter((journal) => journal.projectId === project.id && Number.isFinite(Number(journal.hackatimeSnapshot?.[projectName])))
+      .sort((a, b) => String(a.createdAt || a.entryDate || "").localeCompare(String(b.createdAt || b.entryDate || "")));
+    const firstJournal = journals[0] || null;
+    let creditedMinutesDelta = 0;
+    let journalBefore = null;
+    if (firstJournal) {
+      journalBefore = structuredClone(firstJournal);
+      const firstSnapshotSeconds = Math.max(0, Number(firstJournal.hackatimeSnapshot[projectName]) || 0);
+      const oldCreditedSeconds = Math.max(0, firstSnapshotSeconds - oldBaselineSeconds);
+      const newCreditedSeconds = Math.max(0, firstSnapshotSeconds - newBaselineSeconds);
+      creditedMinutesDelta = Math.round(((newCreditedSeconds - oldCreditedSeconds) / 60) * 100) / 100;
+      firstJournal.minutes = Math.max(0, Math.round(((Number(firstJournal.minutes) || 0) + creditedMinutesDelta) * 100) / 100);
+      firstJournal.hackatimeBaselineAdjustmentMinutes = Math.round(((Number(firstJournal.hackatimeBaselineAdjustmentMinutes) || 0) + creditedMinutesDelta) * 100) / 100;
+      firstJournal.updatedAt = nowIso();
+      await store.put("journal", firstJournal.id, firstJournal);
+    }
+    const timestamp = nowIso();
+    project.hackatimeBaseline = { ...(project.hackatimeBaseline || {}), [projectName]: newBaselineSeconds };
+    project.hackatimeBaselineAdjustedAt = timestamp;
+    project.hackatimeBaselineAdjustments = [...(project.hackatimeBaselineAdjustments || []), {
+      id: randomId("baseline_"), projectName, oldBaselineSeconds, newBaselineSeconds,
+      creditedMinutesDelta, reason, journalId: firstJournal?.id || null,
+      adjustedByUserId: req.user.id, adjustedByName: req.user.name, createdAt: timestamp,
+    }];
+    project.updatedAt = timestamp;
+    await store.put("project", project.id, project);
+    await writeAudit(store, req.user, {
+      action: "project.hackatime_start_adjusted", entityType: "project", entityId: project.id,
+      summary: `Changed the Hackatime tracking start for ${projectName}.`, before: projectBefore, after: project,
+      metadata: { projectName, oldBaselineSeconds, newBaselineSeconds, creditedMinutesDelta, reason, journalBefore, journalAfter: firstJournal },
+    });
+    res.locals.securityAlertDescription = `Changed the Hackatime tracking start for ${project.title}/${projectName}`;
+    const timeEffect = firstJournal
+      ? `${Math.abs(creditedMinutesDelta)} minutes ${creditedMinutesDelta >= 0 ? "added to" : "removed from"} the first devlog.`
+      : "No saved devlog snapshot was available to recalculate.";
+    setFlash(res, "success", `Tracking start updated. ${timeEffect}`);
+    return res.redirect(`/admin/projects/${project.id}`);
   });
 
   router.post("/projects/:id/time-adjustments", requirePermission("projects.review"), requireCsrf, async (req, res) => {
