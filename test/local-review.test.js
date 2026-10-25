@@ -29,7 +29,7 @@ test("projects ship into local review when Ari is not configured", async () => {
   await store.put("project", "cq_local", {
     id: "cq_local", userId: user.id, title: "Digital receiver", description: "A working digital amateur radio receiver.",
     repoUrl: "https://github.com/maker/receiver", demoUrl: "https://example.com/demo",
-    thumbnailUrl: "https://example.com/receiver.jpg", hackatimeProjects: ["receiver"], hackatimeBaseline: { receiver: 0 },
+    thumbnailUrl: "https://example.com/receiver.jpg", hackatimeProjects: ["receiver"], hackatimeBaseline: { receiver: 4200 },
     evidence: ["commits", "elapsed", "devlog"], track: "software", status: "building", projectType: "sdr",
     radioRelevance: "It receives and decodes amateur radio signals from local repeaters.", countryCode: "AU",
     licenseGoal: "Foundation", callsign: "", aiStatement: "", tags: [], isUpdate: false, updateMessage: "",
@@ -38,7 +38,7 @@ test("projects ship into local review when Ari is not configured", async () => {
   await store.put("journal", "log_local", {
     id: "log_local", projectId: "cq_local", title: "Finished decoding", text: "Decoded a real amateur-radio signal.",
     imageUrl: "https://example.com/progress.jpg", imageUrls: ["https://example.com/progress.jpg"],
-    entryDate: "2026-08-31", minutes: 90, createdAt: timestamp, updatedAt: timestamp,
+    entryDate: "2026-08-31", minutes: 90, hackatimeSeconds: 5400, hackatimeSnapshot: { receiver: 9600 }, createdAt: timestamp, updatedAt: timestamp,
   });
 
   const projectList = await agent.get("/app/projects");
@@ -96,6 +96,19 @@ test("projects ship into local review when Ari is not configured", async () => {
   const adjustedProject = await agent.get("/admin/projects/cq_local");
   assert.match(adjustedProject.text, /60 min manually added/);
   assert.match(adjustedProject.text, /Hackatime was connected after the first hour/);
+  const changeStart = await agent.post("/admin/projects/cq_local/hackatime-start").type("form").send({
+    _csrf: csrf(adjustedProject.text), project_name: "receiver", baseline_minutes: "0",
+    reason: "CQ was linked after the first 70 minutes of verified work.",
+  });
+  assert.equal(changeStart.status, 302);
+  assert.equal(changeStart.headers.location, "/admin/projects/cq_local");
+  const startAdjustedProject = await store.get("project", "cq_local");
+  assert.equal(startAdjustedProject.hackatimeBaseline.receiver, 0);
+  assert.equal(startAdjustedProject.hackatimeBaselineAdjustments[0].creditedMinutesDelta, 70);
+  const startAdjustedJournal = await store.get("journal", "log_local");
+  assert.equal(startAdjustedJournal.minutes, 220);
+  assert.equal(startAdjustedJournal.hackatimeBaselineAdjustmentMinutes, 70);
+  assert.equal((await store.list("audit")).some((item) => item.action === "project.hackatime_start_adjusted"), true);
 
   const projectPage = await agent.get("/app/projects/cq_local");
   assert.doesNotMatch(projectPage.text, /connect the project review service/i);
