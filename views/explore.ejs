@@ -1,0 +1,33 @@
+<%- include('partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
+    <div><span class="eyebrow">CQ / ON THE AIR</span><h1>Explore projects</h1><p class="apphead-copy">Approved amateur-radio projects shared by their makers.</p></div>
+    <div class="headright"><a class="button button-ghost" href="/app/dashboard">My CQ</a><a class="button" href="/app/projects/new">+ New project</a></div>
+  </header>
+  <div class="appbody">
+    <form class="explore-filters" method="get" action="/app" role="search">
+      <label><span class="sr-only">Search projects</span><input type="search" name="q" value="<%= filters.q %>" placeholder="Search titles, descriptions, or tags"></label>
+      <select name="track" aria-label="Filter by track"><option value="">All tracks</option><option value="hardware" <%= filters.track === 'hardware' ? 'selected' : '' %>>Hardware</option><option value="software" <%= filters.track === 'software' ? 'selected' : '' %>>Software</option></select>
+      <select name="sort" aria-label="Sort projects"><option value="approved" <%= filters.sort === 'approved' ? 'selected' : '' %>>Recently approved</option><option value="recent" <%= filters.sort === 'recent' ? 'selected' : '' %>>Recently updated</option></select>
+      <button class="button button-ghost" type="submit">Tune in</button>
+    </form>
+    <% if (!projects.length) { %>
+      <div class="empty-screen"><div><h2>NO PUBLIC SIGNALS YET</h2><p>Approved projects appear here when their makers choose to share them. Start your own signal in the meantime.</p><a class="button" href="/app/projects/new">Create project</a></div></div>
+    <% } else { %>
+      <p class="explore-count"><%= projects.length %> project<%= projects.length === 1 ? '' : 's' %> on the air</p>
+      <div class="project-card-grid explore-grid">
+        <% projects.forEach((project) => { %>
+          <article class="project-card explore-card">
+            <% if (project.thumbnailUrl) { %><a class="explore-image" href="/app/explore/<%= project.id %>"><img src="<%= project.thumbnailUrl %>" alt="<%= project.title %> project image" loading="lazy"></a><% } %>
+            <div class="project-card-top"><span class="tag"><%= project.track === 'hardware' ? 'HARDWARE' : 'SOFTWARE' %></span><span class="explore-maker">by <%= project.makerName %></span></div>
+            <h2><a href="/app/explore/<%= project.id %>"><%= project.title %></a></h2>
+            <p><%= project.description %></p>
+            <% if (project.tags.length) { %><div class="tag-list"><% project.tags.slice(0, 5).forEach((tag) => { %><span><%= tag %></span><% }) %></div><% } %>
+            <div class="project-card-foot"><time>Approved <%= formatDate(project.approvedAt) %></time><a href="/app/explore/<%= project.id %>">Open project ›</a></div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</section>
+<%- include('partials/footer') %>
