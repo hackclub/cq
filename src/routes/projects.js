@@ -292,10 +292,11 @@ export function projectRoutes({ store, config, ariClient, hackatimeClient, cdnCl
   });
 
   router.post("/new", requireCsrf, async (req, res) => {
-    const input = projectInput(req.body);
+    const track = req.body.track || "software";
+    const input = projectInput({ ...req.body, track });
     const program = await store.get("setting", "program");
     const errors = validateProject(input, { allowIncomplete: true });
-    if (!["software", "hardware"].includes(req.body.track)) {
+    if (!["software", "hardware"].includes(track)) {
       errors.push("Choose a project track.");
     } else if (input.track === "hardware" && program?.hardwareClosed) {
       errors.push(program.hardwareMessage || "Hardware projects are temporarily unavailable.");
