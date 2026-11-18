@@ -962,9 +962,13 @@ img {
 .bom-table td:nth-child(2) input { min-width: 160px; }
 .bom-table td:nth-child(5) input { min-width: 170px; }
 
-.funding-bom-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+.funding-bom-table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13px; }
 .funding-bom-table th, .funding-bom-table td { padding: 9px; border-bottom: 1px solid var(--line2); text-align: left; vertical-align: top; }
 .funding-bom-table th { color: var(--dim); font-weight: 400; letter-spacing: .07em; }
+.funding-bom-table input { min-width: 110px; font-size: 16px; }
+.funding-bom-table input[type="number"] { min-width: 82px; }
+.per-devlog-minutes label { align-items: center; gap: 10px; }
+.per-devlog-minutes input { width: 110px; margin-inline-start: auto; font-size: 16px; }
 
 .shop-image-upload {
   display: grid;
@@ -1023,6 +1027,15 @@ img {
 
 .form-stack h2 {
   font-weight: 400
+}
+
+.project-create {
+  max-width: 620px;
+  margin-inline: auto;
+}
+
+.project-create .button-row {
+  margin-top: 20px;
 }
 
 .project-form {

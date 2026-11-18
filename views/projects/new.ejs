@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<section id="main" class="screen-page app-screen">
+  <header class="apphead">
+    <h1>Start a project</h1>
+  </header>
+  <div class="appbody">
+    <form class="formpane project-create" method="post" action="/app/projects/new">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <% if (errors.length) { %>
+        <div class="form-errors" role="alert">
+          <ul><% errors.forEach((error) => { %><li><%= error %></li><% }) %></ul>
+        </div>
+      <% } %>
+      <div class="field">
+        <label for="project-name">Project name</label>
+        <input id="project-name" name="title" required minlength="2" maxlength="80"
+          value="<%= values.title || '' %>" placeholder="e.g. My first SDR visualiser"
+          aria-describedby="project-name-help">
+        <small class="field-help" id="project-name-help">Pick a working title for your amateur-radio project. You can rename it later.</small>
+      </div>
+      <div class="field">
+        <label for="project-track">Track</label>
+        <% const hardwareClosed = Boolean(program?.hardwareClosed); %>
+        <select id="project-track" name="track" required aria-describedby="project-track-help">
+          <option value="software" <%= values.track === 'hardware' && !hardwareClosed ? '' : 'selected' %>>Software</option>
+          <option value="hardware" <%= hardwareClosed ? 'disabled' : values.track === 'hardware' ? 'selected' : '' %>><%= hardwareClosed ? 'Hardware (closed)' : 'Hardware' %></option>
+        </select>
+        <small class="field-help" id="project-track-help"><%= hardwareClosed
+          ? program.hardwareMessage || 'Hardware projects are temporarily unavailable.'
+          : 'Software could be an SDR visualiser. Hardware could be a portable antenna.' %></small>
+      </div>
+      <div class="field">
+        <label for="project-idea">What are you thinking of building? <span class="optional">Optional</span></label>
+        <textarea id="project-idea" name="description" rows="3" maxlength="800"
+          placeholder="e.g. A tool that plots signals from my SDR and lets me mark frequencies to revisit"><%= values.description || '' %></textarea>
+        <small class="field-help">You can add a repo and other details when you’re ready.</small>
+      </div>
+      <div class="button-row">
+        <button class="button button-primary" type="submit">Create project</button>
+        <a class="button button-ghost" href="/app/projects">Cancel</a>
+      </div>
+    </form>
+  </div>
+</section>
+<%- include('../partials/footer') %>

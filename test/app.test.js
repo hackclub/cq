@@ -10,6 +10,53 @@ function csrf(html) {
   return html.match(/name="_csrf" value="([^"]+)"/)?.[1];
 }
 
+test("a software project can be started with a name and completed later", async () => {
+  const config = getConfig({ nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true });
+  const store = new LocalEncryptedStore(config, { memory: true });
+  let hackatimeLookups = 0;
+  const hackatimeClient = {
+    projects: async () => {
+      hackatimeLookups += 1;
+      return { configured: true, connected: true, projects: [] };
+    },
+  };
+  const app = await createApp({ config, store, hackatimeClient, logger: { info() {}, error() {} } });
+  await store.put("setting", "program", {
+    ...(await store.get("setting", "program")),
+    hardwareClosed: true,
+    hardwareMessage: "Hardware is closed for testing.",
+  });
+  const agent = request.agent(app);
+  await agent.post("/auth/dev-login").type("form").send({ name: "Radio Builder", email: "builder@example.com" }).expect(302);
+  const start = await agent.get("/app/projects/new").expect(200);
+  assert.match(start.text, /value="hardware" disabled/);
+
+  const rejected = await agent.post("/app/projects/new").type("form").send({
+    _csrf: csrf(start.text), title: "Portable antenna", track: "hardware",
+  }).expect(422);
+  assert.match(rejected.text, /value="Portable antenna"/);
+  assert.match(rejected.text, /Hardware is closed for testing/);
+  assert.equal((await store.list("project")).length, 0);
+
+  const created = await agent.post("/app/projects/new").type("form").send({
+    _csrf: csrf(start.text), title: "SDR logger", track: "software",
+  }).expect(302);
+  const projectPath = created.headers.location;
+  assert.match(projectPath, /^\/app\/projects\/cq_/);
+  const overview = await agent.get(projectPath).expect(200);
+  assert.match(overview.text, /Set up Hackatime/);
+  assert.match(overview.text, /Add a public GitHub repository URL/);
+  assert.equal(hackatimeLookups, 0);
+
+  await agent.post(`${projectPath}/edit`).type("form").send({
+    _csrf: csrf(overview.text), title: "SDR logger", track: "software", description: "Early idea",
+  }).expect(302).expect("Location", projectPath);
+  const project = (await store.list("project"))[0];
+  assert.equal(project.status, "building");
+  assert.equal(project.description, "Early idea");
+  assert.equal(project.repoUrl, "");
+});
+
 test("participant, project, Ari, shop, and admin flows work end to end", async () => {
   const config = getConfig({
     nodeEnv: "development",
@@ -85,8 +132,8 @@ test("participant, project, Ari, shop, and admin flows work end to end", async (
   assert.doesNotMatch(profile.text, /Save profile/);
 
   const newPage = await agent.get("/app/projects/new");
-  assert.match(newPage.text, /iss-station/);
-  assert.match(newPage.text, /2 hours/);
+  assert.equal(newPage.status, 200);
+  assert.doesNotMatch(newPage.text, /iss-station|name="repo_url"/);
   const token = csrf(newPage.text);
   assert.ok(token);
   const create = await agent.post("/app/projects/new").type("form").send({

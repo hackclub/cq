@@ -309,7 +309,9 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const [project, maker, actions] = await Promise.all([
       store.get("project", request.projectId), store.get("user", request.userId), store.list("review_action"),
     ]);
-    res.render("admin/funding-detail", { title: "Hardware funding review", request, project, maker, actions: sortNewest(actions.filter((item) => item.fundingRequestId === request.id)) });
+    const grantIssuers = new Set((config.grantIssuerEmails.length ? config.grantIssuerEmails : config.adminEmails));
+    const canIssueFunding = grantIssuers.has(String(req.user.email || "").toLowerCase());
+    res.render("admin/funding-detail", { title: "Hardware funding review", request, project, maker, canIssueFunding, actions: sortNewest(actions.filter((item) => item.fundingRequestId === request.id)) });
   });
 
   router.post("/funding/:id/decision", requirePermission("projects.review"), requireCsrf, async (req, res) => {
@@ -325,14 +327,23 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const designChecked = req.body.design_checked === "1";
     const bomChecked = req.body.bom_checked === "1";
     const planChecked = req.body.plan_checked === "1";
-    const requested = Math.max(0, Number(request.requestedHertz) || 0);
-    const approvedHertz = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_hertz) || 0) * 100) / 100));
+    const requested = Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0);
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > requested) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    const approvedUsd = Math.min(requested, Math.max(0, Math.round((Number(req.body.approved_usd ?? req.body.approved_hertz) || 0) * 100) / 100));
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and give useful feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedHertz <= 0)) {
+    if (decision === "approved" && (!designChecked || !bomChecked || !planChecked || approvedUsd <= 0)) {
       setFlash(res, "error", "Check the design, BOM, and plan, then enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request);
@@ -341,11 +352,11 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const timestamp = nowIso();
     request.status = "second_pass";
     request.reviewerId = req.user.id; request.reviewerName = req.user.name;
-    request.firstPass = { decision, noteToMaker, internalNote, approvedHertz: decision === "approved" ? approvedHertz : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
+    request.firstPass = { decision, noteToMaker, internalNote, approvedUsd: decision === "approved" ? approvedUsd : 0, criteria: { designChecked, bomChecked, planChecked }, reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp };
     request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
-    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedHertz });
-    await writeAudit(store, req.user, { action: "funding.first_pass", entityType: "funding_request", entityId: request.id, summary: `Completed first pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, "funding_first_pass", { fundingRequestId: request.id, decision, noteToMaker, internalNote, approvedUsd });
+    await writeAudit(store, req.user, { action: "funding.first_pass", entityType: "funding_request", entityId: request.id, summary: `Completed first pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedUsd } });
     setFlash(res, "success", "First pass saved. A second-pass reviewer must confirm it before the maker is notified.");
     res.redirect(`/admin/funding/${request.id}`);
   });
@@ -364,25 +375,39 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const decision = ["approved", "changes", "rejected"].includes(req.body.decision) ? req.body.decision : request.firstPass.decision;
     const noteToMaker = String(req.body.note_to_maker || request.firstPass.noteToMaker || "").trim().slice(0, 3000);
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
+    if (Number(req.body.approved_usd ?? req.body.approved_hertz) > Number(request.requestedUsd ?? request.requestedHertz)) {
+      setFlash(res, "error", "Approved funding cannot exceed the amount supported by the documented design time.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
     if (["changes", "rejected"].includes(decision) && noteToMaker.length < 5) {
       setFlash(res, "error", "Include useful participant feedback when returning or declining a request.");
       return res.redirect(`/admin/funding/${request.id}`);
     }
-    const approvedHertz = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_hertz ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
-    if (decision === "approved" && approvedHertz <= 0) {
+    const approvedUsd = decision === "approved" ? Math.min(Math.max(0, Number(request.requestedUsd ?? request.requestedHertz) || 0), Math.max(0, Math.round((Number(req.body.approved_usd ?? request.firstPass.approvedUsd ?? request.firstPass.approvedHertz) || 0) * 100) / 100)) : 0;
+    const bomTotal = Math.round((request.bomItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0) * 100) / 100;
+    if (decision === "approved" && approvedUsd <= 0) {
       setFlash(res, "error", "Enter the approved funding amount.");
+      return res.redirect(`/admin/funding/${request.id}`);
+    }
+    if (decision === "approved" && request.bomItems?.length && Math.abs(approvedUsd - bomTotal) > 0.009) {
+      setFlash(res, "error", `Approved funding must equal the exact BOM total ($${bomTotal.toFixed(2)}).`);
       return res.redirect(`/admin/funding/${request.id}`);
     }
     const before = structuredClone(request); const timestamp = nowIso();
     const [project, maker] = await Promise.all([store.get("project", request.projectId), store.get("user", request.userId)]);
     request.status = { approved: "approved", changes: "changes_requested", rejected: "rejected" }[decision];
-    request.review = { decision, noteToMaker, internalNote, approvedHertz, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
+    request.review = { decision, noteToMaker, internalNote, approvedUsd, criteria: request.firstPass.criteria, firstPass: request.firstPass, secondPass: { reviewerId: req.user.id, reviewerName: req.user.name, reviewedAt: timestamp, note: internalNote } };
     request.secondPass = request.review.secondPass; request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
-    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedHertz, availableUsd: -approvedHertz, status: "allocated", issued: false });
-    if (project) await store.put("project", project.id, { ...project, status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision], updatedAt: timestamp });
-    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedHertz });
-    await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedHertz } });
+    if (decision === "approved") await recordProgramFunding(store, `grant_${request.id}`, { type: "hardware_grant", sourceId: request.id, projectId: request.projectId, generatedUsd: 0, allocatedUsd: approvedUsd, availableUsd: -approvedUsd, status: "allocated", issued: false });
+    if (project) await store.put("project", project.id, {
+      ...project,
+      status: { approved: "funding_approved", changes: "funding_changes", rejected: "funding_rejected" }[decision],
+      fundedDesignJournalIds: decision === "approved" ? (request.designJournalIds || []) : [],
+      updatedAt: timestamp,
+    });
+    await addReviewAction(store, { id: request.id, projectId: request.projectId }, req.user, `funding_second_pass_${decision}`, { fundingRequestId: request.id, noteToMaker, internalNote, approvedUsd });
+    await writeAudit(store, req.user, { action: `funding.second_pass.${decision}`, entityType: "funding_request", entityId: request.id, summary: `Completed second pass for hardware funding for ${project?.title || request.projectId}.`, before, after: request, metadata: { decision, approvedUsd } });
     if (maker && project) await notifier.fundingDecision?.(maker, project, request);
     setFlash(res, "success", "Second pass confirmed and the participant was notified.");
     res.redirect(`/admin/funding/${request.id}`);
@@ -405,6 +430,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     request.status = "issued"; request.issuedAt = timestamp; request.issuedById = req.user.id;
     request.hcbGrantReference = String(req.body.hcb_grant_reference || "").trim().slice(0, 200); request.updatedAt = timestamp;
     await store.put("funding_request", request.id, request);
+    await recordProgramFunding(store, `grant_${request.id}`, { status: "issued", issued: true, issuedAt: timestamp, issuedById: req.user.id });
     if (project) await store.put("project", project.id, { ...project, status: "funding_issued", updatedAt: timestamp });
     await writeAudit(store, req.user, { action: "funding.issued", entityType: "funding_request", entityId: request.id, summary: `Marked funding issued for ${project?.title || request.projectId}.`, before, after: request });
     if (maker && project) await notifier.fundingIssued?.(maker, project, request);
@@ -953,6 +979,18 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     const internalNote = String(req.body.internal_note || "").trim().slice(0, 3000);
     const technicalNote = String(req.body.technical_note || prior.technical_note || "").trim().slice(0, 3000);
     const timeNote = String(req.body.time_note || prior.time_note || "").trim().slice(0, 2000);
+    const reviewedProject = await store.get("project", submission.projectId);
+    const hardwareChecks = reviewedProject?.track === "hardware" ? {
+      repositoryManual: req.body.repository_manual === "1" || Boolean(prior.criteria?.hardwareChecks?.repositoryManual),
+      designFiles: req.body.design_files === "1" || Boolean(prior.criteria?.hardwareChecks?.designFiles),
+      structuredBom: req.body.structured_bom === "1" || Boolean(prior.criteria?.hardwareChecks?.structuredBom),
+      firmware: req.body.firmware === "1" || Boolean(prior.criteria?.hardwareChecks?.firmware),
+      firmwareNotApplicable: req.body.firmware_na === "1" || Boolean(prior.criteria?.hardwareChecks?.firmwareNotApplicable),
+      schematicCad: req.body.schematic_cad === "1" || Boolean(prior.criteria?.hardwareChecks?.schematicCad),
+      schematicCadNotApplicable: req.body.schematic_cad_na === "1" || Boolean(prior.criteria?.hardwareChecks?.schematicCadNotApplicable),
+      buildEvidence: req.body.build_evidence === "1" || Boolean(prior.criteria?.hardwareChecks?.buildEvidence),
+      finalTest: req.body.final_test === "1" || Boolean(prior.criteria?.hardwareChecks?.finalTest),
+    } : {};
     const criteria = {
       radioRelated: req.body.radio_related === "1" || Boolean(prior.criteria?.radioRelated),
       shipped: req.body.shipped === "1" || Boolean(prior.criteria?.shipped),
@@ -961,6 +999,13 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       evidenceSufficient: req.body.evidence_sufficient === "1" || Boolean(prior.criteria?.evidenceSufficient),
       eligibleWork: req.body.eligible_work === "1" || Boolean(prior.criteria?.eligibleWork),
       distinctHours: req.body.distinct_hours === "1" || Boolean(prior.criteria?.distinctHours),
+      hardwareEvidence: reviewedProject?.track !== "hardware" || (
+        hardwareChecks.repositoryManual && hardwareChecks.designFiles && hardwareChecks.structuredBom
+        && (hardwareChecks.firmware || hardwareChecks.firmwareNotApplicable)
+        && (hardwareChecks.schematicCad || hardwareChecks.schematicCadNotApplicable)
+        && hardwareChecks.buildEvidence && hardwareChecks.finalTest
+      ),
+      hardwareChecks,
     };
     if (!decision || (["changes", "rejected"].includes(decision) && noteToMaker.length < 5)) {
       setFlash(res, "error", "Choose a decision and include useful participant feedback when returning or denying a project.");
@@ -972,7 +1017,8 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
     }
     const precheckJournals = journalsForReview(submission, await store.list("journal"));
     const precheckMinutes = reviewMinutes(precheckJournals);
-    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)));
+    const perJournalMinutes = Object.fromEntries(precheckJournals.map((journal, index) => [journal.id, Math.min(Number(journal.minutes) || 0, Math.max(0, Math.round(Number(req.body[`journal_minutes_${journal.id}`] ?? req.body[`journal_minutes_${index}`]) || 0)))]));
+    const requestedMinutes = Math.min(precheckMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)));
     if (decision === "approved" && requestedMinutes < precheckMinutes && timeNote.length < 5) {
       setFlash(res, "error", "Explain why the approved time was reduced from the tracked time.");
       return res.redirect(`/admin/reviews/${submission.id}`);
@@ -999,7 +1045,7 @@ export function adminRoutes({ store, config, ariClient, hackatimeClient, githubC
       const journals = journalsForReview(submission, await store.list("journal"));
       const loggedMinutes = reviewMinutes(journals);
       const approvedMinutes = decision === "approved"
-        ? Math.min(loggedMinutes, Math.max(0, Math.round(Number(req.body.approved_minutes) || 0)))
+        ? Math.min(loggedMinutes, Math.max(0, Object.values(perJournalMinutes).some((value) => value > 0) ? Object.values(perJournalMinutes).reduce((sum, value) => sum + value, 0) : Math.round(Number(req.body.approved_minutes) || 0)))
         : 0;
       const timestamp = nowIso();
       submission.phase = "reviewed";

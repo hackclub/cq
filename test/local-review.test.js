@@ -186,17 +186,20 @@ test("hardware funding is approved and issued before a final ship can enter revi
   await agent.post("/auth/dev-login").type("form").send({ name: "Hardware reviewer", email: "hardware@example.com", return_to: "/app" });
   const user = (await store.list("user"))[0]; const initialHertz = user.hertz; const timestamp = "2026-09-01T00:00:00.000Z";
   await store.put("project", "cq_hardware", {
-    id: "cq_hardware", userId: user.id, title: "Pocket receiver", description: "A portable amateur radio receiver with a simple RF front end.", repoUrl: "https://github.com/maker/receiver", demoUrl: "https://example.com/demo", thumbnailUrl: "https://example.com/receiver.jpg", hackatimeProjects: [], hackatimeBaseline: {}, evidence: ["commits", "elapsed", "devlog"], track: "hardware", status: "building", projectType: "radio-electronics", radioRelevance: "It receives amateur radio signals with an accessible portable receiver.", countryCode: "AU", licenseGoal: "Foundation", callsign: "", aiStatement: "", tags: [], isUpdate: false, updateMessage: "", originalWork: true, notSchoolAssignment: true, notPaidHackClubWork: true, estimatedHours: 12, buildPlan: "Design the RF front end, assemble the receiver, then test it with a local repeater.", bom: "Receiver IC — 1 — $12 — https://example.com/parts/receiver", designUrl: "https://github.com/maker/receiver/tree/main/hardware", testPlan: "Receive a known local signal and document the measured output.", createdAt: timestamp, updatedAt: timestamp,
+    id: "cq_hardware", userId: user.id, title: "Pocket receiver", description: "A portable amateur radio receiver with a simple RF front end.", repoUrl: "https://github.com/maker/receiver", demoUrl: "https://example.com/demo", thumbnailUrl: "https://example.com/receiver.jpg", hackatimeProjects: [], hackatimeBaseline: {}, evidence: ["commits", "elapsed", "devlog"], track: "hardware", status: "building", projectType: "radio-electronics", radioRelevance: "It receives amateur radio signals with an accessible portable receiver.", countryCode: "AU", licenseGoal: "Foundation", callsign: "", aiStatement: "", tags: [], isUpdate: false, updateMessage: "", originalWork: true, notSchoolAssignment: true, notPaidHackClubWork: true, buildPlan: "Design the RF front end, assemble the receiver, then test it with a local repeater.", bom: "Receiver IC — 1 — $55 — https://example.com/parts/receiver", bomItems: [{ name: "Receiver IC", purpose: "RF receiver", quantity: 1, unitCost: 55, link: "https://example.com/parts/receiver", distributor: "Example Parts" }], designUrl: "https://github.com/maker/receiver/tree/main/hardware", testPlan: "Receive a known local signal and document the measured output.", createdAt: timestamp, updatedAt: timestamp,
   });
+  await store.put("journal", "log_hardware_design", { id: "log_hardware_design", projectId: "cq_hardware", title: "Designed receiver front end", text: "Documented the receiver front end and selected the exact parts for the build.", minutes: 720, entryDate: "2026-09-01", imageUrls: ["https://example.com/design.jpg"], createdAt: timestamp, updatedAt: timestamp });
   const page = await agent.get("/app/projects/cq_hardware");
   const requestFunding = await agent.post("/app/projects/cq_hardware/funding/submit").type("form").send({ _csrf: csrf(page.text) });
   assert.equal(requestFunding.status, 302);
   const funding = (await store.list("funding_request"))[0];
-  assert.equal(funding.requestedHertz, 60);
+  assert.equal(funding.requestedUsd, 55);
+  assert.equal(funding.fundingCapUsd, 60);
+  assert.deepEqual(funding.designJournalIds, ["log_hardware_design"]);
   assert.equal((await store.get("project", "cq_hardware")).status, "funding_submitted");
   const fundingReview = await agent.get(`/admin/funding/${funding.id}`);
   assert.equal(fundingReview.status, 200);
-  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_hertz: "55", note_to_maker: "Looks buildable." });
+  const approve = await agent.post(`/admin/funding/${funding.id}/decision`).type("form").send({ _csrf: csrf(fundingReview.text), decision: "approved", design_checked: "1", bom_checked: "1", plan_checked: "1", approved_usd: "55", note_to_maker: "Looks buildable." });
   assert.equal(approve.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "second_pass");
   const secondAgent = request.agent(app);
@@ -204,13 +207,39 @@ test("hardware funding is approved and issued before a final ship can enter revi
   const secondUser = (await store.list("user")).find((item) => item.email === "second-pass@example.com");
   await store.put("user", secondUser.id, { ...secondUser, roles: ["participant", "second_pass_reviewer"], role: "participant" });
   const secondFundingReview = await secondAgent.get(`/admin/funding/${funding.id}`);
-  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_hertz: "55", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
+  const secondApprove = await secondAgent.post(`/admin/funding/${funding.id}/second-pass`).type("form").send({ _csrf: csrf(secondFundingReview.text), decision: "approved", approved_usd: "55", note_to_maker: "Looks buildable.", internal_note: "Confirmed." });
   assert.equal(secondApprove.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "approved");
+  assert.equal((await store.get("funding_request", funding.id)).review.approvedUsd, 55);
+  assert.deepEqual((await store.get("project", "cq_hardware")).fundedDesignJournalIds, ["log_hardware_design"]);
   assert.equal((await store.get("user", user.id)).hertz, initialHertz);
   const approvedPage = await agent.get(`/admin/funding/${funding.id}`);
   const issue = await agent.post(`/admin/funding/${funding.id}/issue`).type("form").send({ _csrf: csrf(approvedPage.text), hcb_grant_reference: "grant-123" });
   assert.equal(issue.status, 302);
   assert.equal((await store.get("funding_request", funding.id)).status, "issued");
   assert.equal((await store.get("project", "cq_hardware")).status, "funding_issued");
+  assert.equal((await store.get("program_funding", `grant_${funding.id}`)).status, "issued");
+  assert.equal((await store.get("program_funding", `grant_${funding.id}`)).issued, true);
+});
+
+test("hardware funding rejects a BOM above the documented design-time cap", async () => {
+  const config = getConfig({ nodeEnv: "development", baseUrl: "http://localhost:3000", devAuthBypass: true, dataEncryptionKey: Buffer.alloc(32, 7).toString("base64"), adminEmails: "hardware@example.com" });
+  const store = new LocalEncryptedStore(config, { memory: true });
+  const app = await createApp({ config, store, logger: { info() {}, error() {} } });
+  const agent = request.agent(app);
+  await agent.post("/auth/dev-login").type("form").send({ name: "Hardware maker", email: "hardware@example.com", return_to: "/app" });
+  const user = (await store.list("user"))[0];
+  await store.put("project", "cq_cap", {
+    id: "cq_cap", userId: user.id, title: "Small receiver", description: "A compact receiver project for testing the funding limit.", repoUrl: "https://github.com/maker/small-receiver", demoUrl: "", thumbnailUrl: "", hackatimeProjects: [], hackatimeBaseline: {}, evidence: ["commits", "elapsed", "devlog"], track: "hardware", status: "building", projectType: "radio-electronics", radioRelevance: "This receiver directly receives amateur radio signals for testing.", countryCode: "AU", licenseGoal: "", callsign: "", aiStatement: "", tags: [], isUpdate: false, updateMessage: "", originalWork: true, notSchoolAssignment: true, notPaidHackClubWork: true, buildPlan: "Design and assemble the receiver, then test it with a known signal source.", bom: "", bomItems: [], designUrl: "https://github.com/maker/small-receiver/tree/main/hardware", firmwareUrl: "", testPlan: "Receive a known signal and document the measured output clearly.", createdAt: "2026-10-26T00:00:00.000Z", updatedAt: "2026-10-26T00:00:00.000Z",
+  });
+  await store.put("journal", "log_short_design", { id: "log_short_design", projectId: "cq_cap", title: "Initial design", text: "Selected the receiver architecture and documented the first schematic.", minutes: 60, phase: "design", entryDate: "2026-10-26", imageUrls: ["https://example.com/design.jpg"], createdAt: "2026-10-26T00:00:00.000Z", updatedAt: "2026-10-26T00:00:00.000Z" });
+  const page = await agent.get("/app/projects/cq_cap");
+  const response = await agent.post("/app/projects/cq_cap/funding/submit").type("form").send({
+    _csrf: csrf(page.text), build_plan: "Design and assemble the receiver, then test it with a known signal source.",
+    bom_items: JSON.stringify([{ name: "Receiver", purpose: "Receive signals", quantity: 1, unitCost: 20, link: "https://example.com/receiver", distributor: "Example" }]),
+    design_url: "https://github.com/maker/small-receiver/tree/main/hardware", test_plan: "Receive a known signal and document the measured output clearly.",
+  });
+  assert.equal(response.status, 302);
+  assert.equal((await store.list("funding_request")).length, 0);
+  assert.equal((await store.get("project", "cq_cap")).status, "building");
 });
