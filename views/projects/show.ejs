@@ -6,7 +6,7 @@
       <h1><%= project.title %></h1>
     </div>
     <div class="headright">
-      <a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a>
+      <% if (project.repoUrl) { %><a class="button button-ghost" href="<%= project.repoUrl %>" target="_blank" rel="noreferrer">Repository ↗</a><% } %>
       <% if (!projectLocked) { %><a class="button button-primary" href="/app/projects/<%= project.id %>/edit">Edit project</a><% } else { %><span class="status-pill status-submitted">Shipped version locked</span><% } %>
     </div>
   </header>
@@ -14,17 +14,24 @@
   <div class="appbody"><div class="project-layout">
     <div class="project-main-column">
       <% if (project.track === 'hardware') { const funding = fundingRequests[0]; %><section class="panel submission-panel" id="funding">
-        <div class="panel-heading"><div><p class="eyebrow">Before the build</p><h2>Hardware funding</h2><p>Send your design, parts list, and build estimate for review before buying parts.</p></div><span class="review-mark">5 Hz/hr</span></div>
-        <% if (funding) { %><div class="submission-status"><div><small>REQUEST</small><strong><%= participantStatusLabel(funding.status) %></strong><span>$<%= Number(funding.requestedHertz).toFixed(2) %> funding · <%= funding.estimatedHours %> estimated hours</span></div><div><small>UPDATED</small><strong><%= formatDate(funding.updatedAt) %></strong><span><%= funding.review?.noteToMaker || funding.review?.note_to_maker || 'The CQ team will update you here.' %></span></div></div><% if (funding.status === 'issued') { %><div class="ready-banner"><span>✓</span><div><strong>Funding issued — build time</strong><p>Document your progress, then ship the finished hardware project for its final review and Hertz rewards.</p></div></div><% } %><% } else { %><form class="form-stack funding-request-form" method="post" action="/app/projects/<%= project.id %>/funding/submit" data-confirm="Send this design and funding request for review?"><p class="field-help">Log design work first. Funding is based on approved design minutes at $5/hour.</p><label>Build plan<textarea name="build_plan" minlength="40" required><%= project.buildPlan || '' %></textarea></label><label>Bill of materials<textarea name="bom" minlength="20" required></textarea></label><label>Design link<input type="url" name="design_url" value="<%= project.designUrl || '' %>" required></label><label>Firmware/code link <span class="optional">optional</span><input type="url" name="firmware_url" value="<%= project.firmwareUrl || '' %>"></label><label>Test plan<textarea name="test_plan" minlength="30" required><%= project.testPlan || '' %></textarea></label><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button-primary" type="submit">Send design and funding request</button></form><% } %>
+        <div class="panel-heading"><div><p class="eyebrow">Before the build</p><h2>Hardware funding</h2><p>Send your documented design and exact parts list for review before buying parts.</p></div><span class="review-mark">$5 / DESIGN HR</span></div>
+        <% if (funding) { %><div class="submission-status"><div><small>REQUEST</small><strong><%= participantStatusLabel(funding.status) %></strong><span>$<%= Number(funding.requestedUsd ?? funding.requestedHertz ?? 0).toFixed(2) %> requested · <%= funding.designMinutes || 0 %> documented design min</span></div><div><small>UPDATED</small><strong><%= formatDate(funding.updatedAt) %></strong><span><%= funding.review?.noteToMaker || funding.review?.note_to_maker || 'The CQ team will update you here.' %></span></div></div><% if (funding.status === 'issued') { %><div class="ready-banner"><span>✓</span><div><strong>Funding issued — build time</strong><p>Document your progress, then ship the finished hardware project for its final review and Hertz rewards.</p></div></div><% } %><% if (funding.status === 'changes_requested') { const fundingDraft = funding; %><%- include('_funding-form', { fundingDraft }) %><% } %><% } else { const fundingDraft = {}; %><%- include('_funding-form', { fundingDraft }) %><% } %>
       </section><% } %>
       <section class="panel" id="work-log">
         <div class="panel-heading devlog-heading"><div><p class="eyebrow">Build story</p><h2>Devlog</h2><p>Post concrete progress as you make it. Every entry needs visual evidence.</p></div><div class="devlog-total"><strong><%= Math.round(readiness.journalMinutes / 6) / 10 %></strong><span>hours logged</span></div></div>
-        <details class="devlog-composer" <%= !journals.length ? 'open' : '' %>>
+        <% if (project.track === 'software' && !project.hackatimeProjects.length && !projectLocked) { %>
+          <div class="notice">
+            <p>Link the Hackatime project you’ll use for this build before you start tracking time. CQ counts new activity after linking.</p>
+            <a class="button" href="/app/projects/<%= project.id %>/edit#hackatime">Set up Hackatime</a>
+          </div>
+        <% } %>
+        <% const hardwareLoggingPaused = project.track === 'hardware' && ['funding_submitted', 'funding_approved'].includes(project.status); %>
+        <% if (hardwareLoggingPaused) { %><div class="notice">Design evidence is locked while funding is reviewed. Build devlogs open after the grant is issued.</div><% } else { %><details class="devlog-composer" <%= !journals.length ? 'open' : '' %>>
           <summary><span><b>＋</b><strong>Add a progress update</strong></span><small>Markdown<%= project.track === 'software' ? ', Hackatime and images' : ' and images' %></small></summary>
           <form method="post" action="/app/projects/<%= project.id %>/journals" class="journal-form" data-devlog-form data-activity-ready="<%= project.track === 'hardware' || hackatimeActivity.ready ? 'true' : 'false' %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <label class="journal-title">Update title<input name="title" minlength="3" maxlength="120" required placeholder="Tuned the antenna for 2 m"></label>
-            <% if (project.track === 'software') { %><div class="hackatime-earned <%= hackatimeActivity.ready ? 'ready' : '' %>"><span aria-hidden="true">◷</span><div><strong><%= hackatimeActivity.ready ? `${hackatimeActivity.minutes} new minute${hackatimeActivity.minutes === 1 ? '' : 's'} ready to log` : 'Waiting for new Hackatime activity' %></strong><p><%= hackatimeActivity.ready ? `Counted from ${project.hackatimeProjects.join(', ')} since the last devlog.` : hackatimeActivity.reason %></p></div></div><% } else { %><div class="hackatime-earned ready"><span aria-hidden="true">⌁</span><div><strong>Document the build as it progresses</strong><p>Hardware devlogs are visual build notes; they do not add or spend Hertz.</p></div></div><% } %>
+            <% if (project.track === 'software') { %><div class="hackatime-earned <%= hackatimeActivity.ready ? 'ready' : '' %>"><span aria-hidden="true">◷</span><div><strong><%= hackatimeActivity.ready ? `${hackatimeActivity.minutes} new minute${hackatimeActivity.minutes === 1 ? '' : 's'} ready to log` : 'Waiting for new Hackatime activity' %></strong><p><%= hackatimeActivity.ready ? `Counted from ${project.hackatimeProjects.join(', ')} since the last devlog.` : hackatimeActivity.reason %></p></div></div><% } else { %><div class="hackatime-earned ready"><span aria-hidden="true">⌁</span><div><strong>Document the build as it progresses</strong><p>Hardware devlogs record the minutes spent on each update. Those minutes are reviewed before funding is calculated.</p></div></div><label>Minutes spent on this update<input type="number" name="minutes" min="1" step="1" required></label><% } %>
             <label class="journal-text">What changed? <span class="optional">Markdown supported</span><textarea name="text" rows="8" minlength="5" maxlength="2000" required placeholder="## What I changed&#10;&#10;Explain what you built, tested, learned, or fixed. You can use **bold**, lists, links, and code."></textarea></label>
             <div class="journal-image-field">
               <span class="field-label">Progress images</span>
@@ -38,7 +45,7 @@
             </div>
             <div class="journal-submit"><span><%= project.track === 'software' ? 'The final time is calculated when you post, using a fresh Hackatime reading.' : 'Add photos and a clear note so reviewers can follow the build.' %></span><button class="button button-primary" type="submit" <%= imageUploadsConfigured ? '' : 'disabled' %>>Post update</button></div>
           </form>
-        </details>
+        </details><% } %>
         <% if (!journals.length) { %>
           <div class="devlog-empty"><span aria-hidden="true">↳</span><div><strong>Your build story starts here.</strong><p>Post the first thing you made, tested, or changed—not study notes on their own.</p></div></div>
         <% } else { %>
@@ -97,7 +104,7 @@
           <div><dt>Project type</dt><dd><%= statusLabel(project.projectType) %></dd></div>
           <div><dt>Licence goal</dt><dd><%= project.licenseGoal || 'Not set' %></dd></div>
           <div><dt>Callsign</dt><dd><%= project.callsign || 'Not issued' %></dd></div>
-          <div><dt>Hackatime</dt><dd><%= project.hackatimeProjects.join(', ') || 'Using work logs' %></dd></div>
+          <div><dt>Hackatime</dt><dd><%= project.hackatimeProjects.join(', ') || 'Not linked' %></dd></div>
         </dl>
       </section>
       <% if (country) { %>

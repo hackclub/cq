@@ -85,26 +85,29 @@ export function validateFundingRequest(input) {
   const errors = [];
   if (input.track !== "hardware") errors.push("Only hardware projects can request build funding.");
   if (input.buildPlan.length < 40) errors.push("Add a build plan with at least 40 characters.");
-  if (input.bomItems?.length) {
-    if (!input.bomItems.some((item) => item.name && item.quantity > 0 && item.link && isHttpUrl(item.link))) errors.push("Add at least one BOM part with a quantity and supplier link.");
-  } else if (input.bom.length < 20) errors.push("Add a bill of materials with parts, quantities, and supplier links.");
+  if (!input.bomItems?.length) errors.push("Add the parts as a structured BOM with quantities, prices, and supplier links.");
+  else if (input.bomItems.some((item) => !item.name || !item.purpose || item.quantity <= 0 || item.unitCost < 0 || !isHttpUrl(item.link))) {
+    errors.push("Complete every BOM row with a part, purpose, quantity, price, and supplier link.");
+  }
   if (!isHttpUrl(input.designUrl)) errors.push("Add a public link to your schematic, CAD, PCB, or other design work.");
   if (input.testPlan.length < 30) errors.push("Add a short plan for how you will test the finished build.");
   return errors;
 }
 
-export function validateProject(input, { forSubmission = false, journalMinutes = 0, journalCount = 0 } = {}) {
+export function validateProject(input, { forSubmission = false, allowIncomplete = false, journalMinutes = 0, journalCount = 0 } = {}) {
   const errors = [];
   if (input.title.length < 2) errors.push("Give the project a name of at least 2 characters.");
-  if (input.description.length < 20) errors.push("Describe the project in at least 20 characters.");
-  if (!(input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl))) {
+  const requireDetails = forSubmission || !allowIncomplete;
+  if (requireDetails && input.description.length < 20) errors.push("Describe the project in at least 20 characters.");
+  const validRepo = input.track === "hardware" ? isPublicGitRepo(input.repoUrl) : isGithubRepo(input.repoUrl);
+  if ((requireDetails || input.repoUrl) && !validRepo) {
     errors.push(input.track === "hardware" ? "Add a public Git repository URL (GitHub, GitLab, Codeberg, or another provider)." : "Add a public GitHub repository URL.");
   }
-  if (!input.projectType) errors.push("Choose the kind of ham-radio project you are making.");
-  if (input.radioRelevance.length < 40) {
+  if (requireDetails && !input.projectType) errors.push("Choose the kind of ham-radio project you are making.");
+  if (requireDetails && input.radioRelevance.length < 40) {
     errors.push("Explain in at least 40 characters how the project directly relates to ham radio.");
   }
-  if (!input.countryCode) errors.push("Choose the country or territory where you live.");
+  if (requireDetails && !input.countryCode) errors.push("Choose the country or territory where you live.");
 
   if (forSubmission) {
     if (!isHttpUrl(input.thumbnailUrl)) errors.push("Add a public thumbnail image URL.");

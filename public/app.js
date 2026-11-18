@@ -147,6 +147,7 @@ if (bomInput && bomRows && bomAdd) {
 }
 
 const thumbnailUpload = document.querySelector("[data-thumbnail-upload]");
+
 const safeImageUrl = (value) => /^https?:\/\//i.test(String(value || "")) ? String(value) : "";
 if (thumbnailUpload) {
   const input = thumbnailUpload.querySelector("[data-thumbnail-file]");
